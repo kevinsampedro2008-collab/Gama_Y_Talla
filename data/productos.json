@@ -1,14 +1,17 @@
+
 {
-  "_aviso": "DATOS DE DEMOSTRACIÓN. Los precios, tallas y existencias de este archivo son ficticios y no representan información real de Gama & Talla. Las imágenes son ilustraciones SVG provisionales, no fotografías de los modelos. Reemplázalos por la información confirmada antes de vender.",
+
+  "_aviso": "CATÁLOGO DE DEMOSTRACIÓN. Los precios, tallas y existencias son ficticios. Las imágenes son ilustraciones genéricas, no fotografías oficiales de los modelos. Sustituye los datos antes de vender.",
   "productos": [
     {
-      "id": "GT-001",
-      "nombre": "Air Jordan 1 Retro High OG",
-      "marca": "Jordan",
+      
+      "id": "ADD-SAM",
+      "nombre": "SAMBA",
+      "marca": "Adidas",
       "categoria": "Urbanas",
-      "color": "Rojo / blanco / negro",
-      "precio": 989900,
-      "imagen": "assets/images/productos/zapatilla-01.svg",
+      "color": "Rosa / blanco / beigh",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla-01.jpeg",
       "tallasDisponibles": [
         "38",
         "39",
@@ -21,19 +24,19 @@
         "44",
         "45"
       ],
-      "badge": "Nuevo",
+      "badge": "",
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": true
     },
     {
-      "id": "GT-002",
-      "nombre": "Air Force 1 '07",
-      "marca": "Nike",
-      "categoria": "Casuales",
-      "color": "Blanco",
-      "precio": 479900,
-      "imagen": "assets/images/productos/zapatilla-02.svg",
+      "id": "LCS-RET-01",
+      "nombre": "LCS Retro Classic",
+      "marca": "Le Coq Sportif",
+      "categoria": "Casual / Urbanas",
+      "color": "Blanco / Rojo / Azul / Beis",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla-02.jpeg",
       "tallasDisponibles": [
         "36",
         "37",
@@ -49,7 +52,7 @@
       "badge": "",
       "disponible": true,
       "destacado": true,
-      "nuevoIngreso": false
+      "nuevoIngreso": true
     },
     {
       "id": "GT-003",
@@ -69,7 +72,7 @@
       "tallasAgotadas": [
         "42"
       ],
-      "badge": "Nuevo",
+      "badge": "",
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": true
@@ -79,7 +82,7 @@
       "nombre": "Pegasus 41",
       "marca": "Nike",
       "categoria": "Running",
-      "color": "Gris / naranja",
+      "color": "Gris / azul",
       "precio": 529900,
       "imagen": "assets/images/productos/zapatilla-04.svg",
       "tallasDisponibles": [
@@ -101,7 +104,7 @@
       "nombre": "Ultraboost Light",
       "marca": "Adidas",
       "categoria": "Running",
-      "color": "Arena / lima",
+      "color": "Marfil / lima",
       "precio": 689900,
       "imagen": "assets/images/productos/zapatilla-05.svg",
       "tallasDisponibles": [
@@ -113,7 +116,7 @@
         "40",
         "44"
       ],
-      "badge": "Nuevo",
+      "badge": "",
       "disponible": true,
       "destacado": false,
       "nuevoIngreso": true
@@ -180,11 +183,137 @@
       "tallasAgotadas": [
         "43"
       ],
-      "badge": "Nuevo",
+      "badge": "",
       "disponible": true,
       "destacado": false,
       "nuevoIngreso": true
     }
-  ]
+  ],
+  "_avisoTallas": "Las tallas del catálogo son datos de demostración. La guía de Nike es para calzado de hombre y combina equivalencias de las guías oficiales de Nike Colombia y Nike Global; la talla nacional solo se muestra cuando la tabla colombiana la respalda. Confirma el ajuste de cada modelo antes de vender.",
+  "guiasTallas": {
+    "Nike": {
+      "verificada": true,
+      "fuente": "Guías oficiales de calzado de hombre de Nike Colombia y Nike Global",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-hombre",
+      "nota": "Tabla de calzado de hombre. Las tallas de mujer y niño usan tablas diferentes. La horma puede variar por modelo.",
+      "tallas": {
+        "36": {
+          "cm": "22.1",
+          "colombia": "",
+          "us": "4"
+        },
+        "36.5": {
+          "cm": "22.4",
+          "colombia": "",
+          "us": "4.5"
+        },
+        "37.5": {
+          "cm": "22.9",
+          "colombia": "",
+          "us": "5"
+        },
+        "38": {
+          "cm": "23.3",
+          "colombia": "",
+          "us": "5.5"
+        },
+        "38.5": {
+          "cm": "23.7",
+          "colombia": "",
+          "us": "6"
+        },
+        "39": {
+          "cm": "24.1",
+          "colombia": "",
+          "us": "6.5"
+        },
+        "40": {
+          "cm": "25",
+          "colombia": "38",
+          "us": "7"
+        },
+        "40.5": {
+          "cm": "25.5",
+          "colombia": "38.5",
+          "us": "7.5"
+        },
+        "41": {
+          "cm": "26",
+          "colombia": "39",
+          "us": "8"
+        },
+        "42": {
+          "cm": "26.5",
+          "colombia": "39.5",
+          "us": "8.5"
+        },
+        "42.5": {
+          "cm": "27",
+          "colombia": "40",
+          "us": "9"
+        },
+        "43": {
+          "cm": "27.5",
+          "colombia": "40.5",
+          "us": "9.5"
+        },
+        "44": {
+          "cm": "28",
+          "colombia": "41",
+          "us": "10"
+        },
+        "44.5": {
+          "cm": "28.5",
+          "colombia": "41.5",
+          "us": "10.5"
+        },
+        "45": {
+          "cm": "29",
+          "colombia": "42",
+          "us": "11"
+        },
+        "45.5": {
+          "cm": "29.5",
+          "colombia": "42.5",
+          "us": "11.5"
+        },
+        "46": {
+          "cm": "30",
+          "colombia": "43",
+          "us": "12"
+        },
+        "47": {
+          "cm": "30.5",
+          "colombia": "43.5",
+          "us": "12.5"
+        },
+        "47.5": {
+          "cm": "31",
+          "colombia": "44",
+          "us": "13"
+        }
+      },
+      "urlAlterna": "https://www.nike.com/size-fit/mens-footwear"
+    },
+    "Jordan": {
+      "verificada": false,
+      "usaGuiaDe": "Nike",
+      "fuente": "Referencia orientativa basada en la guía de Nike Colombia",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-hombre",
+      "nota": "La tabla corresponde a calzado de hombre de Nike; confirma la equivalencia y el ajuste del modelo Jordan específico con el vendedor.",
+      "tallas": {}
+    },
+    "Adidas": {
+      "verificada": false,
+      "url": "https://www.adidas.co/ayuda/guia-de-tallas",
+      "nota": "Equivalencias pendientes de confirmar con la tabla oficial del modelo.",
+      "tallas": {}
+    },
+    "New Balance": {
+      "verificada": false,
+      "url": "https://www.newbalance.com/size-guide/",
+      "nota": "Equivalencias pendientes de confirmar con la tabla oficial del modelo.",
+      "tallas": {}
+    }
+  }
 }
-
