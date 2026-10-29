@@ -1,14 +1,14 @@
 {
-  "_aviso": "DATOS Y PRECIOS DE DEMOSTRACIÓN. Las ilustraciones SVG son mockups genéricos, no fotografías oficiales. Reemplaza datos, precios, tallas e imágenes por información real antes de publicar.",
+  "_aviso": "DATOS DE DEMOSTRACIÓN. Los precios, tallas y existencias de este archivo son ficticios y no representan información real de Gama & Talla. Las imágenes son ilustraciones SVG provisionales, no fotografías de los modelos. Reemplázalos por la información confirmada antes de vender.",
   "productos": [
     {
-      "id": "UM-001",
+      "id": "GT-001",
       "nombre": "Air Jordan 1 Retro High OG",
       "marca": "Jordan",
-      "categoria": "Edición especial",
+      "categoria": "Urbanas",
       "color": "Rojo / blanco / negro",
       "precio": 989900,
-      "imagen": "assets/images/products/sneaker-01.svg",
+      "imagen": "assets/images/productos/zapatilla-01.svg",
       "tallasDisponibles": [
         "38",
         "39",
@@ -21,19 +21,19 @@
         "44",
         "45"
       ],
-      "badge": "Exclusivo",
+      "badge": "Nuevo",
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": true
     },
     {
-      "id": "UM-002",
+      "id": "GT-002",
       "nombre": "Air Force 1 '07",
       "marca": "Nike",
-      "categoria": "Lifestyle",
-      "color": "Blanco clásico",
+      "categoria": "Casuales",
+      "color": "Blanco",
       "precio": 479900,
-      "imagen": "assets/images/products/sneaker-02.svg",
+      "imagen": "assets/images/productos/zapatilla-02.svg",
       "tallasDisponibles": [
         "36",
         "37",
@@ -46,19 +46,19 @@
         "44"
       ],
       "tallasAgotadas": [],
-      "badge": "Más vendido",
+      "badge": "",
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": false
     },
     {
-      "id": "UM-003",
+      "id": "GT-003",
       "nombre": "Samba OG",
       "marca": "Adidas",
-      "categoria": "Lifestyle",
+      "categoria": "Casuales",
       "color": "Blanco / verde",
       "precio": 459900,
-      "imagen": "assets/images/products/sneaker-03.svg",
+      "imagen": "assets/images/productos/zapatilla-03.svg",
       "tallasDisponibles": [
         "37",
         "38",
@@ -75,13 +75,13 @@
       "nuevoIngreso": true
     },
     {
-      "id": "UM-004",
-      "nombre": "Pegasus Runner 41",
+      "id": "GT-004",
+      "nombre": "Pegasus 41",
       "marca": "Nike",
       "categoria": "Running",
       "color": "Gris / naranja",
       "precio": 529900,
-      "imagen": "assets/images/products/sneaker-04.svg",
+      "imagen": "assets/images/productos/zapatilla-04.svg",
       "tallasDisponibles": [
         "39",
         "40",
@@ -97,13 +97,13 @@
       "nuevoIngreso": false
     },
     {
-      "id": "UM-005",
+      "id": "GT-005",
       "nombre": "Ultraboost Light",
       "marca": "Adidas",
       "categoria": "Running",
       "color": "Arena / lima",
       "precio": 689900,
-      "imagen": "assets/images/products/sneaker-05.svg",
+      "imagen": "assets/images/productos/zapatilla-05.svg",
       "tallasDisponibles": [
         "41",
         "42",
@@ -119,13 +119,13 @@
       "nuevoIngreso": true
     },
     {
-      "id": "UM-006",
+      "id": "GT-006",
       "nombre": "Air Jordan 4 Retro",
       "marca": "Jordan",
-      "categoria": "Edición especial",
+      "categoria": "Urbanas",
       "color": "Gris cemento",
       "precio": 1249900,
-      "imagen": "assets/images/products/sneaker-06.svg",
+      "imagen": "assets/images/productos/zapatilla-06.svg",
       "tallasDisponibles": [],
       "tallasAgotadas": [
         "40",
@@ -133,19 +133,19 @@
         "42",
         "43"
       ],
-      "badge": "Exclusivo",
+      "badge": "",
       "disponible": false,
       "destacado": false,
       "nuevoIngreso": false
     },
     {
-      "id": "UM-007",
+      "id": "GT-007",
       "nombre": "Dunk Low Retro",
       "marca": "Nike",
-      "categoria": "Lifestyle",
+      "categoria": "Urbanas",
       "color": "Negro / blanco",
       "precio": 549900,
-      "imagen": "assets/images/products/sneaker-07.svg",
+      "imagen": "assets/images/productos/zapatilla-07.svg",
       "tallasDisponibles": [
         "38",
         "39",
@@ -157,19 +157,19 @@
       "tallasAgotadas": [
         "44"
       ],
-      "badge": "Más vendido",
+      "badge": "",
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": false
     },
     {
-      "id": "UM-008",
-      "nombre": "550 Classic",
+      "id": "GT-008",
+      "nombre": "550",
       "marca": "New Balance",
-      "categoria": "Lifestyle",
+      "categoria": "Deportivas",
       "color": "Marfil / azul",
       "precio": 519900,
-      "imagen": "assets/images/products/sneaker-08.svg",
+      "imagen": "assets/images/productos/zapatilla-08.svg",
       "tallasDisponibles": [
         "38",
         "39",
@@ -187,3 +187,4 @@
     }
   ]
 }
+

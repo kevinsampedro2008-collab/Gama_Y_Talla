@@ -1,187 +1,334 @@
 <!doctype html>
-<html lang="es-CO">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f1f1ef">
-  <meta name="description" content="Umbral — una selección editorial de sneakers. Explora el catálogo y consulta disponibilidad por WhatsApp.">
+  <title>Gama &amp; Talla — Tienda de zapatillas en Colombia</title>
+  <meta name="description" content="Gama &amp; Talla, tienda de zapatillas en Colombia. Explora nuestro catálogo, consulta modelos, tallas y precios, y haz tu pedido por WhatsApp.">
+  <meta name="theme-color" content="#F3F3F3">
   <meta property="og:type" content="website">
   <meta property="og:locale" content="es_CO">
-  <meta property="og:title" content="Umbral — The Sneaker Index">
-  <meta property="og:description" content="Sneakers seleccionados. Atención personalizada en Colombia.">
+  <meta property="og:site_name" content="Gama &amp; Talla">
+  <meta property="og:title" content="Gama &amp; Talla — Encuentra tu próximo par">
+  <meta property="og:description" content="Explora nuestro catálogo de zapatillas, consulta las tallas disponibles y haz tu pedido por WhatsApp.">
   <meta property="og:image" content="assets/images/branding/hero.svg">
-  <title>Umbral — The Sneaker Index</title>
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Gama &amp; Talla — Encuentra tu próximo par">
+  <meta name="twitter:description" content="Zapatillas para tu estilo. Consulta precios y disponibilidad por WhatsApp.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
 </head>
 <body>
-  <a class="skip-link" href="#catalogo">Saltar al catálogo</a>
+  <a class="enlace-salto" href="#catalogo">Saltar al catálogo</a>
 
-  <div class="announcement" aria-label="Información de la tienda">
-    <span>Envíos a toda Colombia</span>
-    <span class="announcement-dot" aria-hidden="true">◆</span>
-    <span>Sneakers seleccionados</span>
-    <span class="announcement-dot" aria-hidden="true">◆</span>
-    <span>Atención personalizada por WhatsApp</span>
+  <div class="barra-anuncio" role="region" aria-label="Información de la tienda">
+    <ul>
+      <li>Envíos a toda Colombia</li>
+      <li>Consulta modelos y tallas</li>
+      <li>Atención por WhatsApp</li>
+    </ul>
   </div>
 
-  <div class="store-frame">
-    <aside class="sidebar" aria-label="Navegación de la tienda">
-      <div class="sidebar-top">
-        <a class="wordmark" href="#inicio" aria-label="Umbral, inicio"><span data-marca>umbral</span><sup>®</sup></a>
-        <p class="side-caption">THE SNEAKER<br>DEPARTMENT</p>
-        <div class="side-rule"></div>
-
-        <nav class="side-nav" aria-label="Colecciones">
-          <p class="nav-overline">Shop / Index</p>
-          <button class="side-filter is-active" type="button" data-cat="Todos" aria-pressed="true">Todos los sneakers <span>↗</span></button>
-          <div id="side-categories" class="side-categories"></div>
-        </nav>
-      </div>
-
-      <div class="sidebar-bottom">
-        <p class="nav-overline">Follow the movement</p>
-        <a data-ig href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
-        <a data-wa href="#contacto" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>
-        <div class="side-rule"></div>
-        <p class="side-small">CURATED IN COLOMBIA<br><span data-year>2026</span> / VOL. 01</p>
-      </div>
-    </aside>
-
-    <main class="main-content" id="inicio">
-      <div class="mobile-head">
-        <a class="wordmark" href="#inicio" aria-label="Umbral, inicio"><span data-marca>umbral</span><sup>®</sup></a>
-        <button id="menu-btn" class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Abrir menú">
-          <span></span><span></span><span></span>
+  <div class="marco">
+    <!-- Cabecera: barra lateral en escritorio, barra superior compacta en móviles -->
+    <header class="cabecera" id="cabecera">
+      <div class="cabecera-superior">
+        <a class="logotipo" href="#inicio" aria-label="Gama &amp; Talla, ir al inicio">
+          <span class="logotipo-texto" data-marca>Gama &amp; Talla</span>
+          <span class="logotipo-lema">Tienda de zapatillas</span>
+        </a>
+        <button class="boton-menu" id="boton-menu" type="button" aria-expanded="false" aria-controls="menu-principal" aria-label="Abrir menú">
+          <span class="boton-menu-lineas" aria-hidden="true"><span></span><span></span></span>
+          <span class="boton-menu-texto" aria-hidden="true">Menú</span>
         </button>
-        <nav id="mobile-menu" class="mobile-menu" aria-label="Menú móvil">
-          <a href="#inicio">Inicio</a>
-          <a href="#catalogo">Catálogo</a>
-          <a href="#como-comprar">Cómo comprar</a>
-          <a href="#contacto">Contacto</a>
-          <a data-wa href="#contacto" target="_blank" rel="noopener noreferrer">Pedir por WhatsApp ↗</a>
-        </nav>
       </div>
 
-      <section class="collection-intro" aria-labelledby="page-title">
-        <div class="intro-topline">
-          <p class="eyebrow">UMBRAL / FOOTWEAR INDEX</p>
-          <p class="edition">COLLECTION <span>—</span> 2026</p>
+      <nav class="menu" id="menu-principal" aria-label="Navegación principal">
+        <ul class="menu-enlaces">
+          <li><a href="#inicio">Inicio</a></li>
+          <li><a href="#como-comprar">Cómo comprar</a></li>
+          <li><a href="#catalogo">Catálogo</a></li>
+          <li><a href="#contacto">Contacto</a></li>
+        </ul>
+
+        <div class="menu-categorias" id="menu-categorias-bloque" hidden>
+          <p class="sobretitulo">Categorías</p>
+          <ul id="menu-categorias"></ul>
         </div>
-        <div class="intro-grid">
-          <div class="intro-copy">
-            <h1 id="page-title">THE SNEAKER<br><span>INDEX.</span></h1>
-            <p class="intro-description">Piezas para moverse distinto. Una selección de siluetas urbanas, clásicos contemporáneos y sneakers para el día a día.</p>
+
+        <div class="menu-social">
+          <a class="menu-social-enlace" data-wa href="#contacto">
+            <svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>WhatsApp
+          </a>
+          <a class="menu-social-enlace" data-ig href="#contacto">
+            <svg class="icono" aria-hidden="true"><use href="#icono-instagram"></use></svg>Instagram
+          </a>
+        </div>
+      </nav>
+    </header>
+
+    <main class="principal" id="contenido">
+      <!-- Presentación principal -->
+      <section class="portada" id="inicio" aria-labelledby="titulo-portada">
+        <div class="portada-texto">
+          <p class="sobretitulo">Tienda de zapatillas · Colombia</p>
+          <h1 id="titulo-portada">Encuentra tu próximo par.</h1>
+          <p class="portada-descripcion">Explora nuestro catálogo de zapatillas, descubre modelos que se adapten a tu estilo y consulta las tallas disponibles.</p>
+          <div class="acciones">
+            <a class="boton boton-principal" href="#catalogo">Ver catálogo</a>
+            <a class="boton boton-secundario" data-wa href="#contacto">
+              <svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>Escríbenos por WhatsApp
+            </a>
           </div>
-          <div class="hero-art" aria-label="Ilustración editorial de una zapatilla">
-            <span class="hero-art-label">OBJECT<br>NO. 001</span>
-            <img src="assets/images/branding/hero.svg" width="600" height="440" alt="Ilustración de sneaker en tonos marfil y violeta">
-            <span class="hero-art-mark" aria-hidden="true">U.</span>
-          </div>
+          <ul class="portada-datos">
+            <li>Modelos y tallas disponibles</li>
+            <li>Pedidos por WhatsApp</li>
+            <li>Envíos a toda Colombia</li>
+          </ul>
         </div>
-        <div class="intro-bottomline">
-          <span>DESIGN / MOVEMENT / EVERYDAY</span>
-          <a href="#catalogo">EXPLORAR SELECCIÓN <span aria-hidden="true">↓</span></a>
-        </div>
+        <figure class="portada-imagen">
+          <img src="assets/images/branding/hero.svg" width="700" height="520" alt="Ilustración de una zapatilla blanca con detalles en verde y gris" fetchpriority="high">
+        </figure>
       </section>
 
-      <section class="catalog-section" id="catalogo" aria-labelledby="catalog-title">
-        <div class="section-heading">
+      <!-- Cómo comprar -->
+      <section class="seccion" id="como-comprar" aria-labelledby="titulo-como-comprar">
+        <div class="seccion-encabezado">
           <div>
-            <p class="eyebrow">VOL. 01 — CURATED SELECTION</p>
-            <h2 id="catalog-title">La selección</h2>
+            <p class="sobretitulo">Cómo comprar</p>
+            <h2 id="titulo-como-comprar">Tu pedido en cinco pasos</h2>
           </div>
-          <p class="section-note">Encuentra tu próximo par.<br>Consulta disponibilidad con nosotros.</p>
+          <p class="seccion-nota">Sin carrito ni registros. Elige tu par y te atendemos directamente por WhatsApp.</p>
         </div>
-
-        <div class="catalog-tools">
-          <label class="search-field" for="buscar">
-            <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
-            <input id="buscar" type="search" placeholder="Buscar modelo, marca, color o código" autocomplete="off" enterkeyhint="search">
-            <span class="search-shortcut" aria-hidden="true">⌕</span>
-          </label>
-          <label class="sort-field" for="orden">Ordenar
-            <select id="orden">
-              <option value="destacados">Destacados</option>
-              <option value="precio-asc">Precio: menor a mayor</option>
-              <option value="precio-desc">Precio: mayor a menor</option>
-              <option value="nombre">Nombre: A-Z</option>
-            </select>
-          </label>
-        </div>
-
-        <div id="chips" class="category-chips" role="group" aria-label="Filtrar por marca o categoría">
-          <button type="button" class="chip is-active" data-cat="Todos" aria-pressed="true">Todos</button>
-        </div>
-        <div class="catalog-meta">
-          <p id="contador" aria-live="polite">Cargando selección…</p>
-          <p class="meta-right">PRECIOS EN COP <span aria-hidden="true">/</span> TALLAS SEGÚN DISPONIBILIDAD</p>
-        </div>
-
-        <div id="grid" class="product-grid" aria-busy="true">
-          <div class="catalog-state"><span class="spinner" aria-hidden="true"></span><p>Cargando catálogo…</p></div>
-        </div>
-        <p class="demo-notice">Catálogo demostrativo: confirma el precio, la talla y la disponibilidad antes de comprar.</p>
-      </section>
-
-      <section id="como-comprar" class="process-section" aria-labelledby="process-title">
-        <div class="section-heading">
-          <div><p class="eyebrow">THE PROCESS / 01—05</p><h2 id="process-title">Así de simple.</h2></div>
-          <p class="section-note">Sin carrito ni pasos innecesarios.<br>Te atendemos directamente.</p>
-        </div>
-        <ol class="process-grid">
-          <li><span class="step-number">01</span><h3>Explora</h3><p>Encuentra el modelo que va contigo.</p></li>
-          <li><span class="step-number">02</span><h3>Elige tu talla</h3><p>Selecciona una talla disponible en la tarjeta.</p></li>
-          <li><span class="step-number">03</span><h3>Escríbenos</h3><p>El mensaje de WhatsApp lleva el producto y la talla.</p></li>
-          <li><span class="step-number">04</span><h3>Confirma</h3><p>Verificamos disponibilidad, pago y envío.</p></li>
-          <li><span class="step-number">05</span><h3>Recibe</h3><p>Coordinamos la entrega contigo.</p></li>
+        <ol class="pasos">
+          <li class="paso">
+            <span class="paso-numero">01</span>
+            <svg class="icono icono-paso" aria-hidden="true"><use href="#icono-buscar"></use></svg>
+            <h3>Explora el catálogo</h3>
+            <p>Busca por modelo, marca, color o código y usa los filtros.</p>
+          </li>
+          <li class="paso">
+            <span class="paso-numero">02</span>
+            <svg class="icono icono-paso" aria-hidden="true"><use href="#icono-zapatilla"></use></svg>
+            <h3>Elige tus zapatillas</h3>
+            <p>Revisa el color, el precio publicado y el estado de cada modelo.</p>
+          </li>
+          <li class="paso">
+            <span class="paso-numero">03</span>
+            <svg class="icono icono-paso" aria-hidden="true"><use href="#icono-regla"></use></svg>
+            <h3>Selecciona tu talla</h3>
+            <p>Elige una de las tallas disponibles directamente en el producto.</p>
+          </li>
+          <li class="paso">
+            <span class="paso-numero">04</span>
+            <svg class="icono icono-paso" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>
+            <h3>Consulta y confirma por WhatsApp</h3>
+            <p>Te confirmamos disponibilidad, precio y datos de pago.</p>
+          </li>
+          <li class="paso">
+            <span class="paso-numero">05</span>
+            <svg class="icono icono-paso" aria-hidden="true"><use href="#icono-caja"></use></svg>
+            <h3>Coordina y recibe tu pedido</h3>
+            <p>Acordamos contigo el envío y la entrega de tus zapatillas.</p>
+          </li>
         </ol>
       </section>
 
-      <section class="service-section" id="contacto" aria-labelledby="contact-title">
-        <div class="service-panel">
-          <div class="service-copy">
-            <p class="eyebrow">A PERSONAL TOUCH</p>
-            <h2 id="contact-title">¿Buscas algo<br>en particular<span>?</span></h2>
-            <p>Cuéntanos qué modelo tienes en mente. Te ayudamos a confirmar tallas, disponibilidad y opciones de envío.</p>
-            <div class="service-actions">
-              <a class="button button-dark" data-wa href="#contacto" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg> Hablar por WhatsApp ↗</a>
-              <a class="text-link" data-ig href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram <span aria-hidden="true">↗</span></a>
+      <!-- Catálogo -->
+      <section class="seccion seccion-catalogo" id="catalogo" aria-labelledby="titulo-catalogo">
+        <div class="seccion-encabezado">
+          <div>
+            <p class="sobretitulo">Catálogo</p>
+            <h2 id="titulo-catalogo">Catálogo de zapatillas</h2>
+          </div>
+          <p class="seccion-nota">Explora nuestro catálogo, elige tu talla y consulta precios y disponibilidad.</p>
+        </div>
+
+        <div class="herramientas">
+          <div class="campo campo-busqueda">
+            <label for="buscar">Buscar zapatillas</label>
+            <div class="campo-control">
+              <svg class="icono" aria-hidden="true"><use href="#icono-buscar"></use></svg>
+              <input id="buscar" type="search" placeholder="Modelo, marca, color o código" autocomplete="off" enterkeyhint="search" aria-describedby="contador">
             </div>
           </div>
-          <div class="service-details">
-            <div><span class="detail-label">PAYMENT</span><p>Nequi · Bancolombia<br>Daviplata · Transferencia</p></div>
-            <div><span class="detail-label">SHIPPING</span><p>Envíos a toda Colombia.<br>Costos y tiempos por confirmar.</p></div>
-            <div><span class="detail-label">CUSTOMER CARE</span><p data-horario>Escríbenos para consultar el horario de atención.</p></div>
+          <div class="campo campo-orden">
+            <label for="orden">Ordenar por</label>
+            <div class="campo-control">
+              <select id="orden">
+                <option value="destacados">Destacados</option>
+                <option value="precio-asc">Precio: menor a mayor</option>
+                <option value="precio-desc">Precio: mayor a menor</option>
+                <option value="nombre">Nombre: A-Z</option>
+              </select>
+              <svg class="icono icono-flecha" aria-hidden="true"><use href="#icono-flecha-abajo"></use></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="filtros" id="filtros" hidden>
+          <div class="grupo-filtro" role="group" aria-labelledby="etiqueta-marca">
+            <span class="grupo-filtro-titulo" id="etiqueta-marca">Marca</span>
+            <div class="chips" id="filtro-marca"></div>
+          </div>
+          <div class="grupo-filtro" role="group" aria-labelledby="etiqueta-categoria">
+            <span class="grupo-filtro-titulo" id="etiqueta-categoria">Categoría</span>
+            <div class="chips" id="filtro-categoria"></div>
+          </div>
+          <div class="grupo-filtro" id="grupo-nuevos" hidden>
+            <span class="grupo-filtro-titulo">Novedades</span>
+            <div class="chips">
+              <button class="chip" type="button" data-filtro="nuevos" aria-pressed="false">Nuevos ingresos</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="resultado-barra">
+          <p class="contador" id="contador" aria-live="polite">Cargando catálogo…</p>
+          <button class="boton-texto" id="limpiar-filtros" type="button" hidden>Limpiar filtros</button>
+        </div>
+
+        <p class="aviso-demo">
+          <svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg>
+          <span>Catálogo de demostración: los precios, tallas y existencias son de ejemplo y las imágenes son ilustraciones provisionales. Confirma siempre precio y disponibilidad por WhatsApp.</span>
+        </p>
+
+        <div class="grilla" id="grilla-productos" aria-busy="true">
+          <div class="estado-catalogo" role="status">
+            <span class="cargador" aria-hidden="true"></span>
+            <p>Cargando catálogo…</p>
           </div>
         </div>
       </section>
 
-      <footer class="site-footer">
-        <div class="footer-top">
-          <a class="wordmark" href="#inicio"><span data-marca>umbral</span><sup>®</sup></a>
-          <p data-desc>Una selección de sneakers para moverse distinto.</p>
-          <a class="back-top" href="#inicio">VOLVER ARRIBA ↑</a>
+      <!-- Sección promocional -->
+      <section class="promo" aria-labelledby="titulo-promo">
+        <div class="promo-contenido">
+          <p class="sobretitulo">Gama &amp; Talla</p>
+          <h2 id="titulo-promo">Encuentra las zapatillas para tu estilo.</h2>
+          <p>Explora los modelos disponibles y escríbenos para consultar tallas, precios y detalles de tu pedido.</p>
+          <a class="boton boton-principal" data-wa href="#contacto">
+            <svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>Contactar por WhatsApp
+          </a>
         </div>
-        <div class="footer-bottom"><span>© <span data-year>2026</span> <span data-marca>umbral</span>. Todos los derechos reservados.</span><span>MADE FOR MOVEMENT / COLOMBIA</span></div>
+        <span class="promo-monograma" aria-hidden="true">G&amp;T</span>
+      </section>
+
+      <!-- Métodos de pago -->
+      <section class="seccion" id="pagos" aria-labelledby="titulo-pagos">
+        <div class="seccion-encabezado">
+          <div>
+            <p class="sobretitulo">Pagos</p>
+            <h2 id="titulo-pagos">Métodos de pago</h2>
+          </div>
+          <p class="seccion-nota">El pago se coordina por WhatsApp una vez confirmada la disponibilidad de tu pedido.</p>
+        </div>
+        <ul class="pagos">
+          <li class="pago"><svg class="icono" aria-hidden="true"><use href="#icono-celular"></use></svg><span>Nequi</span></li>
+          <li class="pago"><svg class="icono" aria-hidden="true"><use href="#icono-banco"></use></svg><span>Bancolombia</span></li>
+          <li class="pago"><svg class="icono" aria-hidden="true"><use href="#icono-celular"></use></svg><span>Daviplata</span></li>
+          <li class="pago"><svg class="icono" aria-hidden="true"><use href="#icono-transferencia"></use></svg><span>Transferencia bancaria</span></li>
+        </ul>
+        <p class="aviso-pago" role="note">
+          <svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg>
+          <span>Confirma los datos oficiales de pago directamente con nuestro equipo antes de realizar cualquier transferencia.</span>
+        </p>
+      </section>
+
+      <!-- Contacto -->
+      <section class="seccion" id="contacto" aria-labelledby="titulo-contacto">
+        <div class="seccion-encabezado">
+          <div>
+            <p class="sobretitulo">Contacto</p>
+            <h2 id="titulo-contacto">Contáctanos</h2>
+          </div>
+          <p class="seccion-nota">Escríbenos para consultar modelos, tallas, precios y detalles de envío.</p>
+        </div>
+        <div class="contacto">
+          <a class="contacto-tarjeta" data-wa href="#contacto">
+            <svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>
+            <span class="contacto-titulo">WhatsApp</span>
+            <span class="contacto-texto">Escríbenos y te ayudamos con tu pedido.</span>
+            <span class="contacto-accion">Abrir chat <span aria-hidden="true">→</span></span>
+          </a>
+          <a class="contacto-tarjeta" data-ig href="#contacto">
+            <svg class="icono" aria-hidden="true"><use href="#icono-instagram"></use></svg>
+            <span class="contacto-titulo">Instagram</span>
+            <span class="contacto-texto" data-ig-usuario>Síguenos en Instagram.</span>
+            <span class="contacto-accion">Ver perfil <span aria-hidden="true">→</span></span>
+          </a>
+          <div class="contacto-tarjeta">
+            <svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg>
+            <span class="contacto-titulo">Envíos</span>
+            <span class="contacto-texto">Enviamos a toda Colombia. El costo y el tiempo de entrega se confirman con cada pedido.</span>
+          </div>
+          <div class="contacto-tarjeta">
+            <svg class="icono" aria-hidden="true"><use href="#icono-reloj"></use></svg>
+            <span class="contacto-titulo">Horario de atención</span>
+            <span class="contacto-texto" data-horario>Consulta nuestro horario de atención por WhatsApp.</span>
+          </div>
+        </div>
+      </section>
+
+      <footer class="pie">
+        <div class="pie-columnas">
+          <div class="pie-marca">
+            <a class="logotipo" href="#inicio" aria-label="Gama &amp; Talla, volver al inicio">
+              <span class="logotipo-texto" data-marca>Gama &amp; Talla</span>
+            </a>
+            <p data-descripcion>Tienda de zapatillas en Colombia. Explora el catálogo, consulta tallas y haz tu pedido por WhatsApp.</p>
+          </div>
+          <nav class="pie-columna" aria-label="Enlaces del pie de página">
+            <h2 class="pie-titulo">Tienda</h2>
+            <ul>
+              <li><a href="#inicio">Inicio</a></li>
+              <li><a href="#como-comprar">Cómo comprar</a></li>
+              <li><a href="#catalogo">Catálogo</a></li>
+              <li><a href="#pagos">Métodos de pago</a></li>
+            </ul>
+          </nav>
+          <div class="pie-columna">
+            <h2 class="pie-titulo">Contacto</h2>
+            <ul>
+              <li><a data-wa href="#contacto">WhatsApp</a></li>
+              <li><a href="#contacto">Envíos a toda Colombia</a></li>
+              <li><span data-horario>Consulta nuestro horario de atención por WhatsApp.</span></li>
+            </ul>
+          </div>
+          <div class="pie-columna">
+            <h2 class="pie-titulo">Redes sociales</h2>
+            <ul>
+              <li><a data-ig href="#contacto">Instagram</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="pie-legal">
+          <p>© <span data-anio>2026</span> <span data-marca>Gama &amp; Talla</span>. Todos los derechos reservados.</p>
+          <a href="#inicio">Volver arriba <span aria-hidden="true">↑</span></a>
+        </div>
       </footer>
     </main>
-
-    <aside class="utility-rail" aria-label="Accesos rápidos">
-      <div class="utility-top">
-        <a class="utility-icon" data-wa href="#contacto" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp"><svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg></a>
-        <button class="utility-icon" id="search-focus" type="button" aria-label="Buscar sneakers" title="Buscar"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></button>
-        <a class="utility-icon" href="#contacto" aria-label="Contacto" title="Contacto"><svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg></a>
-      </div>
-      <div class="utility-bottom"><span>SCROLL TO DISCOVER</span><span class="rail-line" aria-hidden="true"></span></div>
-    </aside>
   </div>
 
-  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></symbol>
-    <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8.2 8.2 0 0 1-8.3 8.2 9 9 0 0 1-3.5-.7L4 20l1.1-4.1a8 8 0 1 1 15.4-4.4Z"></path><path d="M8.5 9.3c.8 2.2 2.1 3.4 4.4 4.3"></path></symbol>
-    <symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.7 20a6.3 6.3 0 0 1 12.6 0"></path></symbol>
+  <a class="whatsapp-flotante" data-wa href="#contacto" aria-label="Escríbenos por WhatsApp">
+    <svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg>
+  </a>
+
+  <!-- Iconos SVG locales -->
+  <svg class="svg-definiciones" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="icono-buscar" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
+    <symbol id="icono-whatsapp" viewBox="0 0 24 24"><path d="M20.5 11.6a8.4 8.4 0 0 1-12.4 7.4L3.5 20.5 5 16.1a8.4 8.4 0 1 1 15.5-4.5Z"/><path d="M9 8.6c.3 2.6 2.7 5.1 5.5 5.8l1.2-1.3-1.8-.9-.8.8c-1-.5-1.9-1.4-2.4-2.4l.8-.8-.9-1.8Z"/></symbol>
+    <symbol id="icono-instagram" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="5"/><circle cx="12" cy="12" r="3.8"/><circle cx="17.2" cy="6.8" r=".6"/></symbol>
+    <symbol id="icono-zapatilla" viewBox="0 0 24 24"><path d="M2.8 16.5c0-1.8.6-3.4 1.4-5.3l.9-2.6c.2-.6.9-.9 1.5-.6l2.6 1.3c.5.2 1 .1 1.3-.3l.6-.8 6.2 3.4c1.6.9 4 1 4 3.3v1.6H2.8Z"/><path d="M2.8 18.7h18.6M9.3 12.2l1.6-.9M11.2 13.4l1.6-.9"/></symbol>
+    <symbol id="icono-regla" viewBox="0 0 24 24"><rect x="2.5" y="8" width="19" height="8" rx="1.5"/><path d="M6.5 8v3M10 8v4.5M13.5 8v3M17 8v4.5"/></symbol>
+    <symbol id="icono-caja" viewBox="0 0 24 24"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5Z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9M7.8 5.2l8.5 4.5"/></symbol>
+    <symbol id="icono-reloj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="icono-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="icono-celular" viewBox="0 0 24 24"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/></symbol>
+    <symbol id="icono-banco" viewBox="0 0 24 24"><path d="M3 9.5 12 4l9 5.5M4.5 20h15M6 10.5v7M10 10.5v7M14 10.5v7M18 10.5v7"/></symbol>
+    <symbol id="icono-transferencia" viewBox="0 0 24 24"><path d="M4 8h14l-3.5-3.5M20 16H6l3.5 3.5"/></symbol>
+    <symbol id="icono-flecha-abajo" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
   </svg>
 </body>
 </html>
