@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f1f1ef">
+  <meta name="description" content="Umbral — una selección editorial de sneakers. Explora el catálogo y consulta disponibilidad por WhatsApp.">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_CO">
+  <meta property="og:title" content="Umbral — The Sneaker Index">
+  <meta property="og:description" content="Sneakers seleccionados. Atención personalizada en Colombia.">
+  <meta property="og:image" content="assets/images/branding/hero.svg">
+  <title>Umbral — The Sneaker Index</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#catalogo">Saltar al catálogo</a>
+
+  <div class="announcement" aria-label="Información de la tienda">
+    <span>Envíos a toda Colombia</span>
+    <span class="announcement-dot" aria-hidden="true">◆</span>
+    <span>Sneakers seleccionados</span>
+    <span class="announcement-dot" aria-hidden="true">◆</span>
+    <span>Atención personalizada por WhatsApp</span>
+  </div>
+
+  <div class="store-frame">
+    <aside class="sidebar" aria-label="Navegación de la tienda">
+      <div class="sidebar-top">
+        <a class="wordmark" href="#inicio" aria-label="Umbral, inicio"><span data-marca>umbral</span><sup>®</sup></a>
+        <p class="side-caption">THE SNEAKER<br>DEPARTMENT</p>
+        <div class="side-rule"></div>
+
+        <nav class="side-nav" aria-label="Colecciones">
+          <p class="nav-overline">Shop / Index</p>
+          <button class="side-filter is-active" type="button" data-cat="Todos" aria-pressed="true">Todos los sneakers <span>↗</span></button>
+          <div id="side-categories" class="side-categories"></div>
+        </nav>
+      </div>
+
+      <div class="sidebar-bottom">
+        <p class="nav-overline">Follow the movement</p>
+        <a data-ig href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram ↗</a>
+        <a data-wa href="#contacto" target="_blank" rel="noopener noreferrer">WhatsApp ↗</a>
+        <div class="side-rule"></div>
+        <p class="side-small">CURATED IN COLOMBIA<br><span data-year>2026</span> / VOL. 01</p>
+      </div>
+    </aside>
+
+    <main class="main-content" id="inicio">
+      <div class="mobile-head">
+        <a class="wordmark" href="#inicio" aria-label="Umbral, inicio"><span data-marca>umbral</span><sup>®</sup></a>
+        <button id="menu-btn" class="menu-toggle" type="button" aria-expanded="false" aria-controls="mobile-menu" aria-label="Abrir menú">
+          <span></span><span></span><span></span>
+        </button>
+        <nav id="mobile-menu" class="mobile-menu" aria-label="Menú móvil">
+          <a href="#inicio">Inicio</a>
+          <a href="#catalogo">Catálogo</a>
+          <a href="#como-comprar">Cómo comprar</a>
+          <a href="#contacto">Contacto</a>
+          <a data-wa href="#contacto" target="_blank" rel="noopener noreferrer">Pedir por WhatsApp ↗</a>
+        </nav>
+      </div>
+
+      <section class="collection-intro" aria-labelledby="page-title">
+        <div class="intro-topline">
+          <p class="eyebrow">UMBRAL / FOOTWEAR INDEX</p>
+          <p class="edition">COLLECTION <span>—</span> 2026</p>
+        </div>
+        <div class="intro-grid">
+          <div class="intro-copy">
+            <h1 id="page-title">THE SNEAKER<br><span>INDEX.</span></h1>
+            <p class="intro-description">Piezas para moverse distinto. Una selección de siluetas urbanas, clásicos contemporáneos y sneakers para el día a día.</p>
+          </div>
+          <div class="hero-art" aria-label="Ilustración editorial de una zapatilla">
+            <span class="hero-art-label">OBJECT<br>NO. 001</span>
+            <img src="assets/images/branding/hero.svg" width="600" height="440" alt="Ilustración de sneaker en tonos marfil y violeta">
+            <span class="hero-art-mark" aria-hidden="true">U.</span>
+          </div>
+        </div>
+        <div class="intro-bottomline">
+          <span>DESIGN / MOVEMENT / EVERYDAY</span>
+          <a href="#catalogo">EXPLORAR SELECCIÓN <span aria-hidden="true">↓</span></a>
+        </div>
+      </section>
+
+      <section class="catalog-section" id="catalogo" aria-labelledby="catalog-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">VOL. 01 — CURATED SELECTION</p>
+            <h2 id="catalog-title">La selección</h2>
+          </div>
+          <p class="section-note">Encuentra tu próximo par.<br>Consulta disponibilidad con nosotros.</p>
+        </div>
+
+        <div class="catalog-tools">
+          <label class="search-field" for="buscar">
+            <svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg>
+            <input id="buscar" type="search" placeholder="Buscar modelo, marca, color o código" autocomplete="off" enterkeyhint="search">
+            <span class="search-shortcut" aria-hidden="true">⌕</span>
+          </label>
+          <label class="sort-field" for="orden">Ordenar
+            <select id="orden">
+              <option value="destacados">Destacados</option>
+              <option value="precio-asc">Precio: menor a mayor</option>
+              <option value="precio-desc">Precio: mayor a menor</option>
+              <option value="nombre">Nombre: A-Z</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="chips" class="category-chips" role="group" aria-label="Filtrar por marca o categoría">
+          <button type="button" class="chip is-active" data-cat="Todos" aria-pressed="true">Todos</button>
+        </div>
+        <div class="catalog-meta">
+          <p id="contador" aria-live="polite">Cargando selección…</p>
+          <p class="meta-right">PRECIOS EN COP <span aria-hidden="true">/</span> TALLAS SEGÚN DISPONIBILIDAD</p>
+        </div>
+
+        <div id="grid" class="product-grid" aria-busy="true">
+          <div class="catalog-state"><span class="spinner" aria-hidden="true"></span><p>Cargando catálogo…</p></div>
+        </div>
+        <p class="demo-notice">Catálogo demostrativo: confirma el precio, la talla y la disponibilidad antes de comprar.</p>
+      </section>
+
+      <section id="como-comprar" class="process-section" aria-labelledby="process-title">
+        <div class="section-heading">
+          <div><p class="eyebrow">THE PROCESS / 01—05</p><h2 id="process-title">Así de simple.</h2></div>
+          <p class="section-note">Sin carrito ni pasos innecesarios.<br>Te atendemos directamente.</p>
+        </div>
+        <ol class="process-grid">
+          <li><span class="step-number">01</span><h3>Explora</h3><p>Encuentra el modelo que va contigo.</p></li>
+          <li><span class="step-number">02</span><h3>Elige tu talla</h3><p>Selecciona una talla disponible en la tarjeta.</p></li>
+          <li><span class="step-number">03</span><h3>Escríbenos</h3><p>El mensaje de WhatsApp lleva el producto y la talla.</p></li>
+          <li><span class="step-number">04</span><h3>Confirma</h3><p>Verificamos disponibilidad, pago y envío.</p></li>
+          <li><span class="step-number">05</span><h3>Recibe</h3><p>Coordinamos la entrega contigo.</p></li>
+        </ol>
+      </section>
+
+      <section class="service-section" id="contacto" aria-labelledby="contact-title">
+        <div class="service-panel">
+          <div class="service-copy">
+            <p class="eyebrow">A PERSONAL TOUCH</p>
+            <h2 id="contact-title">¿Buscas algo<br>en particular<span>?</span></h2>
+            <p>Cuéntanos qué modelo tienes en mente. Te ayudamos a confirmar tallas, disponibilidad y opciones de envío.</p>
+            <div class="service-actions">
+              <a class="button button-dark" data-wa href="#contacto" target="_blank" rel="noopener noreferrer"><svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg> Hablar por WhatsApp ↗</a>
+              <a class="text-link" data-ig href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer">Instagram <span aria-hidden="true">↗</span></a>
+            </div>
+          </div>
+          <div class="service-details">
+            <div><span class="detail-label">PAYMENT</span><p>Nequi · Bancolombia<br>Daviplata · Transferencia</p></div>
+            <div><span class="detail-label">SHIPPING</span><p>Envíos a toda Colombia.<br>Costos y tiempos por confirmar.</p></div>
+            <div><span class="detail-label">CUSTOMER CARE</span><p data-horario>Escríbenos para consultar el horario de atención.</p></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="site-footer">
+        <div class="footer-top">
+          <a class="wordmark" href="#inicio"><span data-marca>umbral</span><sup>®</sup></a>
+          <p data-desc>Una selección de sneakers para moverse distinto.</p>
+          <a class="back-top" href="#inicio">VOLVER ARRIBA ↑</a>
+        </div>
+        <div class="footer-bottom"><span>© <span data-year>2026</span> <span data-marca>umbral</span>. Todos los derechos reservados.</span><span>MADE FOR MOVEMENT / COLOMBIA</span></div>
+      </footer>
+    </main>
+
+    <aside class="utility-rail" aria-label="Accesos rápidos">
+      <div class="utility-top">
+        <a class="utility-icon" data-wa href="#contacto" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" title="WhatsApp"><svg class="icon" aria-hidden="true"><use href="#icon-chat"></use></svg></a>
+        <button class="utility-icon" id="search-focus" type="button" aria-label="Buscar sneakers" title="Buscar"><svg class="icon" aria-hidden="true"><use href="#icon-search"></use></svg></button>
+        <a class="utility-icon" href="#contacto" aria-label="Contacto" title="Contacto"><svg class="icon" aria-hidden="true"><use href="#icon-user"></use></svg></a>
+      </div>
+      <div class="utility-bottom"><span>SCROLL TO DISCOVER</span><span class="rail-line" aria-hidden="true"></span></div>
+    </aside>
+  </div>
+
+  <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"></circle><path d="m16 16 4.5 4.5"></path></symbol>
+    <symbol id="icon-chat" viewBox="0 0 24 24"><path d="M20.5 11.5a8.2 8.2 0 0 1-8.3 8.2 9 9 0 0 1-3.5-.7L4 20l1.1-4.1a8 8 0 1 1 15.4-4.4Z"></path><path d="M8.5 9.3c.8 2.2 2.1 3.4 4.4 4.3"></path></symbol>
+    <symbol id="icon-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.2"></circle><path d="M5.7 20a6.3 6.3 0 0 1 12.6 0"></path></symbol>
+  </svg>
+</body>
+</html>

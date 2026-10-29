@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 390" role="img" aria-label="Ilustración vectorial genérica de zapatilla deportiva">
+  <defs>
+    <linearGradient id="upper" x1="0" y1="0" x2="0.85" y2="1"><stop offset="0" stop-color="#fcfbf6"/><stop offset="1" stop-color="#e9e8e2"/></linearGradient>
+    <linearGradient id="sole" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#faf9f5"/></linearGradient>
+  </defs>
+  <ellipse cx="302" cy="318" rx="221" ry="20" fill="#252522" opacity=".09"/>
+  <path d="M66 270 C91 264 119 244 146 207 L183 164 C197 148 215 145 232 153 L291 183 C318 198 352 211 385 216 L448 229 C475 235 501 249 523 264 C540 276 539 291 524 300 C510 308 481 310 448 310 L124 309 C94 309 73 299 67 285 C64 280 64 275 66 270Z" fill="#272725" opacity=".95"/>
+  <path d="M74 267 C105 252 128 226 153 192 L185 160 C200 146 215 149 233 157 L291 187 C322 204 352 212 386 218 L447 230 C478 237 500 250 521 266 C530 273 531 280 525 286 C509 299 476 298 447 298 L124 298 C94 298 76 290 72 279Z" fill="url(#upper)" stroke="#282825" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M79 270 C111 260 139 233 166 196 L191 169 C201 158 212 157 223 163 L244 175 C222 203 197 239 174 267Z" fill="#34383a" opacity=".96"/>
+  <path d="M196 162 C212 157 224 164 241 174 L295 200 C318 211 341 218 366 221 L352 246 C323 246 296 235 270 224 L213 199Z" fill="#fcfbf6" opacity=".95"/>
+  <path d="M365 221 L447 232 C471 238 491 250 509 264 L475 277 L411 268 L369 249Z" fill="#34383a" opacity=".95"/>
+  <path d="M98 266 C125 250 147 227 171 196" fill="none" stroke="#242424" stroke-width="5" stroke-linecap="round" opacity=".8"/>
+  <path d="M229 177 C255 189 281 202 307 212 C331 221 354 227 380 230" fill="none" stroke="#242424" stroke-width="4" stroke-linecap="round" opacity=".8"/>
+  <path d="M221 177 L258 187 M215 187 L250 199 M209 197 L242 211 M204 207 L233 222" stroke="#f7f6f0" stroke-width="6" stroke-linecap="round"/>
+  <path d="M219 175 L257 188 M213 185 L249 200 M207 196 L241 212 M202 206 L233 222" stroke="#41413d" stroke-width="1.2" stroke-linecap="round" opacity=".45"/>
+  <path d="M75 278 C104 289 123 290 157 290 L453 289 C484 289 512 288 526 278 L527 291 C519 307 486 312 449 312 L123 311 C93 311 73 300 70 287Z" fill="url(#sole)" stroke="#d6d5cf" stroke-width="2"/>
+  <path d="M100 299 L492 299" stroke="#d6d5cf" stroke-width="2" stroke-dasharray="9 8"/>
+  <path d="M184 161 C196 147 210 145 226 153" fill="none" stroke="#fff" stroke-width="3" opacity=".65"/>
+  <circle cx="225" cy="176" r="3.5" fill="#242424"/><circle cx="235" cy="181" r="3.5" fill="#242424"/><circle cx="245" cy="186" r="3.5" fill="#242424"/><circle cx="255" cy="191" r="3.5" fill="#242424"/>
+</svg>

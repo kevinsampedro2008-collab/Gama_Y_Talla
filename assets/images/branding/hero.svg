@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 510" role="img" aria-label="Ilustración editorial de sneaker marfil y violeta">
+<defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fbfaff"/><stop offset="1" stop-color="#dcd8ff"/></linearGradient><linearGradient id="shoe" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#d9d7e4"/></linearGradient></defs>
+<circle cx="350" cy="252" r="218" fill="url(#bg)"/><circle cx="350" cy="252" r="184" fill="none" stroke="#fff" stroke-width="1.5" opacity=".75"/><ellipse cx="350" cy="358" rx="230" ry="22" fill="#242329" opacity=".13"/>
+<g transform="translate(30,62) rotate(-7 320 220)">
+<path d="M68 275 C96 264 126 239 154 202 L189 161 C204 146 221 146 238 155 L295 184 C322 198 355 211 389 218 L452 232 C479 239 504 252 524 267 C540 279 535 293 519 301 C503 309 479 309 448 309 L127 308 C95 308 75 299 69 285 C67 281 66 278 68 275Z" fill="#26262b"/>
+<path d="M77 269 C106 253 134 226 160 190 L191 161 C204 150 220 151 236 160 L295 190 C322 204 354 214 388 220 L449 233 C476 239 499 252 520 267 C528 274 529 281 522 287 C507 299 476 298 447 298 L126 298 C95 298 77 290 73 280Z" fill="url(#shoe)" stroke="#29282e" stroke-width="3" stroke-linejoin="round"/>
+<path d="M81 268 C112 251 139 224 163 191 L190 164 C201 156 211 157 224 163 L242 175 C220 204 197 237 173 267Z" fill="#5b4be7"/>
+<path d="M198 163 C213 158 225 165 242 175 L296 201 C319 212 342 219 367 222 L352 246 C324 245 296 235 269 224 L214 199Z" fill="#eeedf5"/>
+<path d="M365 222 L449 234 C474 241 493 253 510 266 L476 278 L411 269 L369 250Z" fill="#8e83ef"/>
+<path d="M221 177 L258 188 M215 187 L250 200 M209 197 L241 212 M204 207 L233 222" stroke="#fff" stroke-width="6" stroke-linecap="round"/><path d="M218 177 L257 189 M212 187 L249 201 M206 197 L240 212 M201 207 L232 222" stroke="#3f3d4c" stroke-width="1.4" stroke-linecap="round" opacity=".45"/>
+<path d="M76 278 C106 289 126 290 157 290 L453 289 C484 289 511 288 524 278 L526 291 C517 306 485 311 448 311 L126 310 C94 310 74 300 70 287Z" fill="#faf9f5" stroke="#d5d4dc" stroke-width="2"/><path d="M105 299 L492 299" stroke="#d0ced9" stroke-width="2" stroke-dasharray="9 8"/>
+</g>
+<path d="M115 103 L140 103 M127.5 90.5 L127.5 115.5" stroke="#5b4be7" stroke-width="1.5" opacity=".45"/><circle cx="575" cy="380" r="4" fill="#5b4be7"/><circle cx="590" cy="365" r="2" fill="#5b4be7"/>
+</svg>

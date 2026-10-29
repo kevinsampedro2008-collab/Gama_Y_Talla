@@ -1,0 +1,189 @@
+{
+  "_aviso": "DATOS Y PRECIOS DE DEMOSTRACIÓN. Las ilustraciones SVG son mockups genéricos, no fotografías oficiales. Reemplaza datos, precios, tallas e imágenes por información real antes de publicar.",
+  "productos": [
+    {
+      "id": "UM-001",
+      "nombre": "Air Jordan 1 Retro High OG",
+      "marca": "Jordan",
+      "categoria": "Edición especial",
+      "color": "Rojo / blanco / negro",
+      "precio": 989900,
+      "imagen": "assets/images/products/sneaker-01.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "Exclusivo",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "UM-002",
+      "nombre": "Air Force 1 '07",
+      "marca": "Nike",
+      "categoria": "Lifestyle",
+      "color": "Blanco clásico",
+      "precio": 479900,
+      "imagen": "assets/images/products/sneaker-02.svg",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "Más vendido",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "UM-003",
+      "nombre": "Samba OG",
+      "marca": "Adidas",
+      "categoria": "Lifestyle",
+      "color": "Blanco / verde",
+      "precio": 459900,
+      "imagen": "assets/images/products/sneaker-03.svg",
+      "tallasDisponibles": [
+        "37",
+        "38",
+        "39",
+        "40",
+        "41"
+      ],
+      "tallasAgotadas": [
+        "42"
+      ],
+      "badge": "Nuevo",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "UM-004",
+      "nombre": "Pegasus Runner 41",
+      "marca": "Nike",
+      "categoria": "Running",
+      "color": "Gris / naranja",
+      "precio": 529900,
+      "imagen": "assets/images/products/sneaker-04.svg",
+      "tallasDisponibles": [
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "UM-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Arena / lima",
+      "precio": 689900,
+      "imagen": "assets/images/products/sneaker-05.svg",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "Nuevo",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "UM-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Edición especial",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/products/sneaker-06.svg",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "Exclusivo",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "UM-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Lifestyle",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/products/sneaker-07.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "Más vendido",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "UM-008",
+      "nombre": "550 Classic",
+      "marca": "New Balance",
+      "categoria": "Lifestyle",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/products/sneaker-08.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "Nuevo",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    }
+  ]
+}
