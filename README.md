@@ -186,3 +186,13 @@ Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. S
 - Cada pulsación carga hasta 12 productos adicionales; el botón desaparece al mostrar el último artículo.
 - La paginación se aplica a los resultados filtrados y ordenados. Al cambiar búsqueda, marca, categoría o criterio de orden, se vuelve al primer grupo de 12.
 - El botón no aparece cuando hay 12 productos o menos. El catálogo de demostración incluido contiene 8 productos, por lo que para visualizar el botón debes añadir al menos 5 productos adicionales en `data/productos.json`.
+
+
+## Versión 13 — navegación de catálogo en ambos sentidos
+
+- El catálogo muestra inicialmente hasta 12 productos.
+- Si hay más de 12, aparece **Mostrar más** y cada clic agrega el siguiente grupo de hasta 12 zapatillas.
+- Al llegar al último producto, el mismo control cambia a **Mostrar menos**, con la flecha orientada hacia arriba.
+- **Mostrar menos** regresa exactamente al grupo anterior: por ejemplo, 24 → 12; 25 → 24; 36 → 24. Desde ese punto vuelve a estar disponible **Mostrar más**.
+- Al cambiar la búsqueda, los filtros o el orden, la vista se reinicia en los primeros 12 resultados.
+- Si el resultado tiene 12 productos o menos, el control no aparece.

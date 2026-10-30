@@ -445,17 +445,32 @@ function firmaFiltrosCatalogo() {
 function actualizarPaginacionCatalogo(total, visibles) {
   const contenedor = $("#catalogo-paginacion");
   const boton = $("#mostrar-mas");
+  const etiqueta = boton?.querySelector("span");
+  const icono = boton?.querySelector(".icono");
   const ayuda = $("#catalogo-paginacion-ayuda");
-  if (!contenedor || !boton) return;
+  if (!contenedor || !boton || !etiqueta) return;
 
+  // El control se mantiene visible al llegar al final para poder retroceder un grupo.
+  if (total <= 12) {
+    contenedor.hidden = true;
+    return;
+  }
+
+  contenedor.hidden = false;
   const restantes = Math.max(0, total - visibles);
-  contenedor.hidden = restantes === 0;
-  if (restantes > 0) {
-    const siguienteGrupo = Math.min(12, restantes);
-    boton.setAttribute("aria-label", `Mostrar ${siguienteGrupo} productos más`);
-    if (ayuda) ayuda.textContent = `Hay ${restantes} ${restantes === 1 ? "zapatilla" : "zapatillas"} más en este resultado.`;
-  } else if (ayuda) {
-    ayuda.textContent = "";
+  const mostrarMenos = restantes === 0;
+  boton.classList.toggle("boton-mostrar-mas--menos", mostrarMenos);
+  etiqueta.textContent = mostrarMenos ? "Mostrar menos" : "Mostrar más";
+  boton.setAttribute(
+    "aria-label",
+    mostrarMenos ? "Mostrar el grupo anterior de zapatillas" : `Mostrar ${Math.min(12, restantes)} productos más`
+  );
+  if (icono) icono.setAttribute("aria-label", mostrarMenos ? "Flecha hacia arriba" : "Flecha hacia abajo");
+
+  if (ayuda) {
+    ayuda.textContent = mostrarMenos
+      ? `Estás viendo los ${total} productos. Puedes volver al grupo anterior.`
+      : `Hay ${restantes} ${restantes === 1 ? "zapatilla" : "zapatillas"} más en este resultado.`;
   }
 }
 
@@ -473,6 +488,7 @@ function renderizarCatalogo() {
 
   if (!estado.productos.length) {
     actualizarContador("0 productos");
+    actualizarPaginacionCatalogo(0, 0);
     mostrarEstado({ titulo: "Aún no hay productos", mensaje: "Pronto publicaremos nuestro catálogo. Escríbenos por WhatsApp para consultar modelos y tallas." });
     return;
   }
@@ -480,6 +496,7 @@ function renderizarCatalogo() {
   const lista = productosFiltrados();
   if (!lista.length) {
     actualizarContador("0 productos");
+    actualizarPaginacionCatalogo(0, 0);
     mostrarEstado({ titulo: "No encontramos zapatillas", mensaje: "Prueba con otra búsqueda o elimina algunos filtros.", textoBoton: "Limpiar filtros", accion: "limpiar" });
     return;
   }
@@ -1110,7 +1127,16 @@ function animarInsignia() {
 function iniciarCatalogo() {
   $("#mostrar-mas")?.addEventListener("click", () => {
     const total = productosFiltrados().length;
-    estado.productosVisibles = Math.min(total, estado.productosVisibles + 12);
+    const yaEstanTodosVisibles = estado.productosVisibles >= total;
+
+    if (yaEstanTodosVisibles && total > 12) {
+      // Vuelve al estado inmediatamente anterior de la carga por grupos de 12.
+      // Ejemplos: 24 → 12, 25 → 24, 36 → 24, 37 → 36.
+      estado.productosVisibles = Math.max(12, Math.floor((total - 1) / 12) * 12);
+    } else {
+      estado.productosVisibles = Math.min(total, estado.productosVisibles + 12);
+    }
+
     renderizarCatalogo();
   });
 
