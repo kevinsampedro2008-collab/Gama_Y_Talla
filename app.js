@@ -8,7 +8,7 @@
 const CONFIG = {
   tienda: "Gama & Talla",
   descripcion: "Tienda de zapatillas en Colombia. Explora el catálogo, consulta tallas y arma tu pedido por WhatsApp.",
-  whatsapp: "573124745942", // Sustituir por el número real antes de publicar.
+  whatsapp: "573000000000", // Sustituir por el número real antes de publicar.
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
   datosUrl: "data/productos.json",
@@ -148,6 +148,7 @@ function normalizarProducto(bruto, indice, idsUsados) {
     categoria: limpiarTexto(bruto.categoria, "Otras"),
     color: limpiarTexto(bruto.color, "Por confirmar"),
     precio: Math.max(0, Math.round(Number(bruto.precio) || 0)),
+    precioAnterior: Math.max(0, Math.round(Number(bruto.precioAnterior) || 0)),
     imagen: limpiarTexto(bruto.imagen, CONFIG.imagenRespaldo),
     tallasDisponibles: disponibles,
     tallasAgotadas: agotadas.sort(compararTallas),
@@ -156,6 +157,7 @@ function normalizarProducto(bruto, indice, idsUsados) {
     nuevoIngreso: bruto.nuevoIngreso === true,
     indice
   };
+  producto.descuento = producto.precio > 0 && producto.precioAnterior > producto.precio ? Math.round((1 - producto.precio / producto.precioAnterior) * 100) : 0;
   // Evita mostrar reclamos comerciales no confirmados. Solo mostramos «Nuevo» si el campo lo indica.
   producto.badge = producto.nuevoIngreso ? "Nuevo" : "";
   producto.textoBusqueda = normalizarTexto([producto.nombre, producto.marca, producto.color, producto.categoria, producto.id].join(" "));
@@ -450,12 +452,21 @@ function crearTarjeta(producto) {
   const botonImagen = crearBoton("tarjeta-media", crearImagen(producto), { accion: "detalles" });
   botonImagen.setAttribute("aria-label", `Ver detalles de ${nombreCompleto(producto)}`);
   if (agotado) botonImagen.append(crearElemento("span", "etiqueta etiqueta-agotado", "Agotado"));
-  else if (producto.badge) botonImagen.append(crearElemento("span", "etiqueta", producto.badge));
+  else if (producto.descuento) {
+    const oferta = crearElemento("span", "etiqueta-oferta");
+    oferta.append(crearElemento("span", "etiqueta-oferta-sello", "SALE"), crearElemento("span", "etiqueta-oferta-porcentaje", `-${producto.descuento}%`));
+    botonImagen.append(oferta);
+  } else if (producto.badge) botonImagen.append(crearElemento("span", "etiqueta", producto.badge));
 
   const cuerpo = crearElemento("div", "tarjeta-cuerpo");
   const marca = crearElemento("p", "tarjeta-marca", producto.marca);
   const nombre = crearElemento("h3", "tarjeta-nombre", producto.nombre);
-  const precio = crearElemento("p", "precio", formatearPrecio(producto.precio));
+  const precio = crearElemento("div", "precio precio-oferta");
+  precio.append(crearElemento("span", "precio-actual", formatearPrecio(producto.precio)));
+  if (producto.descuento) {
+    precio.append(crearElemento("del", "precio-anterior", formatearPrecio(producto.precioAnterior)));
+    precio.append(crearElemento("span", "precio-ahorro", `${producto.descuento}% OFF`));
+  }
   const acciones = crearElemento("div", "tarjeta-acciones");
   const detalle = crearBoton("boton boton-principal boton-compacto boton-detalles", "Ver detalles", { accion: "detalles" });
   detalle.setAttribute("aria-label", `Ver detalles de ${nombreCompleto(producto)}`);
@@ -543,13 +554,20 @@ function renderizarDetalle({ selectorFoco = "" } = {}) {
   media.dataset.tono = String(producto.indice % 4);
   media.append(crearImagen(producto, { perezosa: false }));
   if (agotado) media.append(crearElemento("span", "etiqueta etiqueta-agotado", "Agotado"));
+  else if (producto.descuento) media.append(crearElemento("span", "detalle-rebaja", `OFERTA · ${producto.descuento}% OFF`));
 
   const info = crearElemento("div", "detalle-info");
   const cabecera = crearElemento("div", "detalle-cabecera");
   cabecera.append(crearElemento("p", "sobretitulo", `${producto.marca} · ${producto.categoria}`));
   const titulo = crearElemento("h2", "detalle-nombre", producto.nombre);
   titulo.id = "detalle-nombre";
-  cabecera.append(titulo, crearElemento("p", "detalle-precio", formatearPrecio(producto.precio)));
+  const precioDetalle = crearElemento("div", "detalle-precio detalle-precio-oferta");
+  precioDetalle.append(crearElemento("span", "", formatearPrecio(producto.precio)));
+  if (producto.descuento) {
+    precioDetalle.append(crearElemento("del", "precio-anterior", formatearPrecio(producto.precioAnterior)));
+    precioDetalle.append(crearElemento("span", "precio-ahorro", `${producto.descuento}% OFF`));
+  }
+  cabecera.append(titulo, precioDetalle);
 
   const ficha = crearElemento("dl", "detalle-ficha");
   [["Color", producto.color], ["Referencia", producto.id], ["Disponibilidad", agotado ? "Agotado" : "Disponible"]].forEach(([clave, valor]) => {
@@ -1133,7 +1151,28 @@ function iniciarRevelado() {
   elementos.forEach((elemento) => observador.observe(elemento));
 }
 
+function iniciarNavegacionActiva() {
+  const secciones = ["inicio", "como-comprar", "catalogo", "pagos", "contacto"].map((id) => document.getElementById(id)).filter(Boolean);
+  const enlaces = $$(".menu-enlaces a");
+  function actualizar() {
+    const umbral = Math.min(230, window.innerHeight * .35);
+    let actual = "inicio";
+    for (const seccion of secciones) if (seccion.getBoundingClientRect().top <= umbral) actual = seccion.id;
+    enlaces.forEach((a) => {
+      const activo = a.getAttribute("href") === `#${actual}`;
+      a.classList.toggle("navegacion-activa", activo);
+      if (activo) a.setAttribute("aria-current", "location"); else a.removeAttribute("aria-current");
+    });
+    document.body.classList.toggle("viendo-catalogo", actual === "catalogo");
+  }
+  window.addEventListener("scroll", actualizar, { passive: true });
+  window.addEventListener("resize", actualizar, { passive: true });
+  window.addEventListener("hashchange", () => requestAnimationFrame(actualizar));
+  actualizar();
+}
+
 function iniciar() {
+  iniciarNavegacionActiva();
   aplicarConfiguracion();
   iniciarMenu();
   iniciarDialogos();

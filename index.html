@@ -11,7 +11,7 @@
   <meta property="og:site_name" content="Gama &amp; Talla">
   <meta property="og:title" content="Gama &amp; Talla | Encuentra tu próximo par">
   <meta property="og:description" content="Explora modelos, consulta tallas y envía tu pedido por WhatsApp.">
-  <meta property="og:image" content="assets/images/branding/hero.jpeg">
+  <meta property="og:image" content="assets/images/branding/hero.svg">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,8 +38,8 @@
       <nav class="menu" id="menu-principal" aria-label="Navegación principal">
         <ul class="menu-enlaces">
           <li><a href="#inicio">Inicio</a></li>
-          <li><a href="#catalogo">Catálogo</a></li>
           <li><a href="#como-comprar">Cómo comprar</a></li>
+          <li><a href="#catalogo">Catálogo</a></li>
           <li><a href="#pagos">Pagos</a></li>
           <li><a href="#contacto">Contacto</a></li>
         </ul>
@@ -82,8 +82,8 @@
           <span class="portada-forma" aria-hidden="true"></span>
           <span class="portada-anillo" aria-hidden="true"></span>
           <img src="assets/images/branding/hero.svg" width="700" height="510" alt="Ilustración decorativa de una zapatilla clara con detalles violetas" fetchpriority="high">
-          <span class="portada-chip portada-chip-a"><svg class="icono" aria-hidden="true"><use href="#icono-regla"></use></svg>Guía de tallas EU</span>
-          <button class="portada-chip portada-chip-b" type="button" data-abrir-carrito><svg class="icono" aria-hidden="true"><use href="#icono-bolsa"></use></svg>Ver mi carrito</button>
+          <button class="portada-chip portada-chip-a" type="button" data-abrir-guia aria-haspopup="dialog" aria-controls="guia-tallas"><svg class="icono" aria-hidden="true"><use href="#icono-regla"></use></svg>Guía de tallas EU</button>
+          <a class="portada-chip portada-chip-b" href="#catalogo"><svg class="icono" aria-hidden="true"><use href="#icono-flecha"></use></svg>Ver catálogo</a>
         </figure>
       </div>
     </section>
@@ -107,8 +107,8 @@
       <div class="contenedor">
         <div class="seccion-encabezado revelar">
           <div>
-            <p class="sobretitulo">Una selección para ti</p>
-            <h2 id="titulo-catalogo">Elige tus zapatillas</h2>
+            <p class="sobretitulo"><span class="indicador-seccion" aria-hidden="true"></span> Estás en el catálogo</p>
+            <h2 id="titulo-catalogo">Elige tus zapatillas</h2><p class="catalogo-ruta" aria-label="Ubicación actual">Inicio <span aria-hidden="true">/</span> <strong>Catálogo</strong></p>
           </div>
           <p class="seccion-nota">Abre los detalles de cada modelo para consultar tallas y añadirlo al carrito.</p>
         </div>
@@ -146,7 +146,7 @@
           <button class="boton-texto" id="limpiar-filtros" type="button" hidden>Limpiar filtros</button>
         </div>
 
-        
+        <p class="aviso-demo"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg><span>Catálogo de demostración: los precios, tallas y existencias son de ejemplo y las imágenes son ilustraciones provisionales.</span></p>
 
         <div class="grilla" id="grilla-productos" aria-busy="true">
           <div class="estado-catalogo" role="status"><span class="cargador" aria-hidden="true"></span><p>Cargando catálogo…</p></div>
@@ -179,7 +179,7 @@
           <li class="pago"><span class="pago-icono tono-rosa"><svg class="icono" aria-hidden="true"><use href="#icono-banco"></use></svg></span><span><strong>Bancolombia</strong><small>Cuenta bancaria</small></span></li>
           <li class="pago"><span class="pago-icono tono-verde"><svg class="icono" aria-hidden="true"><use href="#icono-transferencia"></use></svg></span><span><strong>Transferencia bancaria</strong><small>Desde tu banco</small></span></li>
         </ul>
-        <p class="aviso-pago"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg><span>Confirma los datos oficiales de pago directamente con nosotros antes de realizar cualquier transferencia.</span></p>
+        <p class="aviso-pago"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg><span>Confirma los datos oficiales de pago directamente con nuestro equipo antes de realizar cualquier transferencia.</span></p>
       </div>
     </section>
 
@@ -198,7 +198,7 @@
   <footer class="pie">
     <div class="contenedor pie-columnas">
       <div class="pie-marca"><a class="logotipo" href="#inicio" aria-label="Gama &amp; Talla, volver al inicio"><span class="logotipo-sello" aria-hidden="true">G&amp;T</span><span class="logotipo-texto" data-marca>Gama &amp; Talla</span></a><p data-descripcion>Tienda de zapatillas en Colombia.</p></div>
-      <nav class="pie-columna" aria-label="Enlaces del pie de página"><h2 class="pie-titulo">Tienda</h2><ul><li><a href="#catalogo">Catálogo</a></li><li><a href="#como-comprar">Cómo comprar</a></li><li><a href="#pagos">Métodos de pago</a></li><li><button class="boton-texto" type="button" data-abrir-guia>Guía de tallas</button></li></ul></nav>
+      <nav class="pie-columna" aria-label="Enlaces del pie de página"><h2 class="pie-titulo">Tienda</h2><ul><li><a href="#como-comprar">Cómo comprar</a></li><li><a href="#catalogo">Catálogo</a></li><li><a href="#pagos">Métodos de pago</a></li><li><button class="boton-texto" type="button" data-abrir-guia>Guía de tallas</button></li></ul></nav>
       <div class="pie-columna"><h2 class="pie-titulo">Atención</h2><ul><li><a data-wa href="#contacto">WhatsApp</a></li><li><a href="#contacto">Envíos a toda Colombia</a></li><li><span data-horario>Consulta nuestro horario de atención por WhatsApp.</span></li></ul></div>
     </div>
     <div class="contenedor pie-legal"><p>© <span data-anio>2026</span> <span data-marca>Gama &amp; Talla</span>. Todos los derechos reservados.</p><a href="#inicio">Volver arriba ↑</a></div>

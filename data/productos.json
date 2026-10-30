@@ -27,7 +27,8 @@
       "badge": "",
       "disponible": true,
       "destacado": true,
-      "nuevoIngreso": true
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
     },
     {
       "id": "LCS-RET-01",
@@ -53,6 +54,58 @@
       "disponible": true,
       "destacado": true,
       "nuevoIngreso": true
+    },
+    {
+      "id": "GT-001",
+      "nombre": "Air Jordan 1 Retro High OG",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Rojo / blanco / negro",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla-01.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "GT-002",
+      "nombre": "Air Force 1 '07",
+      "marca": "Nike",
+      "categoria": "Casuales",
+      "color": "Blanco",
+      "precio": 132900,
+      "imagen": "assets/images/productos/zapatilla-02.svg",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false,
+      "precioAnterior": 290000
     },
     {
       "id": "GT-003",

@@ -150,3 +150,10 @@ El proyecto no requiere comando de compilación. `netlify.toml` configura `publi
 - [ ] Revisar las guías de talla por marca y tipo de calzado.
 - [ ] Confirmar los métodos de pago y las condiciones de envío.
 - [ ] Hacer una prueba real de WhatsApp sin asumir que el pedido quedó confirmado.
+
+
+## Descuentos de muestra (versión actual)
+
+En `data/productos.json`, algunos artículos tienen `precioAnterior` como **ejemplo**, no como oferta vigente. El precio de venta sigue siendo `precio`. Cuando `precioAnterior` sea mayor que `precio`, la tarjeta mostrará automáticamente **SALE**, porcentaje calculado, precio tachado y precio actual. Para retirar una oferta, elimina el campo `precioAnterior` o ponlo en `0`. **Nunca anuncies un descuento si el precio anterior no corresponde a un precio real verificable.** Las demostraciones usan GT-002, GT-004 y GT-006 y deben revisarse antes de publicar.
+
+La guía EU de la portada abre el diálogo. Los diálogos de producto y guía están centrados; el carrito sigue a la derecha. El menú marca la sección visible y respeta el nuevo orden: Inicio, Cómo comprar, Catálogo, Pagos, Contacto.

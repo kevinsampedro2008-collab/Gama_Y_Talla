@@ -766,3 +766,60 @@ body { background: var(--fondo); }
   .tarjeta:hover .tarjeta-media img { transform: none; filter: none; }
   .promo, .contacto { box-shadow: none; }
 }
+
+/* ========================================================
+   Ajustes de navegación, modales, alternancia y ofertas
+   ======================================================== */
+/* Fondos intercalados: portada marfil, pasos blanco, catálogo
+   marfil, pagos blanco y contacto marfil. */
+.portada { background: #f5f2eb; }
+.seccion-pasos { background: #ffffff; }
+.seccion-catalogo { background: #f5f2eb; border-top: 1px solid #e8e3d7; border-radius: 0; }
+.promo-seccion { background: #f5f2eb; }
+.seccion-pagos { background: #ffffff; }
+.seccion-contacto { background: #f5f2eb; }
+.portada-chip-a { cursor: pointer; }
+.portada-chip:focus-visible { outline: 3px solid #8b7448; outline-offset: 4px; }
+.portada-chip:hover { transform: translateY(-3px); border-color: #b9a17c; box-shadow: 0 16px 34px -16px rgba(32,33,31,.28); }
+/* Los cuadros informativos siempre ocupan el centro de la pantalla.
+   El carrito conserva exclusivamente su posición lateral. */
+dialog.modal:not(.modal-lateral) { position: fixed; inset: 0; margin: auto; width: max-content; max-width: 100vw; max-height: 100dvh; }
+dialog.modal:not(.modal-lateral)[open] { margin: auto; }
+dialog.modal-lateral { position: fixed; inset: 0 0 0 auto; margin: 0 0 0 auto; }
+dialog.modal-lateral[open] { margin: 0 0 0 auto; }
+/* Se anima el contenido, no el elemento dialog: mantiene el centrado. */
+dialog.modal:not(.modal-lateral)[open] { animation: none; }
+dialog.modal:not(.modal-lateral)[open] > .modal-caja { animation: aparecer-centrado 260ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes aparecer-centrado { from { opacity: 0; transform: translateY(14px) scale(.975); } to { opacity: 1; transform: none; } }
+.menu-enlaces a.navegacion-activa { color: #20211f; }
+.menu-enlaces a.navegacion-activa::after { right: 0; background: #9d8252; }
+.catalogo-ruta { display: inline-flex; align-items: center; gap: 9px; margin-top: 2px; color: #7a756d; font-size: .75rem; letter-spacing: .03em; }
+.catalogo-ruta strong { color: #564a36; font-weight: 700; }
+.indicador-seccion { width: 7px; height: 7px; display: inline-block; margin-right: 5px; border-radius: 50%; background: #ae8a4b; box-shadow: 0 0 0 4px rgba(174,138,75,.14); vertical-align: middle; }
+.seccion-catalogo .seccion-encabezado { position: relative; padding-top: 12px; }
+.seccion-catalogo .seccion-encabezado::before { content: ''; position: absolute; width: 42px; height: 2px; top: 0; left: 0; background: #b29a6b; }
+/* Oferta configurable desde precioAnterior. Sin valor no se ve el descuento. */
+.tarjeta-media { position: relative; overflow: hidden; }
+.etiqueta-oferta { position: absolute; z-index: 4; top: 13px; left: 12px; display: flex; align-items: center; gap: 0; filter: drop-shadow(0 4px 7px rgba(0,0,0,.13)); }
+.etiqueta-oferta-sello { display: grid; place-items: center; width: 48px; height: 48px; color: white; background: #df3439; font-size: .71rem; font-weight: 800; letter-spacing: -.02em; clip-path: polygon(50% 0%,60% 9%,73% 3%,79% 17%,94% 16%,93% 32%,100% 44%,91% 54%,96% 68%,82% 76%,78% 92%,62% 91%,50% 100%,39% 90%,23% 96%,20% 80%,5% 77%,9% 60%,0 50%,10% 39%,5% 22%,22% 20%,27% 5%,40% 10%); }
+.etiqueta-oferta-porcentaje { margin-left: -3px; padding: 5px 9px; border-radius: 2px; background: #222321; color: white; font-size: .72rem; line-height: 1.2; font-weight: 800; white-space: nowrap; }
+.precio-oferta, .detalle-precio-oferta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 9px; }
+.precio-anterior { color: #9a9a97; font-size: .79em; font-weight: 500; text-decoration-thickness: 1px; }
+.precio-ahorro { color: #567946; font-size: .73em; font-weight: 800; white-space: nowrap; }
+.detalle-rebaja { position: absolute; z-index: 3; top: 18px; left: 18px; padding: 7px 12px; background: #242622; color: #fff; border-radius: 3px; font-size: .73rem; font-weight: 700; letter-spacing: .05em; }
+.detalle-media { position: relative; }
+@media (max-width: 700px) {
+  dialog.modal:not(.modal-lateral), dialog.modal:not(.modal-lateral)[open] { inset: 0; margin: auto; width: calc(100vw - 22px); max-width: calc(100vw - 22px); }
+  dialog.modal:not(.modal-lateral) .modal-caja, dialog.modal-guia .modal-caja { width: 100%; max-height: min(88dvh, 850px); border-radius: 15px; }
+  .modal-producto[open], .modal-producto { margin: auto !important; }
+  .etiqueta-oferta { top: 6px; left: 5px; }
+  .etiqueta-oferta-sello { width: 36px; height: 36px; font-size: .55rem; }
+  .etiqueta-oferta-porcentaje { padding: 4px 6px; font-size: .62rem; }
+  .precio-oferta { gap: 2px 6px; }
+  .precio-ahorro { font-size: .69em; }
+  .portada-chip { transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease; }
+}
+@media (prefers-reduced-motion: reduce) {
+  dialog.modal:not(.modal-lateral)[open] > .modal-caja { animation: none; }
+  .portada-chip:hover { transform: none; }
+}
