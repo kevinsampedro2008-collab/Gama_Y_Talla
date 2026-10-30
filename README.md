@@ -168,3 +168,12 @@ La guía EU de la portada abre el diálogo. Los diálogos de producto y guía es
 - El número de WhatsApp sigue siendo provisional y debe ser reemplazado por el número comercial antes de publicar.
 
 Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. Se recomienda comprobar los enlaces antes del lanzamiento comercial.
+
+
+## Actualización V11: formato de fotografías y etiqueta de agotado
+
+- Las ilustraciones provisionales y la reserva de fotografía ahora utilizan lienzo cuadrado 1:1 (600 × 600).
+- La tarjeta del catálogo muestra la imagen a todo el recuadro, sin el margen interior anterior.
+- Para que las fotografías reales conserven el mismo encuadre y no se recorten, utiliza imágenes cuadradas (recomendado: 1200 × 1200 px), con la zapatilla centrada y dejando un margen de seguridad alrededor.
+- Si se usa una imagen rectangular, el catálogo la adapta al recuadro cuadrado y puede recortar sus extremos; prepara las fotografías en 1:1 antes de cargarlas.
+- El distintivo de producto agotado ahora lleva fondo negro y texto rojo.
