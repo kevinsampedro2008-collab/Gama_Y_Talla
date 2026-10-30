@@ -244,3 +244,21 @@ Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. S
 - Al abrir un detalle se carga la foto que corresponda, aunque la tarjeta original estuviera fuera de pantalla.
 - Recomendado para tus fotografías: formato WebP/AVIF, 1:1, alrededor de 800–1200 px por lado y, como referencia práctica, entre 80 y 200 KB por foto si la calidad lo permite.
 - **Netlify:** en planes por créditos, cada despliegue a producción cuesta créditos; con GitHub conectado, cada `git push` a la rama de producción puede generar uno. Puedes agrupar cambios para evitar despliegues innecesarios.
+
+
+## V21 — Portada editorial
+Se rediseñó únicamente el bloque de texto de Inicio (titular, texto, botones y pasos resumidos). Se conservan ilustración, guía de tallas, enlace al catálogo y catálogo optimizado de V20.
+
+## V23 — Animaciones restauradas
+
+Se recuperó el movimiento suave de la ilustración de Inicio y el efecto de elevación/acercamiento de las tarjetas del catálogo, sin alterar la composición editorial de la portada de V22. Se respeta `prefers-reduced-motion` y los efectos hover se aplican solo en dispositivos compatibles con cursor. Los productos siguen cargándose en grupos de 12.
+
+### V24 · Métodos de pago
+Se unificó el recuadro del icono de transferencia bancaria con Nequi y Bancolombia. El nuevo símbolo de banco es negro y está incrustado en el HTML, sin enlaces externos.
+
+
+## Versión 25 — icono de transferencia y nitidez de fotografías
+
+- El método «Transferencia bancaria» recupera el icono original de dos flechas de transferencia (`icono-transferencia`), ahora en negro. Se conserva el mismo recuadro blanco y las dimensiones de los recuadros de Nequi y Bancolombia.
+- Se eliminó el zoom y la rotación de la fotografía al pasar el cursor sobre una tarjeta. La zapatilla mantiene un movimiento vertical muy sutil de 2 px, mientras la tarjeta se eleva ligeramente. Esto evita que la animación amplíe la imagen y provoque pérdida de nitidez.
+- En dispositivos táctiles no se fuerza el efecto de hover y se respeta `prefers-reduced-motion`.

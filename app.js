@@ -8,7 +8,7 @@
 const CONFIG = {
   tienda: "Gama & Talla",
   descripcion: "Tienda de zapatillas en Colombia. Explora el catálogo, consulta tallas y arma tu pedido por WhatsApp.",
-  whatsapp: "573000000000", // Sustituir por el número real antes de publicar.
+  whatsapp: "573124745942", // Sustituir por el número real antes de publicar.
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
   datosUrl: "data/productos.json",

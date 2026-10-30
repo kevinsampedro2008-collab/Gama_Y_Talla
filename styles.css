@@ -1494,3 +1494,175 @@ body { background: var(--beige-v6); }
 @media (prefers-reduced-motion: reduce) {
   .tarjeta { transition: none !important; }
 }
+
+
+/* V21 — Portada editorial: mensaje corto, jerarquía clara y recorrido discreto.
+   No modifica los accesos de la ilustración ni añade elementos al fondo. */
+.portada .portada-texto {
+  max-width: 565px;
+  gap: 0;
+  align-content: center;
+}
+.portada-etiqueta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: 11px;
+  row-gap: 2px;
+  color: #7c6a50;
+  font-size: .68rem;
+  font-weight: 800;
+  line-height: 1.65;
+  letter-spacing: .15em;
+}
+.portada-etiqueta-linea {
+  display: inline-block;
+  width: 27px;
+  height: 1px;
+  flex: none;
+  background: #a68a58;
+}
+.portada-etiqueta-punto { color: #ad9975; }
+.portada .portada-texto h1 {
+  margin-top: clamp(22px, 3vw, 35px);
+  max-width: 640px;
+  font-size: clamp(3.35rem, 5.4vw, 5.6rem);
+  line-height: 1.105;
+  letter-spacing: -.052em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+.portada .portada-texto h1 em {
+  color: #92774a;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.portada .portada-descripcion {
+  margin-top: clamp(20px, 2.5vw, 28px);
+  max-width: 445px;
+  color: #5d5c55;
+  font-size: clamp(1rem, 1.35vw, 1.1rem);
+  line-height: 1.85;
+}
+.portada-acciones {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 20px;
+  margin-top: 30px;
+}
+.portada-acciones .portada-cta { min-height: 52px; padding-inline: 26px; }
+.portada-enlace {
+  display: inline-flex;
+  gap: 9px;
+  align-items: center;
+  min-height: 44px;
+  color: #32312d;
+  font-size: .9rem;
+  font-weight: 700;
+  border-bottom: 1px solid #b8a582;
+  transition: color 200ms ease, border-color 200ms ease;
+}
+.portada-enlace:hover { color: #92774a; border-color: currentColor; }
+.portada-enlace span { color: #9e8356; font-size: 1.2em; }
+.portada-recorrido {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin-top: clamp(33px, 4vw, 51px);
+  padding-top: 17px;
+  border-top: 1px solid #dcd4c5;
+  color: #615e56;
+  font-size: .76rem;
+  line-height: 1.6;
+  letter-spacing: .005em;
+}
+.portada-recorrido > span:not(.portada-recorrido-sep) { display: inline-flex; align-items: baseline; gap: 7px; white-space: nowrap; }
+.portada-recorrido b { color: #92774a; font-size: .69rem; font-weight: 800; letter-spacing: .04em; }
+.portada-recorrido-sep { width: 3px; height: 3px; border-radius: 50%; background: #b7a688; }
+@media (max-width: 1050px) {
+  .portada .portada-texto h1 { font-size: clamp(2.7rem, 5.5vw, 4.3rem); }
+  .portada-recorrido { column-gap: 9px; }
+}
+@media (max-width: 700px) {
+  .portada .portada-texto h1 { margin-top: 19px; font-size: clamp(2.85rem, 11.1vw, 4.4rem); }
+  .portada .portada-descripcion { margin-top: 15px; font-size: .98rem; line-height: 1.75; }
+  .portada-etiqueta { font-size: .62rem; column-gap: 8px; }
+  .portada-etiqueta-linea { width: 19px; }
+  .portada-acciones { margin-top: 24px; gap: 12px; }
+  .portada-acciones .portada-cta { min-height: 49px; }
+  .portada-recorrido { margin-top: 29px; padding-top: 14px; gap: 8px; font-size: .7rem; }
+}
+@media (max-width: 400px) {
+  .portada .portada-texto h1 { font-size: clamp(2.5rem, 11vw, 3rem); }
+  .portada-recorrido-sep { display: none; }
+  .portada-recorrido { column-gap: 14px; }
+  .portada-acciones { align-items: stretch; }
+  .portada-acciones .portada-cta { width: 100%; justify-content: center; }
+  .portada-enlace { width: fit-content; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portada-enlace { transition: none; }
+}
+
+/* V22 — Beneficios recuperados con la línea editorial de la portada. */
+.portada .portada-beneficios {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 22px;
+  width: 100%;
+  margin-top: clamp(33px, 4vw, 51px);
+  padding-top: 18px;
+  border-top: 1px solid #dcd4c5;
+  color: #615e56;
+  font-size: .79rem;
+  line-height: 1.6;
+}
+.portada .portada-beneficios li { display: inline-flex; align-items: center; gap: 7px; }
+.portada .portada-beneficios .icono { color: #92774a; flex: none; }
+@media (max-width: 700px) {
+  .portada .portada-beneficios { margin-top: 29px; padding-top: 14px; gap: 10px 15px; font-size: .75rem; }
+}
+@media (max-width: 400px) {
+  .portada .portada-beneficios { display: flex; flex-direction: column; align-items: flex-start; }
+}
+
+/* V23 — recupera movimiento delicado de portada y catálogo de versiones previas.
+   Sin interferir con el diseño editorial V22 ni el marco champagne unificado. */
+@keyframes gt-flotacion-suave {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(0, -9px, 0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  /* La ilustración vuelve a flotar lentamente, como en las primeras versiones. */
+  .portada-imagen img {
+    animation: gt-flotacion-suave 7s ease-in-out infinite;
+    will-change: transform;
+  }
+  /* Tarjeta y zapatilla con el efecto de acercamiento al pasar el cursor. */
+  .tarjeta {
+    transition: transform 300ms cubic-bezier(.2,.7,.2,1),
+                box-shadow 300ms ease, border-color 300ms ease;
+  }
+  .tarjeta-media img {
+    transition: transform 500ms cubic-bezier(.2,.7,.2,1), filter 500ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .tarjeta:hover { transform: translateY(-5px); }
+    /* Se mantiene el movimiento de la zapatilla sin ampliar la fotografía,
+       para evitar interpolación y pérdida de nitidez al pasar el cursor. */
+    .tarjeta:hover .tarjeta-media img { transform: translateY(-2px); }
+    .portada-imagen:hover img { animation-play-state: paused; transform: translateY(-4px); }
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .portada-imagen img { animation: none !important; transform: none !important; }
+  .tarjeta:hover, .tarjeta:hover .tarjeta-media img { transform: none !important; }
+}
+
+/* V25: conserva el icono de flechas de transferencia original, ahora en negro,
+   dentro del mismo recuadro blanco usado por Nequi y Bancolombia. */
+.pago-transferencia { color: #20211f; }
+.pago-transferencia .icono { width: 25px; height: 25px; color: #20211f; }
