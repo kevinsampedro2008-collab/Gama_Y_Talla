@@ -95,18 +95,19 @@ Las imágenes incluidas son ilustraciones genéricas para diseño y pruebas. No 
 
 Se recomienda usar imágenes cuadradas, de buena resolución y optimizadas para web (`.webp` o `.jpg`). Si una imagen falla, se utiliza `assets/images/branding/placeholder.svg` como respaldo.
 
-### 4. Guía de tallas
+### 4. Guía de tallas y fuentes oficiales
 
-El catálogo usa talla EU como selección principal. La guía muestra equivalencias colombianas únicamente cuando la tabla incluida aporta ese dato; para otras tallas indica que debe confirmarse con el vendedor.
+Los enlaces de consulta de esta versión se actualizaron a páginas oficiales que se comprobaron al preparar la entrega:
 
-La tabla Nike de demostración se basa en guías oficiales de calzado de hombre de Nike Colombia y Nike Global:
+- Nike Colombia: https://www.nike.com.co/guia-de-tallas
+- adidas, tabla oficial de calzado (EU/US/longitud): https://www.adidas.com/us/help/size_charts/shoes
+- adidas Colombia, orientación para abrir la tabla desde cada producto: https://www.adidas.co/ayuda/producto/cual-es-mi-talla-adidas
+- New Balance, guía oficial en español: https://www.newbalance.com/es/size-guide.html
+- Jordan, ayuda oficial de Nike sobre cómo consultar la tabla específica de cada modelo: https://www.nike.com/mx/help/a/tabla-de-tallas/app
 
-- [Guía de tallas de Nike Colombia](https://www.nike.com.co/guia-tallas/calzado-de-hombre)
-- [Guía global de calzado de hombre de Nike](https://www.nike.com/size-fit/mens-footwear)
+**Importante:** Nike y New Balance disponen de tablas por categoría (hombre, mujer, unisex o niños). adidas presenta algunas tallas EU en tercios. Jordan requiere consultar la guía desde la ficha del modelo concreto; no se debe tratar como una conversión universal. Antes de publicar tallas, confirma la categoría, la etiqueta física y el modelo exacto. La web no inventa una equivalencia colombiana cuando no hay una fuente que la respalde.
 
-No apliques la tabla de hombre automáticamente a calzado de mujer o niño ni a otras marcas. Comprueba periódicamente las fuentes y confirma el ajuste de cada modelo. Las equivalencias son orientativas, porque la horma puede variar.
-
-Para actualizar las tablas, edita `guiasTallas` dentro de `data/productos.json`. Deja `verificada: true` únicamente cuando los datos y la fuente se hayan comprobado. Las guías pendientes no muestran equivalencias como si fueran oficiales.
+Los enlaces se abren en una pestaña nueva. Las páginas y sus rutas pueden cambiar con el tiempo; si una marca modifica su sitio, actualiza el campo `url` correspondiente en `data/productos.json`.
 
 ### 5. Métodos de pago y envíos
 
@@ -158,39 +159,12 @@ En `data/productos.json`, algunos artículos tienen `precioAnterior` como **ejem
 
 La guía EU de la portada abre el diálogo. Los diálogos de producto y guía están centrados; el carrito sigue a la derecha. El menú marca la sección visible y respeta el nuevo orden: Inicio, Cómo comprar, Catálogo, Pagos, Contacto.
 
-## Ajustes visuales V5
+## Versión 10 — enlaces, ilustraciones y disponibilidad
 
-La secuencia de fondos de las secciones principales empieza en **blanco** (portada), **beige** (Cómo comprar), **blanco** (catálogo), **beige** (promoción), **blanco** (pagos) y **beige** (contacto). La insignia roja `SALE` y la etiqueta oscura del porcentaje se solapan ligeramente para verse unidas, también en dispositivos móviles. El botón flotante de la portada sigue diciendo **Ver catálogo**.
+- Los enlaces de consulta de tallas apuntan a páginas oficiales comprobadas: Nike Colombia, adidas (tabla oficial de calzado y ayuda colombiana), New Balance en español y ayuda de Nike para encontrar la guía específica de cada modelo Jordan.
+- La ficha de producto mantiene el enlace oficial de consulta incluso cuando una talla concreta no aparece en la tabla integrada.
+- Los pasos 2 y 3 usan ilustraciones SVG locales nuevas: una zapatilla de perfil y un carrito de compras reconocible.
+- El distintivo «Agotado» es rojo con texto blanco de alto contraste.
+- El número de WhatsApp sigue siendo provisional y debe ser reemplazado por el número comercial antes de publicar.
 
-
-### Ajustes V6
-- Inicio y Cómo comprar: beige continuo; Catálogo: blanco; Promoción, Pagos y Contacto: beige.
-- Barra de navegación beige; al desplazarse pasa a beige translúcido con desenfoque suave (en móvil, más opaco para conservar legibilidad).
-- Logos de Nequi y Bancolombia como imágenes externas con nombre de respaldo; necesitan conexión a Internet. Si cambian de dirección, sustituye `src` en `index.html` por un archivo local autorizado. Los logotipos pertenecen a sus respectivos titulares y no implican afiliación.
-
-### Versión 7: presentación de secciones
-
-- Inicio y Cómo comprar: beige continuo. Catálogo y Promoción: blanco continuo. Pagos y Contacto: beige.
-- Cinco pasos en tarjetas independientes, más amplias y adaptadas a móvil.
-- Portada sin círculo inferior izquierdo, con tipografía decorativa Gama & Talla y destellos.
-- Bancolombia usa un símbolo local simplificado (sin el nombre dentro de la imagen), mientras el nombre accesible aparece al lado. El símbolo es una representación esquemática; si cuentas con el recurso de marca oficial autorizado, sustituye `assets/images/branding/bancolombia-simbolo.svg`.
-
-
-## Ajustes V8
-- Inicio limpio sin letras ni destellos de fondo agregados en V7.
-- Menú activo: Contacto permanece seleccionado al llegar al final de la página.
-- Símbolo de Bancolombia integrado en HTML como SVG: no depende de una imagen que pueda fallar.
-- Líneas sutiles de separación entre Inicio/Cómo comprar y Pagos/Contacto.
-
-
-## Versión 9 — guías oficiales y mejoras visuales
-Se añadieron guías de hombre Nike, Adidas Colombia y New Balance a partir de fuentes oficiales. Jordan requiere comprobar la tabla de cada referencia en Nike. **No se asignan tallas colombianas a Adidas ni a New Balance** sin respaldo oficial, ni se interpolan tallas ausentes. Confirma siempre género, referencia y etiqueta antes de vender.
-
-Fuentes consultadas:
-- Nike Colombia: https://www.nike.com.co/guia-tallas/calzado-de-hombre
-- Nike global: https://www.nike.com/size-fit/mens-footwear
-- Adidas Colombia: https://www.adidas.co/ayuda/producto/cual-es-mi-talla-adidas
-- New Balance: https://www.newbalance.com/size-guide.html
-- Jordan (guía por modelo): https://www.nike.com/us/es/help/a/tabla-de-tallas
-
-Los cinco iconos de «Cómo comprar» son ilustraciones SVG originales incluidas localmente. El distintivo de «Agotado» es oscuro con texto blanco de alto contraste. WhatsApp sigue provisional para que el propietario introduzca su número.
+Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. Se recomienda comprobar los enlaces antes del lanzamiento comercial.

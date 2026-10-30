@@ -964,3 +964,18 @@ body { background: var(--beige-v6); }
 .tarjeta-agotada .tarjeta-media img{opacity:.3}
 @media(max-width:650px){.pasos .paso-icono{width:66px;height:66px;flex-basis:66px}.etiqueta.etiqueta-agotado{font-size:.76rem;padding:8px 11px}}
 @media(prefers-reduced-motion:reduce){.pasos .paso-icono img{transition:none}.pasos .paso:hover .paso-icono img{transform:none}}
+
+
+/* V10: mayor claridad en el distintivo de producto agotado */
+.etiqueta.etiqueta-agotado {
+  color: #FFFFFF !important;
+  background: #C62832 !important;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 5px 15px rgba(151, 26, 37, .28);
+  font-weight: 850;
+  letter-spacing: .045em;
+  opacity: 1 !important;
+  text-shadow: none !important;
+}
+.estado-stock.no { color: #C62832 !important; font-weight: 800; }
+.tarjeta-agotada .etiqueta.etiqueta-agotado { background: #C62832 !important; }

@@ -221,11 +221,23 @@ function guiaDeMarca(marca) {
 function orientacionTalla(producto, talla) {
   const guia = guiaDeMarca(producto.marca);
   if (!guia || !guia.verificada) {
-    return { verificada: false, texto: `No tenemos una equivalencia nacional verificada para ${producto.marca}. Confirma la talla de este modelo con el vendedor.` };
+    return {
+      verificada: false,
+      texto: guia?.nota || `No tenemos una equivalencia verificada para ${producto.marca}. Confirma la talla exacta de este modelo antes de comprar.`,
+      url: guia?.url || "",
+      urlAlterna: guia?.urlAlterna || "",
+      fuente: guia?.fuente || ""
+    };
   }
   const medida = guia.tallas[String(talla)];
   if (!medida) {
-    return { verificada: false, texto: `La talla EU ${talla} no figura en la tabla oficial consultada de ${producto.marca}. Comprueba la talla exacta de la etiqueta del par antes de comprar; no se asigna una equivalencia estimada.` };
+    return {
+      verificada: false,
+      texto: `La talla EU ${talla} no figura en la tabla oficial consultada de ${producto.marca}. Comprueba la talla exacta de la etiqueta del par antes de comprar; no se asigna una equivalencia estimada.`,
+      url: guia.url,
+      urlAlterna: guia.urlAlterna,
+      fuente: guia.fuente
+    };
   }
   const partes = [];
   if (medida.colombia) partes.push(`talla Colombia ${medida.colombia}`);
@@ -609,14 +621,16 @@ function renderizarDetalle({ selectorFoco = "" } = {}) {
     orientacion.classList.add(datos.verificada ? "verificada" : "pendiente");
     orientacion.append(crearElemento("p", "orientacion-talla", `Talla seleccionada: EU ${talla}`), crearElemento("p", "orientacion-texto", datos.texto));
     if (datos.url) {
-      const fuente = crearElemento("a", "orientacion-fuente", `Consultar guía de ${producto.marca}`);
+      const textoFuente = producto.marca === "Jordan" ? "Consultar cómo encontrar la talla Jordan" : `Consultar guía oficial de ${producto.marca}`;
+      const fuente = crearElemento("a", "orientacion-fuente", textoFuente);
       fuente.href = datos.url;
       fuente.target = "_blank";
       fuente.rel = "noopener noreferrer";
       orientacion.append(fuente);
     }
     if (datos.urlAlterna) {
-      const fuenteAlterna = crearElemento("a", "orientacion-fuente", "Ver tabla global de la marca");
+      const textoAlterno = producto.marca === "Adidas" ? "Ver ayuda de tallas de adidas Colombia" : "Ver otra fuente oficial de la marca";
+      const fuenteAlterna = crearElemento("a", "orientacion-fuente", textoAlterno);
       fuenteAlterna.href = datos.urlAlterna;
       fuenteAlterna.target = "_blank";
       fuenteAlterna.rel = "noopener noreferrer";
@@ -683,7 +697,8 @@ function renderizarGuia(marcaDestacada = "") {
     if (!verificada) {
       bloque.append(crearElemento("p", "", guia?.nota || `Aún no hay equivalencias verificadas para ${marca}.`));
       if (guia?.url) {
-        const enlace = crearElemento("a", "orientacion-fuente", "Consultar guía de la marca");
+        const textoEnlace = marca === "Jordan" ? "Consultar cómo encontrar la talla Jordan" : `Consultar guía oficial de ${marca}`;
+        const enlace = crearElemento("a", "orientacion-fuente", textoEnlace);
         enlace.href = guia.url;
         enlace.target = "_blank";
         enlace.rel = "noopener noreferrer";
@@ -714,11 +729,13 @@ function renderizarGuia(marcaDestacada = "") {
     bloque.append(envoltura);
     if (guia.nota) bloque.append(crearElemento("p", "guia-fuente", guia.nota));
     if (guia.url) {
-      const fuente = crearElemento("a", "orientacion-fuente", `Ver fuente oficial de ${marca}`);
+      const textoFuente = marca === "Jordan" ? "Consultar cómo encontrar la talla Jordan" : `Consultar guía oficial de ${marca}`;
+      const fuente = crearElemento("a", "orientacion-fuente", textoFuente);
       fuente.href = guia.url; fuente.target = "_blank"; fuente.rel = "noopener noreferrer"; bloque.append(fuente);
     }
     if (guia.urlAlterna) {
-      const fuenteAlterna = crearElemento("a", "orientacion-fuente", "Ver fuente oficial adicional");
+      const textoAlterno = marca === "Adidas" ? "Ver ayuda de tallas de adidas Colombia" : "Ver otra fuente oficial de la marca";
+      const fuenteAlterna = crearElemento("a", "orientacion-fuente", textoAlterno);
       fuenteAlterna.href = guia.urlAlterna; fuenteAlterna.target = "_blank"; fuenteAlterna.rel = "noopener noreferrer"; bloque.append(fuenteAlterna);
     }
     return bloque;
