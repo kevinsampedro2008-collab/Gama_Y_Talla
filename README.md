@@ -196,3 +196,33 @@ Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. S
 - **Mostrar menos** regresa exactamente al grupo anterior: por ejemplo, 24 → 12; 25 → 24; 36 → 24. Desde ese punto vuelve a estar disponible **Mostrar más**.
 - Al cambiar la búsqueda, los filtros o el orden, la vista se reinicia en los primeros 12 resultados.
 - Si el resultado tiene 12 productos o menos, el control no aparece.
+
+
+## Versión 14 — marco de fotografías y espacio del control del catálogo
+
+- Las fotografías de producto mantienen el formato cuadrado 1:1 y ocupan el recuadro completo, pero ahora tienen un borde cálido y una sombra muy sutil para que el marco no se pierda cuando la propia fotografía tiene fondo blanco.
+- Se añadió un espacio más claro entre la fotografía y el nombre/precio del producto, sin alterar el tamaño del recuadro.
+- El control **Mostrar más / Mostrar menos** tiene más separación respecto a la última fila de productos, con un ajuste específico para celular.
+
+## Actualización V15 — marco de fotografías del catálogo
+
+- Cada fotografía del catálogo queda insetada dentro de un marco beige visible de 9–12 px, con borde cálido, doble separación sutil y esquinas redondeadas. Esto evita que las fotos de fondo blanco se confundan con el fondo de la tarjeta.
+- Se conserva el formato cuadrado 1:1 y `object-fit: cover` para mantener una presentación uniforme de las fotos.
+- Se amplió el espacio antes del control «Mostrar más / Mostrar menos» y se añadió un separador horizontal champagne para distinguirlo de la última fila de productos.
+
+
+## Actualización V16 — marco negro y ficha del producto
+
+- El marco de la fotografía ahora es negro, con una separación interior uniforme y esquinas redondeadas.
+- La información debajo de la foto (marca, modelo, precio y botón «Ver detalles») ahora está agrupada en una ficha beige con borde oscuro, radio suave y sombra ligera. Así deja de perderse sobre el fondo blanco del catálogo.
+- En pantallas pequeñas se reducen los márgenes internos de la ficha para conservar espacio y legibilidad.
+- Se mantiene la paginación «Mostrar más / Mostrar menos» y el resto de las funciones del catálogo.
+
+
+## Actualización V17 — tarjeta de producto unificada
+
+- Se eliminó el marco negro independiente de la fotografía.
+- La fotografía y el bloque de información quedan unidos, sin margen ni separación entre ambos.
+- Un único contorno exterior rodea el conjunto completo del producto.
+- La zona de información conserva un fondo beige suave para que marca, modelo, precio y acciones destaquen sobre el catálogo blanco, pero ya no tiene un borde ni una sombra independientes.
+- Se mantiene la imagen cuadrada 1:1, `object-fit: contain` y los ajustes de visualización para móvil.
