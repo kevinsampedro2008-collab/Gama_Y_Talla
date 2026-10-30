@@ -1666,3 +1666,149 @@ body { background: var(--beige-v6); }
    dentro del mismo recuadro blanco usado por Nequi y Bancolombia. */
 .pago-transferencia { color: #20211f; }
 .pago-transferencia .icono { width: 25px; height: 25px; color: #20211f; }
+
+
+/* V26 — Ajustes móviles de portada y alineación de fichas del catálogo. */
+@media (max-width: 700px) {
+  /* En móvil, el enlace secundario queda centrado debajo del CTA principal. */
+  .portada-acciones {
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+    gap: 11px;
+  }
+  .portada-acciones .portada-cta {
+    width: 100%;
+    justify-content: center;
+  }
+  .portada-acciones .portada-enlace {
+    align-self: center;
+    justify-content: center;
+    width: fit-content;
+    text-align: center;
+  }
+
+  /* La ficha reserva alto para el precio normal o el precio con descuento. */
+  .tarjeta { height: 100%; }
+  .tarjeta-cuerpo { flex: 1 1 auto; }
+  .precio-oferta {
+    min-height: 3.15em;
+    align-content: flex-start;
+    align-items: baseline;
+  }
+  .tarjeta-acciones {
+    margin-top: auto;
+    padding-top: 8px;
+    align-items: stretch;
+  }
+}
+@media (min-width: 701px) {
+  /* Mantiene alineados los botones en cada fila del catálogo en escritorio. */
+  .tarjeta { height: 100%; }
+  .tarjeta-cuerpo { flex: 1 1 auto; }
+  .tarjeta-acciones { margin-top: auto; padding-top: 8px; }
+}
+
+/* V28 — ajustes exclusivos para celular.
+   En escritorio se conserva la presentación de precios y tarjetas de V26.
+   En móvil, el bloque de precio mantiene dos filas para alinear descuentos,
+   mientras que los productos sin descuento usan la misma columna izquierda. */
+@media (max-width: 700px) {
+  .tarjeta {
+    height: 100%;
+  }
+
+  .tarjeta > .tarjeta-cuerpo {
+    display: flex;
+    flex: 1 1 auto;
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  .tarjeta-cuerpo .tarjeta-nombre {
+    min-height: 2.5em;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    hyphens: auto;
+  }
+
+  .tarjeta-cuerpo .precio-oferta {
+    display: grid;
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    grid-template-rows: minmax(1.35em, auto) minmax(1.35em, auto);
+    align-items: center;
+    align-content: center;
+    column-gap: 5px;
+    row-gap: 0;
+    min-height: 3em;
+    margin-top: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tarjeta-cuerpo .precio-actual {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    align-self: center;
+    justify-self: start;
+    white-space: nowrap;
+    line-height: 1.15;
+    font-size: .94em;
+  }
+
+  .tarjeta-cuerpo .precio-con-descuento .precio-anterior {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+    justify-self: start;
+    white-space: nowrap;
+    line-height: 1.15;
+    font-size: .72em;
+  }
+
+  .tarjeta-cuerpo .precio-con-descuento .precio-ahorro {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: start;
+    justify-self: start;
+    white-space: nowrap;
+    line-height: 1.15;
+    font-size: .65em;
+  }
+
+  /* El precio normal ocupa la misma columna izquierda que el precio vigente
+     de un producto rebajado, pero queda alineado al inicio, no centrado. */
+  .tarjeta-cuerpo .precio-sin-descuento {
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, .92fr);
+    grid-template-rows: minmax(1.35em, auto) minmax(1.35em, auto);
+    justify-items: stretch;
+    align-items: center;
+  }
+
+  .tarjeta-cuerpo .precio-sin-descuento .precio-actual {
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    justify-self: start;
+    text-align: left;
+  }
+
+  .tarjeta-cuerpo .tarjeta-acciones {
+    margin-top: auto;
+    padding-top: 9px;
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 360px) {
+  .tarjeta-cuerpo .precio-oferta {
+    column-gap: 3px;
+  }
+  .tarjeta-cuerpo .precio-actual {
+    font-size: .88em;
+  }
+  .tarjeta-cuerpo .precio-anterior {
+    font-size: .68em;
+  }
+  .tarjeta-cuerpo .precio-ahorro {
+    font-size: .61em;
+  }
+}

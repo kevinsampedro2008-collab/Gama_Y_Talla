@@ -262,3 +262,24 @@ Se unificó el recuadro del icono de transferencia bancaria con Nequi y Bancolom
 - El método «Transferencia bancaria» recupera el icono original de dos flechas de transferencia (`icono-transferencia`), ahora en negro. Se conserva el mismo recuadro blanco y las dimensiones de los recuadros de Nequi y Bancolombia.
 - Se eliminó el zoom y la rotación de la fotografía al pasar el cursor sobre una tarjeta. La zapatilla mantiene un movimiento vertical muy sutil de 2 px, mientras la tarjeta se eleva ligeramente. Esto evita que la animación amplíe la imagen y provoque pérdida de nitidez.
 - En dispositivos táctiles no se fuerza el efecto de hover y se respeta `prefers-reduced-motion`.
+
+
+## Cambios de la versión 26
+
+- En teléfonos, el enlace «Cómo comprar» queda centrado debajo de «Descubrir zapatillas»; el botón principal ocupa el ancho disponible. En escritorio se conserva la disposición anterior.
+- Las fichas de productos reservan espacio para el precio y el distintivo de descuento, y fijan las acciones al final de la tarjeta para alinear «Ver detalles» entre productos con y sin oferta.
+- Se retiró la ruta decorativa «Inicio / Catálogo» del encabezado de la sección de catálogo.
+
+## Versión 27 — equilibrio de precios y botones
+- Los precios sin descuento se centran vertical y horizontalmente en el mismo espacio de dos niveles que ocupan el precio anterior y el porcentaje de descuento.
+- En productos con descuento, el precio actual queda a la izquierda y el precio anterior tachado y el porcentaje se apilan a la derecha.
+- Las fichas reservan una altura mínima para nombres de dos líneas y los botones `Ver detalles` quedan anclados en la parte inferior, aunque los modelos tengan nombres más largos.
+- Se mantienen el diseño, las funciones y los recursos de la versión 26.
+
+## Versión 28 — diseño de escritorio restaurado y precios móviles ajustados
+
+- En pantallas de escritorio se restaura la presentación original de las tarjetas y los precios de la versión 26. Los cambios de distribución de precios introducidos en la versión 27 ya no se aplican al escritorio.
+- En celular se conserva el diseño de dos niveles para las ofertas: precio vigente a la izquierda y precio anterior tachado junto al porcentaje a la derecha.
+- En celular, los productos sin descuento muestran el precio normal alineado a la izquierda, en la misma columna del precio vigente de los productos rebajados.
+- En celular, el nombre del producto reserva altura y el botón «Ver detalles» se mantiene abajo para que los nombres largos no desacomoden la fila.
+- Los ajustes nuevos de precios están dentro de reglas `@media (max-width: 700px)`, por lo que no alteran la composición de escritorio.

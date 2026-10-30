@@ -8,7 +8,7 @@
 const CONFIG = {
   tienda: "Gama & Talla",
   descripcion: "Tienda de zapatillas en Colombia. Explora el catálogo, consulta tallas y arma tu pedido por WhatsApp.",
-  whatsapp: "573124745942", // Sustituir por el número real antes de publicar.
+  whatsapp: "573000000000", // Sustituir por el número real antes de publicar.
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
   datosUrl: "data/productos.json",
@@ -553,7 +553,7 @@ function crearTarjeta(producto, indiceVisible = 12) {
   const cuerpo = crearElemento("div", "tarjeta-cuerpo");
   const marca = crearElemento("p", "tarjeta-marca", producto.marca);
   const nombre = crearElemento("h3", "tarjeta-nombre", producto.nombre);
-  const precio = crearElemento("div", "precio precio-oferta");
+  const precio = crearElemento("div", `precio precio-oferta ${producto.descuento ? "precio-con-descuento" : "precio-sin-descuento"}`);
   precio.append(crearElemento("span", "precio-actual", formatearPrecio(producto.precio)));
   if (producto.descuento) {
     precio.append(crearElemento("del", "precio-anterior", formatearPrecio(producto.precioAnterior)));
