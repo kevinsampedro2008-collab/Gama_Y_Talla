@@ -181,3 +181,16 @@ La secuencia de fondos de las secciones principales empieza en **blanco** (porta
 - Menú activo: Contacto permanece seleccionado al llegar al final de la página.
 - Símbolo de Bancolombia integrado en HTML como SVG: no depende de una imagen que pueda fallar.
 - Líneas sutiles de separación entre Inicio/Cómo comprar y Pagos/Contacto.
+
+
+## Versión 9 — guías oficiales y mejoras visuales
+Se añadieron guías de hombre Nike, Adidas Colombia y New Balance a partir de fuentes oficiales. Jordan requiere comprobar la tabla de cada referencia en Nike. **No se asignan tallas colombianas a Adidas ni a New Balance** sin respaldo oficial, ni se interpolan tallas ausentes. Confirma siempre género, referencia y etiqueta antes de vender.
+
+Fuentes consultadas:
+- Nike Colombia: https://www.nike.com.co/guia-tallas/calzado-de-hombre
+- Nike global: https://www.nike.com/size-fit/mens-footwear
+- Adidas Colombia: https://www.adidas.co/ayuda/producto/cual-es-mi-talla-adidas
+- New Balance: https://www.newbalance.com/size-guide.html
+- Jordan (guía por modelo): https://www.nike.com/us/es/help/a/tabla-de-tallas
+
+Los cinco iconos de «Cómo comprar» son ilustraciones SVG originales incluidas localmente. El distintivo de «Agotado» es oscuro con texto blanco de alto contraste. WhatsApp sigue provisional para que el propietario introduzca su número.

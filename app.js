@@ -127,8 +127,13 @@ function listaDeTallas(valor) {
 }
 
 function compararTallas(a, b) {
-  const numeroA = Number(String(a).replace(",", "."));
-  const numeroB = Number(String(b).replace(",", "."));
+  const convertir = (valor) => {
+    const texto = String(valor).trim().replace(",", ".");
+    const fraccion = texto.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+    return fraccion ? Number(fraccion[1]) + Number(fraccion[2]) / Number(fraccion[3]) : Number(texto);
+  };
+  const numeroA = convertir(a);
+  const numeroB = convertir(b);
   if (Number.isFinite(numeroA) && Number.isFinite(numeroB)) return numeroA - numeroB;
   return String(a).localeCompare(String(b), "es", { numeric: true });
 }
@@ -220,15 +225,15 @@ function orientacionTalla(producto, talla) {
   }
   const medida = guia.tallas[String(talla)];
   if (!medida) {
-    return { verificada: false, texto: `La talla EU ${talla} no aparece en la tabla disponible. Confirma la equivalencia con el vendedor.` };
+    return { verificada: false, texto: `La talla EU ${talla} no figura en la tabla oficial consultada de ${producto.marca}. Comprueba la talla exacta de la etiqueta del par antes de comprar; no se asigna una equivalencia estimada.` };
   }
   const partes = [];
   if (medida.colombia) partes.push(`talla Colombia ${medida.colombia}`);
   if (medida.cm) partes.push(`${medida.cm} cm de largo de pie`);
   if (medida.us) partes.push(`US hombre ${medida.us}`);
   const texto = medida.colombia
-    ? `Según las guías oficiales consultadas de ${guia.marcaBase || guia.marca}, EU ${talla} corresponde a ${partes.join(" · ")}. La horma puede variar según el modelo.`
-    : `La guía global de ${guia.marcaBase || guia.marca} indica EU ${talla}${medida.cm ? ` y ${medida.cm} cm de largo de pie` : ""}${medida.us ? ` (US hombre ${medida.us})` : ""}, pero la tabla colombiana consultada no publica una equivalencia nacional para esta talla. Confirma con el vendedor.`;
+    ? `Según la tabla oficial consultada de ${guia.marcaBase || guia.marca}, EU ${talla}: ${partes.join(" · ")}. Confirma la categoría (hombre/mujer/unisex) y el ajuste del modelo.`
+    : `La tabla oficial de ${guia.marcaBase || guia.marca} indica EU ${talla}${medida.cm ? ` · referencia ${medida.cm} cm` : ""}${medida.us ? ` · US hombre ${medida.us}` : ""}. No se dispone de conversión nacional colombiana verificada para esta talla. Confirma la etiqueta y el modelo.`;
   return { verificada: true, texto, url: guia.url, urlAlterna: guia.urlAlterna, fuente: guia.fuente };
 }
 
@@ -673,7 +678,7 @@ function renderizarGuia(marcaDestacada = "") {
     const verificada = Boolean(guia?.verificada && Object.keys(guia.tallas || {}).length);
     const bloque = crearElemento("section", `guia-marca${marca === marcaDestacada ? " destacada" : ""}`);
     const cabecera = crearElemento("div", "guia-marca-cabecera");
-    cabecera.append(crearElemento("h3", "", marca), crearElemento("span", `sello ${verificada ? "sello-ok" : "sello-pendiente"}`, verificada ? "Tabla consultada" : "Por confirmar"));
+    cabecera.append(crearElemento("h3", "", marca), crearElemento("span", `sello ${verificada ? "sello-ok" : "sello-pendiente"}`, verificada ? "Tabla oficial" : "Por modelo"));
     bloque.append(cabecera);
     if (!verificada) {
       bloque.append(crearElemento("p", "", guia?.nota || `Aún no hay equivalencias verificadas para ${marca}.`));
@@ -709,11 +714,11 @@ function renderizarGuia(marcaDestacada = "") {
     bloque.append(envoltura);
     if (guia.nota) bloque.append(crearElemento("p", "guia-fuente", guia.nota));
     if (guia.url) {
-      const fuente = crearElemento("a", "orientacion-fuente", "Ver guía oficial de Nike Colombia");
+      const fuente = crearElemento("a", "orientacion-fuente", `Ver fuente oficial de ${marca}`);
       fuente.href = guia.url; fuente.target = "_blank"; fuente.rel = "noopener noreferrer"; bloque.append(fuente);
     }
     if (guia.urlAlterna) {
-      const fuenteAlterna = crearElemento("a", "orientacion-fuente", "Ver guía global de Nike");
+      const fuenteAlterna = crearElemento("a", "orientacion-fuente", "Ver fuente oficial adicional");
       fuenteAlterna.href = guia.urlAlterna; fuenteAlterna.target = "_blank"; fuenteAlterna.rel = "noopener noreferrer"; bloque.append(fuenteAlterna);
     }
     return bloque;
