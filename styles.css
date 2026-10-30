@@ -823,3 +823,71 @@ dialog.modal:not(.modal-lateral)[open] > .modal-caja { animation: aparecer-centr
   dialog.modal:not(.modal-lateral)[open] > .modal-caja { animation: none; }
   .portada-chip:hover { transform: none; }
 }
+
+/* V5 · Ritmo visual: blanco → beige → blanco → beige → blanco → beige. */
+.portada { background: #ffffff; }
+.seccion-pasos { background: #f5f2eb; }
+.seccion-catalogo { background: #ffffff; border-top-color: #e8e3d7; }
+.promo-seccion { background: #f5f2eb; }
+.seccion-pagos { background: #ffffff; }
+.seccion-contacto { background: #f5f2eb; }
+
+/* V5 · Unir ópticamente la estrella SALE con la placa del descuento. */
+.etiqueta-oferta { gap: 0; isolation: isolate; }
+.etiqueta-oferta-sello { position: relative; z-index: 2; flex: none; }
+.etiqueta-oferta-porcentaje {
+  position: relative;
+  z-index: 1;
+  margin-left: -12px;
+  padding-left: 18px;
+  border-radius: 0 3px 3px 0;
+}
+@media (max-width: 700px) {
+  .etiqueta-oferta-porcentaje { margin-left: -9px; padding-left: 14px; }
+}
+
+
+/* V6: superficies continuas — inicio beige, pasos beige, catálogo blanco,
+   promoción, pagos y contacto beige. */
+:root { --beige-v6: #f4f2ec; }
+body { background: var(--beige-v6); }
+.portada { background: var(--beige-v6); }
+.seccion-pasos { background: var(--beige-v6); }
+.seccion-catalogo { background: #ffffff; }
+.promo-seccion { background: var(--beige-v6); }
+.seccion-pagos { background: var(--beige-v6); }
+.seccion-contacto { background: var(--beige-v6); }
+/* Header beige y velo translúcido cuando se desplaza sobre el contenido. */
+.cabecera {
+  background: #f4f2ec;
+  border-bottom-color: rgba(120,108,87,.10);
+  transition: background-color 280ms ease, border-color 280ms ease, box-shadow 280ms ease;
+}
+.cabecera.desplazada {
+  background: rgba(244,242,236,.82);
+  border-bottom-color: rgba(120,108,87,.18);
+  box-shadow: 0 8px 26px -18px rgba(32,33,31,.26);
+  -webkit-backdrop-filter: blur(16px) saturate(115%);
+  backdrop-filter: blur(16px) saturate(115%);
+}
+/* Identidad visual en los métodos de pago, sin perder el nombre accesible. */
+.pago-logo {
+  width: 64px;
+  height: 52px;
+  flex: 0 0 64px;
+  padding: 7px;
+  overflow: hidden;
+  border: 1px solid #ebe6db;
+  border-radius: 9px;
+  background: #fff;
+}
+.pago-logo img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.pago-nequi img { object-fit: contain; }
+.pago-bancolombia img { object-fit: contain; }
+@media (max-width: 700px) {
+  .pago-logo { width: 60px; height: 48px; flex-basis: 60px; }
+  .cabecera.desplazada { background: rgba(244,242,236,.91); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .cabecera.desplazada { background: var(--beige-v6); }
+}

@@ -157,3 +157,13 @@ El proyecto no requiere comando de compilación. `netlify.toml` configura `publi
 En `data/productos.json`, algunos artículos tienen `precioAnterior` como **ejemplo**, no como oferta vigente. El precio de venta sigue siendo `precio`. Cuando `precioAnterior` sea mayor que `precio`, la tarjeta mostrará automáticamente **SALE**, porcentaje calculado, precio tachado y precio actual. Para retirar una oferta, elimina el campo `precioAnterior` o ponlo en `0`. **Nunca anuncies un descuento si el precio anterior no corresponde a un precio real verificable.** Las demostraciones usan GT-002, GT-004 y GT-006 y deben revisarse antes de publicar.
 
 La guía EU de la portada abre el diálogo. Los diálogos de producto y guía están centrados; el carrito sigue a la derecha. El menú marca la sección visible y respeta el nuevo orden: Inicio, Cómo comprar, Catálogo, Pagos, Contacto.
+
+## Ajustes visuales V5
+
+La secuencia de fondos de las secciones principales empieza en **blanco** (portada), **beige** (Cómo comprar), **blanco** (catálogo), **beige** (promoción), **blanco** (pagos) y **beige** (contacto). La insignia roja `SALE` y la etiqueta oscura del porcentaje se solapan ligeramente para verse unidas, también en dispositivos móviles. El botón flotante de la portada sigue diciendo **Ver catálogo**.
+
+
+### Ajustes V6
+- Inicio y Cómo comprar: beige continuo; Catálogo: blanco; Promoción, Pagos y Contacto: beige.
+- Barra de navegación beige; al desplazarse pasa a beige translúcido con desenfoque suave (en móvil, más opaco para conservar legibilidad).
+- Logos de Nequi y Bancolombia como imágenes externas con nombre de respaldo; necesitan conexión a Internet. Si cambian de dirección, sustituye `src` en `index.html` por un archivo local autorizado. Los logotipos pertenecen a sus respectivos titulares y no implican afiliación.
