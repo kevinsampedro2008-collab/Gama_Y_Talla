@@ -11,7 +11,7 @@
       "categoria": "Urbanas",
       "color": "Rosa / blanco / beigh",
       "precio": 120000,
-      "imagen": "assets/images/productos/zapatilla-01.jpeg",
+      "imagen": "assets/images/productos/zapatilla-01.webp",
       "tallasDisponibles": [
         "38",
         "39",
@@ -37,7 +37,7 @@
       "categoria": "Casual / Urbanas",
       "color": "Blanco / Rojo / Azul / Beis",
       "precio": 120000,
-      "imagen": "assets/images/productos/zapatilla-02.jpeg",
+      "imagen": "assets/images/productos/zapatilla-02.webp",
       "tallasDisponibles": [
         "36",
         "37",

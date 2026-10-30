@@ -226,3 +226,21 @@ Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. S
 - Un único contorno exterior rodea el conjunto completo del producto.
 - La zona de información conserva un fondo beige suave para que marca, modelo, precio y acciones destaquen sobre el catálogo blanco, pero ya no tiene un borde ni una sombra independientes.
 - Se mantiene la imagen cuadrada 1:1, `object-fit: contain` y los ajustes de visualización para móvil.
+
+
+## Versión 18 — fotografía a ras del marco de la tarjeta
+
+- La imagen del producto ocupa ahora todo el recuadro cuadrado 1:1, sin relleno interior: llega a ras del borde superior, izquierdo y derecho de la tarjeta unificada.
+- Todas las fotografías usan el mismo tamaño visual y `object-fit: cover`, para que el marco se vea uniforme cuando se cargan imágenes de distintos tamaños.
+- Se eliminó el padding tanto en escritorio como en móvil. No hay un marco separado para la foto ni un espacio entre la imagen y la ficha beige de marca, modelo, precio y detalles.
+- La tarjeta conserva un único contorno exterior. Para evitar recortes de la zapatilla, se recomienda subir fotografías cuadradas (1:1), con el calzado centrado y suficiente margen dentro de la propia foto.
+
+
+## Versión 20 — borde champagne y optimización de imágenes
+
+- La tarjeta (foto e información) tiene un único borde champagne con brillo muy tenue al enfocar o pasar el cursor, sin crear un marco negro separado.
+- El catálogo solamente crea elementos de imagen para los productos que se van mostrando en grupos de 12. Los siguientes grupos **no se solicitan al servidor** hasta que el visitante pulse «Mostrar más».
+- Dentro del grupo visible, las primeras dos imágenes tienen prioridad de carga; las demás usan `loading="lazy"` y prioridad baja para que el navegador las descargue cuando las necesite. El navegador decide la distancia de precarga.
+- Al abrir un detalle se carga la foto que corresponda, aunque la tarjeta original estuviera fuera de pantalla.
+- Recomendado para tus fotografías: formato WebP/AVIF, 1:1, alrededor de 800–1200 px por lado y, como referencia práctica, entre 80 y 200 KB por foto si la calidad lo permite.
+- **Netlify:** en planes por créditos, cada despliegue a producción cuesta créditos; con GitHub conectado, cada `git push` a la rama de producción puede generar uno. Puedes agrupar cambios para evitar despliegues innecesarios.

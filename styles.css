@@ -1378,3 +1378,119 @@ body { background: var(--beige-v6); }
   }
   .tarjeta-cuerpo { padding: 12px 12px 14px !important; }
 }
+
+/* V19 — fotografía a borde completo de la tarjeta.
+   El botón de imagen sangra 1 px hacia los bordes superior y laterales
+   para cubrir también el trazo del contorno exterior. No deja un halo
+   ni margen interno; la ficha inferior comienza justo al terminar la foto. */
+.tarjeta {
+  box-sizing: border-box !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid #292A26 !important;
+  border-radius: 20px !important;
+  background: #F4F2EC !important;
+}
+.tarjeta > .tarjeta-media {
+  -webkit-appearance: none !important;
+  appearance: none !important;
+  display: block !important;
+  position: relative !important;
+  flex: 0 0 auto !important;
+  align-self: stretch !important;
+  box-sizing: border-box !important;
+  width: calc(100% + 2px) !important;
+  height: auto !important;
+  aspect-ratio: 1 / 1 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  margin: -1px -1px 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: #FFFFFF !important;
+  line-height: 0 !important;
+  text-align: left !important;
+  box-shadow: none !important;
+}
+.tarjeta > .tarjeta-media > img {
+  position: absolute !important;
+  inset: 0 !important;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  object-fit: cover !important;
+  object-position: center center !important;
+  background: #FFFFFF !important;
+  mix-blend-mode: normal !important;
+}
+.tarjeta > .tarjeta-cuerpo {
+  position: relative !important;
+  z-index: 1;
+  display: flex !important;
+  flex: 1 0 auto !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  padding: 15px 16px 17px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: #F4F2EC !important;
+  box-shadow: none !important;
+}
+@media (max-width: 700px) {
+  .tarjeta { border-radius: 16px !important; }
+  .tarjeta > .tarjeta-media {
+    width: calc(100% + 2px) !important;
+    aspect-ratio: 1 / 1 !important;
+    margin: -1px -1px 0 !important;
+    padding: 0 !important;
+  }
+  .tarjeta > .tarjeta-cuerpo {
+    gap: 5px !important;
+    padding: 12px 12px 14px !important;
+  }
+}
+
+
+/* V20 — tarjeta premium integrada, sin marco negro duro ni huecos.
+   Contorno champagne y halo suave que aparece al interactuar. */
+.tarjeta {
+  border: 1px solid #d7c7a7 !important;
+  box-shadow: 0 6px 20px -12px rgba(58, 46, 27, .24),
+              0 0 0 1px rgba(196, 159, 92, .1) !important;
+  transition: transform 240ms ease, box-shadow 240ms ease, border-color 240ms ease !important;
+}
+.tarjeta:hover, .tarjeta:focus-within {
+  border-color: #b99b60 !important;
+  box-shadow: 0 14px 30px -16px rgba(58, 46, 27, .32),
+              0 0 0 2px rgba(205, 169, 102, .38),
+              0 0 22px rgba(218, 184, 113, .16) !important;
+}
+.tarjeta > .tarjeta-cuerpo {
+  background: linear-gradient(165deg, #f9f7f2 0%, #f2ece0 100%) !important;
+}
+@media (hover: none) {
+  .tarjeta:hover {
+    box-shadow: 0 6px 20px -12px rgba(58, 46, 27, .24),
+                0 0 0 1px rgba(196, 159, 92, .1) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tarjeta { transition: none !important; }
+}
