@@ -167,3 +167,17 @@ La secuencia de fondos de las secciones principales empieza en **blanco** (porta
 - Inicio y Cómo comprar: beige continuo; Catálogo: blanco; Promoción, Pagos y Contacto: beige.
 - Barra de navegación beige; al desplazarse pasa a beige translúcido con desenfoque suave (en móvil, más opaco para conservar legibilidad).
 - Logos de Nequi y Bancolombia como imágenes externas con nombre de respaldo; necesitan conexión a Internet. Si cambian de dirección, sustituye `src` en `index.html` por un archivo local autorizado. Los logotipos pertenecen a sus respectivos titulares y no implican afiliación.
+
+### Versión 7: presentación de secciones
+
+- Inicio y Cómo comprar: beige continuo. Catálogo y Promoción: blanco continuo. Pagos y Contacto: beige.
+- Cinco pasos en tarjetas independientes, más amplias y adaptadas a móvil.
+- Portada sin círculo inferior izquierdo, con tipografía decorativa Gama & Talla y destellos.
+- Bancolombia usa un símbolo local simplificado (sin el nombre dentro de la imagen), mientras el nombre accesible aparece al lado. El símbolo es una representación esquemática; si cuentas con el recurso de marca oficial autorizado, sustituye `assets/images/branding/bancolombia-simbolo.svg`.
+
+
+## Ajustes V8
+- Inicio limpio sin letras ni destellos de fondo agregados en V7.
+- Menú activo: Contacto permanece seleccionado al llegar al final de la página.
+- Símbolo de Bancolombia integrado en HTML como SVG: no depende de una imagen que pueda fallar.
+- Líneas sutiles de separación entre Inicio/Cómo comprar y Pagos/Contacto.

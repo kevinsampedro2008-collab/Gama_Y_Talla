@@ -1158,6 +1158,10 @@ function iniciarNavegacionActiva() {
     const umbral = Math.min(230, window.innerHeight * .35);
     let actual = "inicio";
     for (const seccion of secciones) if (seccion.getBoundingClientRect().top <= umbral) actual = seccion.id;
+    // En la parte inferior de la página Contacto debe permanecer activo,
+    // aunque la sección no alcance el umbral por falta de espacio para desplazar.
+    const cercaDelFinal = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 24;
+    if (cercaDelFinal && document.getElementById("contacto")) actual = "contacto";
     enlaces.forEach((a) => {
       const activo = a.getAttribute("href") === `#${actual}`;
       a.classList.toggle("navegacion-activa", activo);
