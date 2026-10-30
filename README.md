@@ -177,3 +177,12 @@ Las páginas externas de las marcas pueden actualizar sus rutas con el tiempo. S
 - Para que las fotografías reales conserven el mismo encuadre y no se recorten, utiliza imágenes cuadradas (recomendado: 1200 × 1200 px), con la zapatilla centrada y dejando un margen de seguridad alrededor.
 - Si se usa una imagen rectangular, el catálogo la adapta al recuadro cuadrado y puede recortar sus extremos; prepara las fotografías en 1:1 antes de cargarlas.
 - El distintivo de producto agotado ahora lleva fondo negro y texto rojo.
+
+
+## Versión 12 — mostrar más productos
+
+- El catálogo presenta inicialmente hasta 12 productos.
+- Cuando el resultado tiene más de 12 artículos, aparece el botón **Mostrar más** debajo de las tarjetas.
+- Cada pulsación carga hasta 12 productos adicionales; el botón desaparece al mostrar el último artículo.
+- La paginación se aplica a los resultados filtrados y ordenados. Al cambiar búsqueda, marca, categoría o criterio de orden, se vuelve al primer grupo de 12.
+- El botón no aparece cuando hay 12 productos o menos. El catálogo de demostración incluido contiene 8 productos, por lo que para visualizar el botón debes añadir al menos 5 productos adicionales en `data/productos.json`.

@@ -8,7 +8,7 @@
 const CONFIG = {
   tienda: "Gama & Talla",
   descripcion: "Tienda de zapatillas en Colombia. Explora el catálogo, consulta tallas y arma tu pedido por WhatsApp.",
-  whatsapp: "573124745942", // Sustituir por el número real antes de publicar.
+  whatsapp: "573000000000", // Sustituir por el número real antes de publicar.
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
   datosUrl: "data/productos.json",
@@ -109,6 +109,8 @@ const estado = {
   categoria: TODOS,
   soloNuevos: false,
   orden: "destacados",
+  productosVisibles: 12,
+  firmaVistaCatalogo: "",
   tallas: new Map(),
   detalle: null,
   carrito: []
@@ -275,6 +277,8 @@ function actualizarContador(texto) {
 
 function mostrarCarga() {
   const contenedor = grilla();
+  const paginacion = $("#catalogo-paginacion");
+  if (paginacion) paginacion.hidden = true;
   if (!contenedor) return;
   const fragmento = document.createDocumentFragment();
   for (let i = 0; i < 6; i += 1) {
@@ -290,6 +294,8 @@ function mostrarCarga() {
 
 function mostrarEstado({ titulo, mensaje, textoBoton = "", accion = "" }) {
   const contenedor = grilla();
+  const paginacion = $("#catalogo-paginacion");
+  if (paginacion) paginacion.hidden = true;
   if (!contenedor) return;
   const bloque = crearElemento("div", "estado-catalogo");
   bloque.setAttribute("role", "status");
@@ -320,6 +326,10 @@ function aplicarCatalogo(catalogo) {
   estado.productos = catalogo.productos;
   estado.guias = catalogo.guias;
   estado.catalogoListo = true;
+  if (cambio) {
+    estado.productosVisibles = 12;
+    estado.firmaVistaCatalogo = "";
+  }
   return cambio;
 }
 
@@ -422,29 +432,74 @@ function limpiarFiltros() {
   renderizarCatalogo();
 }
 
+function firmaFiltrosCatalogo() {
+  return [
+    normalizarTexto(estado.busqueda),
+    estado.marca,
+    estado.categoria,
+    estado.soloNuevos ? "1" : "0",
+    estado.orden
+  ].join("¦");
+}
+
+function actualizarPaginacionCatalogo(total, visibles) {
+  const contenedor = $("#catalogo-paginacion");
+  const boton = $("#mostrar-mas");
+  const ayuda = $("#catalogo-paginacion-ayuda");
+  if (!contenedor || !boton) return;
+
+  const restantes = Math.max(0, total - visibles);
+  contenedor.hidden = restantes === 0;
+  if (restantes > 0) {
+    const siguienteGrupo = Math.min(12, restantes);
+    boton.setAttribute("aria-label", `Mostrar ${siguienteGrupo} productos más`);
+    if (ayuda) ayuda.textContent = `Hay ${restantes} ${restantes === 1 ? "zapatilla" : "zapatillas"} más en este resultado.`;
+  } else if (ayuda) {
+    ayuda.textContent = "";
+  }
+}
+
 function renderizarCatalogo() {
   sincronizarFiltros();
   const contenedor = grilla();
   if (!contenedor) return;
+
+  // Cada cambio de búsqueda, filtro u orden inicia de nuevo desde las primeras 12 tarjetas.
+  const firmaActual = firmaFiltrosCatalogo();
+  if (firmaActual !== estado.firmaVistaCatalogo) {
+    estado.firmaVistaCatalogo = firmaActual;
+    estado.productosVisibles = 12;
+  }
+
   if (!estado.productos.length) {
     actualizarContador("0 productos");
     mostrarEstado({ titulo: "Aún no hay productos", mensaje: "Pronto publicaremos nuestro catálogo. Escríbenos por WhatsApp para consultar modelos y tallas." });
     return;
   }
+
   const lista = productosFiltrados();
-  actualizarContador(lista.length === estado.productos.length
-    ? `${lista.length} ${lista.length === 1 ? "producto" : "productos"}`
-    : `${lista.length} de ${estado.productos.length} productos`);
   if (!lista.length) {
+    actualizarContador("0 productos");
     mostrarEstado({ titulo: "No encontramos zapatillas", mensaje: "Prueba con otra búsqueda o elimina algunos filtros.", textoBoton: "Limpiar filtros", accion: "limpiar" });
     return;
   }
+
+  const cantidadVisible = Math.min(estado.productosVisibles, lista.length);
+  const productosParaMostrar = lista.slice(0, cantidadVisible);
+  if (cantidadVisible < lista.length) {
+    actualizarContador(`Mostrando ${cantidadVisible} de ${lista.length} productos`);
+  } else {
+    actualizarContador(lista.length === estado.productos.length
+      ? `${lista.length} ${lista.length === 1 ? "producto" : "productos"}`
+      : `${lista.length} de ${estado.productos.length} productos`);
+  }
+
   const fragmento = document.createDocumentFragment();
-  lista.forEach((producto) => fragmento.append(crearTarjeta(producto)));
+  productosParaMostrar.forEach((producto) => fragmento.append(crearTarjeta(producto)));
   contenedor.replaceChildren(fragmento);
   contenedor.setAttribute("aria-busy", "false");
+  actualizarPaginacionCatalogo(lista.length, cantidadVisible);
 }
-
 function crearImagen(producto, { perezosa = true } = {}) {
   const imagen = new Image(600, 600);
   if (perezosa) imagen.loading = "lazy";
@@ -1053,6 +1108,12 @@ function animarInsignia() {
 
 /* ---------- Eventos de catálogo y panel de producto ---------- */
 function iniciarCatalogo() {
+  $("#mostrar-mas")?.addEventListener("click", () => {
+    const total = productosFiltrados().length;
+    estado.productosVisibles = Math.min(total, estado.productosVisibles + 12);
+    renderizarCatalogo();
+  });
+
   $("#buscar")?.addEventListener("input", (evento) => { estado.busqueda = evento.target.value; renderizarCatalogo(); });
   $("#orden")?.addEventListener("change", (evento) => { estado.orden = ordenadores[evento.target.value] ? evento.target.value : "destacados"; renderizarCatalogo(); });
   $("#limpiar-filtros")?.addEventListener("click", limpiarFiltros);

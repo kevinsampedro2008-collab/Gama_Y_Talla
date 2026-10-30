@@ -1008,3 +1008,53 @@ body { background: var(--beige-v6); }
   font-weight: 850;
   letter-spacing: .045em;
 }
+
+
+/* Catálogo: carga progresiva de 12 productos por interacción */
+.catalogo-paginacion {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  padding: 34px 0 8px;
+}
+.catalogo-paginacion[hidden] { display: none; }
+.boton-mostrar-mas {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 25px;
+  border: 1px solid #292925;
+  border-radius: var(--pastilla);
+  color: #fff;
+  background: #292925;
+  box-shadow: 0 9px 22px -15px rgba(32, 32, 28, .7);
+  font: 700 .9rem/1.1 var(--sans);
+  cursor: pointer;
+  transition: transform var(--transicion), background var(--transicion), box-shadow var(--transicion);
+}
+.boton-mostrar-mas .icono {
+  width: 17px;
+  height: 17px;
+  color: #dfd0ae;
+  transition: transform var(--transicion);
+}
+.boton-mostrar-mas:hover {
+  background: #3a3933;
+  box-shadow: 0 12px 25px -15px rgba(32, 32, 28, .8);
+  transform: translateY(-2px);
+}
+.boton-mostrar-mas:hover .icono { transform: translateY(3px); }
+.boton-mostrar-mas:focus-visible { outline: 3px solid #c4a873; outline-offset: 4px; }
+.catalogo-paginacion-ayuda {
+  min-height: 1em;
+  color: var(--texto-suave);
+  font-size: .76rem;
+  text-align: center;
+}
+@media (max-width: 700px) {
+  .catalogo-paginacion { padding-top: 27px; }
+  .boton-mostrar-mas { min-height: 46px; padding-inline: 23px; }
+}

@@ -240,6 +240,96 @@
       "disponible": true,
       "destacado": false,
       "nuevoIngreso": true
+    },
+    {
+      "id": "GT-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Marfil / lima",
+      "precio": 689900,
+      "imagen": "assets/images/productos/zapatilla-05.svg",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/productos/zapatilla-06.svg",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false,
+      "precioAnterior": 1599900
+    },
+    {
+      "id": "GT-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/productos/zapatilla-07.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-008",
+      "nombre": "550",
+      "marca": "New Balance",
+      "categoria": "Deportivas",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/productos/zapatilla-08.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
     }
   ],
   "_avisoTallas": "Las tallas del catálogo son datos de demostración. La guía de Nike es para calzado de hombre y combina equivalencias de las guías oficiales de Nike Colombia y Nike Global; la talla nacional solo se muestra cuando la tabla colombiana la respalda. Confirma el ajuste de cada modelo antes de vender.",
