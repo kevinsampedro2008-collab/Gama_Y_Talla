@@ -1,0 +1,9 @@
+Imágenes estáticas de la presentación del catálogo (versión de respaldo y de movimiento reducido).
+
+Son renders del modelo assets/images/models/af1-model.glb en la pose del cierre, generados con la
+misma escena de assets/js/catalog-intro-escena.js (fondo transparente, WebP con canal alfa):
+
+  poster-amplio.webp    2520 × 1575  (pantallas horizontales; 1440 × 900 a 1,75×)
+  poster-compacto.webp   585 × 1266  (pantallas verticales; 390 × 844 a 1,5×)
+
+Si cambia el modelo o el encuadre del cierre, conviene regenerarlas.

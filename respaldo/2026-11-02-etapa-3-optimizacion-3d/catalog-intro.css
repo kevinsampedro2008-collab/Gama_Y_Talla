@@ -1,0 +1,345 @@
+/* =========================================================
+   GAMA & TALLA — Presentación cinematográfica de bienvenida
+   Capa a pantalla completa por encima de la tienda (dialog modal).
+   Oscuridad cálida, crema para el texto, divisores discontinuos,
+   tipografía de la marca (Archivo + IBM Plex Mono). El cobalto
+   aparece solo como sello de marca.
+   ========================================================= */
+
+.intro {
+  --intro-noche: #100904;
+  --intro-crema: #ffedd7;
+  --intro-crema-2: rgb(255 237 215 / 0.7);
+  --intro-corteza: #382416;
+  --intro-corcho: #40372e;
+  --intro-madera: #6c5f51;
+  --intro-ascua: #dc5000;
+  --intro-cobalto: #1f3bff;
+  --intro-cobalto-claro: #8ea0ff;
+  --intro-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --intro-ease-io: cubic-bezier(0.77, 0, 0.175, 1);
+  --intro-margen: clamp(1.25rem, 4vw, 3.5rem);
+  --intro-discontinua: repeating-linear-gradient(90deg, var(--intro-corcho) 0 6px, transparent 6px 12px);
+
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  background: var(--intro-noche);
+  color: var(--intro-crema);
+  font-family: "Archivo", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.intro::backdrop { background: #100904; }
+.intro:focus { outline: none; }
+
+/* Mientras dura, la tienda no se desplaza. En entrada directa a #catalogo,
+   la cubierta evita ver la grilla antes de que arranque la presentación. */
+html.intro-activa { overflow: hidden; }
+html.intro-pendiente { background: #100904; }
+html.intro-pendiente body { opacity: 0; }
+
+.intro-escenario { position: absolute; inset: 0; overflow: hidden; }
+
+/* La luz del fondo es la de la escena (sube con la iluminación), no un adorno. */
+.intro-fondo {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse 60% 48% at 50% 52%, #2c1b0e 0%, #1b1008 46%, #100904 80%);
+  opacity: var(--intro-luz, 0);
+}
+.intro[data-modo="estatico"] .intro-fondo { transition: opacity 900ms ease; }
+.intro-lienzo { position: absolute; inset: 0; }
+.intro-lienzo canvas { display: block; width: 100%; height: 100%; }
+
+.intro-poster { position: absolute; inset: 0; }
+.intro-poster img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+/* ---------- Barra superior ---------- */
+.intro-barra {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: max(env(safe-area-inset-top), 0.5rem) var(--intro-margen) 0.5rem;
+}
+.intro-barra::after {
+  content: "";
+  position: absolute;
+  left: var(--intro-margen);
+  right: var(--intro-margen);
+  bottom: 0;
+  height: 1px;
+  background: var(--intro-discontinua);
+}
+.intro-marca {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--intro-crema-2);
+  white-space: nowrap;
+}
+.intro-marca::before { content: ""; width: 6px; height: 6px; background: var(--intro-cobalto-claro); }
+.intro-saltar {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0 0.25rem;
+  border: 0;
+  background: none;
+  color: var(--intro-crema);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-decoration: underline;
+  text-decoration-color: rgb(255 237 215 / 0.35);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.5em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: text-decoration-color 160ms ease, transform 120ms var(--intro-ease);
+}
+.intro-saltar .icono { width: 1rem; height: 1rem; }
+.intro-saltar:active { transform: scale(0.97); }
+.intro-saltar:focus-visible { outline: 2px solid var(--intro-crema); outline-offset: 4px; border-radius: 2px; }
+
+/* ---------- Textos de la secuencia ---------- */
+.intro-paso {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  opacity: 0;
+  transform: translateY(14px);
+  filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 420ms ease, transform 520ms var(--intro-ease), filter 420ms ease;
+}
+.intro-paso[data-visible] {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  transition-duration: 900ms, 1100ms, 900ms;
+}
+
+.intro-apertura {
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.25rem;
+  text-align: center;
+}
+.intro-identidad {
+  margin: 0 -0.16em 0 0;
+  font-size: clamp(2rem, 0.8rem + 4.6vw, 4.5rem);
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.intro-identidad span { color: var(--intro-cobalto-claro); }
+.intro-etiqueta {
+  margin: 0 -0.32em 0 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--intro-crema-2);
+}
+.intro-apertura .intro-etiqueta { opacity: 0; transition: opacity 800ms ease 450ms; }
+.intro-apertura[data-visible] .intro-etiqueta { opacity: 1; }
+
+.intro-carga { display: grid; justify-items: center; gap: 0.75rem; margin-top: 1.25rem; }
+.intro-carga-barra {
+  position: relative;
+  width: min(12rem, 50vw);
+  height: 1px;
+  overflow: hidden;
+  background: var(--intro-corcho);
+}
+.intro-carga-barra span {
+  position: absolute;
+  inset: 0;
+  background: var(--intro-crema);
+  transform: scaleX(var(--progreso, 0));
+  transform-origin: left;
+  transition: transform 200ms linear;
+}
+.intro-carga.indeterminada .intro-carga-barra span {
+  width: 30%;
+  transform: none;
+  animation: intro-carga 1.3s var(--intro-ease-io) infinite;
+}
+@keyframes intro-carga { from { translate: -100% 0; } to { translate: 340% 0; } }
+.intro-carga-texto {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--intro-crema-2);
+}
+
+/* Frases: a izquierda (abajo) y derecha (arriba) de la zapatilla. */
+.intro-frase { display: grid; gap: 1rem; width: min(24rem, 25vw); }
+.intro-frase-izq { left: var(--intro-margen); bottom: 18vh; }
+.intro-frase-der { right: var(--intro-margen); top: 14vh; }
+.intro-frase-indice {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--intro-crema-2);
+}
+.intro-frase-indice::after { content: ""; flex: 1; height: 1px; background: var(--intro-discontinua); }
+.intro-frase-texto {
+  margin: 0;
+  font-size: clamp(1.75rem, 0.9rem + 2.2vw, 3.2rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.intro-cierre {
+  left: 0;
+  right: 0;
+  bottom: 15vh;
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  padding-inline: var(--intro-margen);
+  text-align: center;
+}
+.intro-titular {
+  max-width: 16ch;
+  margin: 0;
+  font-size: clamp(2.25rem, 0.9rem + 4.2vw, 4.75rem);
+  font-weight: 500;
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+.intro-poster.intro-paso { inset: 0; transform: scale(1.03); filter: none; }
+.intro-poster.intro-paso[data-visible] { transform: none; transition: opacity 1000ms ease, transform 1600ms var(--intro-ease); }
+
+/* ---------- Salida: telón claro (el tono de la portada) ---------- */
+.intro-telon {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: #f3f3f0;
+  clip-path: inset(100% 0 0 0);
+  pointer-events: none;
+}
+.intro[data-fase="salida"] .intro-telon { clip-path: inset(0); transition: clip-path 720ms var(--intro-ease-io); }
+.intro[data-fase="salida"] .intro-paso[data-visible] { opacity: 0; transition-duration: 320ms; }
+.intro[data-fase="saltando"] { opacity: 0; transition: opacity 180ms ease; }
+
+/* ---------- Celular y tableta vertical: una columna ---------- */
+@media (max-width: 959px), (orientation: portrait) {
+  .intro-fondo { background: radial-gradient(ellipse 85% 34% at 50% 40%, #2c1b0e 0%, #1b1008 50%, #100904 84%); }
+  .intro-marca span { display: none; }
+  .intro-frase,
+  .intro-frase-der {
+    left: var(--intro-margen);
+    right: var(--intro-margen);
+    top: auto;
+    bottom: calc(max(env(safe-area-inset-bottom), 1.5rem) + 1.5rem);
+    width: auto;
+  }
+  .intro-frase-texto { max-width: 14ch; font-size: clamp(1.75rem, 1rem + 3.4vw, 2.5rem); }
+  .intro-cierre { bottom: calc(max(env(safe-area-inset-bottom), 1.5rem) + 1.5rem); }
+  .intro-titular { font-size: clamp(2.25rem, 1.2rem + 5vw, 3.25rem); }
+  .intro-cierre .intro-etiqueta { letter-spacing: 0.2em; margin-right: -0.2em; }
+}
+
+/* Pantallas estrechas: la barra superior no se parte. */
+@media (max-width: 400px) {
+  .intro-marca { letter-spacing: 0.14em; }
+  .intro-saltar { letter-spacing: 0.08em; }
+}
+
+/* ---------- Movimiento reducido: solo fundidos ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .intro-paso,
+  .intro-paso[data-visible],
+  .intro-poster.intro-paso,
+  .intro-poster.intro-paso[data-visible] { transform: none; filter: none; }
+  .intro-telon { clip-path: none; opacity: 0; }
+  .intro[data-fase="salida"] .intro-telon { clip-path: none; opacity: 1; transition: opacity 360ms ease; }
+  .intro-carga.indeterminada .intro-carga-barra span { animation-duration: 2.6s; }
+  .intro-saltar:active { transform: none; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .intro-saltar:hover { text-decoration-color: var(--intro-crema); }
+}
+
+/* ---------- Llegada a la portada ---------- */
+@keyframes intro-pagina-entrar { from { opacity: 0; transform: translateY(12px); } }
+@keyframes intro-pagina-fundido { from { opacity: 0; } }
+#inicio.portada-entrada .portada-texto,
+#inicio.portada-entrada .portada-visual,
+#inicio.portada-entrada .portada-controles { animation: intro-pagina-entrar 560ms cubic-bezier(0.23, 1, 0.32, 1) both; }
+#inicio.portada-entrada .portada-visual { animation-delay: 70ms; }
+#inicio.portada-entrada .portada-controles { animation-delay: 140ms; }
+@media (prefers-reduced-motion: reduce) {
+  #inicio.portada-entrada .portada-texto,
+  #inicio.portada-entrada .portada-visual,
+  #inicio.portada-entrada .portada-controles { animation-name: intro-pagina-fundido; }
+}
+
+/* ---------- «Ver presentación» en el encabezado del catálogo ---------- */
+.intro-repetir {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-height: 2.75rem;
+  margin: -0.75rem 0 -0.75rem var(--e-5, 1.5rem);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tinta-2, #5e5e5a);
+  font: inherit;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.3em;
+  cursor: pointer;
+}
+.intro-repetir::before {
+  content: "";
+  width: 0;
+  height: 0;
+  border-left: 6px solid currentColor;
+  border-block: 4px solid transparent;
+}
+@media (hover: hover) and (pointer: fine) {
+  .intro-repetir:hover { color: var(--tinta, #141414); }
+}

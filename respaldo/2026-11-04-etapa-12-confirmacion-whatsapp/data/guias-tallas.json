@@ -1,0 +1,2184 @@
+{
+  "_aviso": "Guías de tallas de Gama & Talla. Cada fila indica su nivel y sus fuentes. No añadas tallas calculadas: documenta el origen en data/guias-tallas-fuentes.md.",
+  "version": 1,
+  "actualizado": "2026-11-03",
+  "niveles": {
+    "OFICIAL_DE_MARCA": "La propia marca publica la equivalencia COL y EU.",
+    "OFICIAL_POR_CORRESPONDENCIA": "Se verifica cruzando tablas oficiales de la misma marca mediante una medida compartida.",
+    "REFERENCIA_COMERCIAL_VERIFICADA": "Fuentes colombianas independientes coinciden, pero la marca no publica la equivalencia.",
+    "SIN_EQUIVALENCIA_CONFIRMADA": "No hay pruebas suficientes para asignar una talla colombiana."
+  },
+  "fuentes": {
+    "nike-co-hombre": {
+      "titulo": "Guía de tallas de calzado de hombre Nike",
+      "entidad": "Nike Colombia",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-hombre",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US hombre",
+        "COL hombre",
+        "US mujer",
+        "Largo del pie (cm)"
+      ]
+    },
+    "nike-co-mujer": {
+      "titulo": "Guía de tallas de calzado de mujer Nike · Tabla de Tenis",
+      "entidad": "Nike Colombia",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-mujer",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US mujer",
+        "COL mujer",
+        "US hombre",
+        "US niños",
+        "Largo del pie (cm)"
+      ]
+    },
+    "nike-global-hombre": {
+      "titulo": "Men's Footwear Size Chart",
+      "entidad": "Nike (global)",
+      "url": "https://www.nike.com/size-fit/mens-footwear",
+      "tipo": "oficial-internacional",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US hombre",
+        "US mujer",
+        "UK",
+        "CM/JP",
+        "EU",
+        "Foot length (in)"
+      ]
+    },
+    "nike-global-mujer": {
+      "titulo": "Women's Footwear Size Chart",
+      "entidad": "Nike (global)",
+      "url": "https://www.nike.com/size-fit/womens-footwear",
+      "tipo": "oficial-internacional",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US mujer",
+        "US hombre",
+        "UK",
+        "CM/JP",
+        "EU",
+        "Foot length (in)"
+      ]
+    },
+    "jordan-co-hombre": {
+      "titulo": "Tabla de tallas · Hombre, en la ficha «Tenis Air Jordan 1 Mid para Hombre»",
+      "entidad": "Nike Colombia",
+      "url": "https://www.nike.com.co/air-jordan-1-mid-tenis-hombre-dq8426-004-tf6/p",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US hombre",
+        "COL hombre",
+        "US mujer",
+        "US niños",
+        "Largo (cm)"
+      ],
+      "formato": "Imagen dentro del modal «Guía de tallas»"
+    },
+    "jordan-co-mujer": {
+      "titulo": "Tabla de tallas · Mujer, en la ficha «Tenis Air Jordan 1 Mid para Mujer»",
+      "entidad": "Nike Colombia",
+      "url": "https://www.nike.com.co/air-jordan-1-mid-tenis-mujer-bq6472-603-tf6/p",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US mujer",
+        "COL mujer",
+        "US hombre",
+        "US niños",
+        "Largo mujer (cm)"
+      ],
+      "formato": "Imagen dentro del modal «Guía de tallas»"
+    },
+    "adidas-co-calzado": {
+      "titulo": "Guía de tallas de calzado (hombre y mujer)",
+      "entidad": "adidas Colombia",
+      "url": "https://www.adidas.co/on/demandware.store/Sites-adidas-CO-Site/es_CO/Page-Include?cid=size-chart-size-shoes",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "bloqueado-automatizado",
+      "sistemas": [
+        "Medida del pie (cm)",
+        "US hombre",
+        "CO hombre",
+        "US mujer",
+        "CO mujer",
+        "FR"
+      ],
+      "nota": "El sitio responde 403 a navegadores automatizados. La tabla se leyó a través del índice del buscador, que también la muestra en adidas.com/ec/es y adidas.com/cr/es."
+    },
+    "adidas-global": {
+      "titulo": "Men and Women · adidas footwear sizing",
+      "entidad": "adidas (soporte oficial)",
+      "url": "https://support.dtb.adidas.com/static-content/size-charts/en_GB/footwear/size-shoes.html",
+      "tipo": "oficial-internacional",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "Heel-toe (cm)",
+        "EU",
+        "UK",
+        "US hombre",
+        "US mujer"
+      ]
+    },
+    "lcs-co-guia-hombre": {
+      "titulo": "Talla calzado hombre (GUIA_DE_TALLAS_HOMBRE.png)",
+      "entidad": "Le Coq Sportif Colombia",
+      "url": "https://cdn.shopify.com/s/files/1/0632/9450/5120/files/GUIA_DE_TALLAS_HOMBRE.png",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "EUR",
+        "US",
+        "COL",
+        "CMS"
+      ],
+      "formato": "Imagen enlazada desde las fichas de lecoqsportif.com.co"
+    },
+    "lcs-co-guia-mujer": {
+      "titulo": "Talla calzado mujer (GUIA_DE_TALLAS_MUJER.png)",
+      "entidad": "Le Coq Sportif Colombia",
+      "url": "https://cdn.shopify.com/s/files/1/0632/9450/5120/files/GUIA_DE_TALLAS_MUJER.png",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "EUR",
+        "US",
+        "COL",
+        "CMS"
+      ],
+      "formato": "Imagen enlazada desde las fichas de lecoqsportif.com.co"
+    },
+    "lcs-co-variantes": {
+      "titulo": "Calzado de Le Coq Sportif Colombia: variantes de talla",
+      "entidad": "Le Coq Sportif Colombia",
+      "url": "https://lecoqsportif.com.co/collections/calzado-deportivo",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "EUR",
+        "US",
+        "COL"
+      ],
+      "formato": "Texto de cada variante, por ejemplo «39 EUR / 6.5 US / 37 COL»"
+    },
+    "nb-co-hombre": {
+      "titulo": "Guía de tallas · Zapatos de Hombre",
+      "entidad": "New Balance Colombia",
+      "url": "https://newbalance.com.co/pages/guia-de-tallas-zapatos-de-hombre",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US hombre",
+        "US mujer",
+        "UK",
+        "EU",
+        "Largo (cm)"
+      ]
+    },
+    "nb-co-mujer": {
+      "titulo": "Guía de tallas · Zapatos de Mujer",
+      "entidad": "New Balance Colombia",
+      "url": "https://newbalance.com.co/pages/guia-de-tallas-zapatos-de-mujer",
+      "tipo": "oficial-colombia",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US mujer",
+        "US hombre",
+        "UK",
+        "EU",
+        "Length (cm)"
+      ]
+    },
+    "contraste-running-balboa": {
+      "titulo": "Guía de Tallas Calzado · adidas",
+      "entidad": "Running Balboa (tienda colombiana)",
+      "url": "https://runningbalboa.com.co/pages/guia-de-tallas-calzado",
+      "tipo": "contraste-comercial",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US",
+        "Medida del pie",
+        "CO"
+      ]
+    },
+    "contraste-falabella-adidas": {
+      "titulo": "Tabla de tallas adidas hombre",
+      "entidad": "Falabella Colombia",
+      "url": "https://www.falabella.com.co/static/RDF/site/minisitios/tabla_tallas/2023/Tabla_Tallas_Adidas_Hombre.html",
+      "tipo": "contraste-comercial",
+      "fechaConsulta": "2026-11-03",
+      "acceso": "directo",
+      "sistemas": [
+        "US",
+        "COL",
+        "CM",
+        "EUR",
+        "JP"
+      ]
+    }
+  },
+  "marcas": [
+    {
+      "id": "adidas",
+      "nombre": "Adidas",
+      "segmentos": [
+        {
+          "id": "hombre",
+          "rotulo": "Hombre",
+          "nivel": "OFICIAL_DE_MARCA",
+          "sistema": "Medida del pie / US / CO / FR",
+          "metodo": "adidas Colombia publica en una sola tabla la talla CO y la FR (europea).",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "adidas-co-calzado",
+          "fuenteCruce": "adidas-global",
+          "rotuloCruce": "Talla EU y cm",
+          "contrastes": [
+            "contraste-running-balboa",
+            "contraste-falabella-adidas"
+          ],
+          "observaciones": "adidas numera en tercios (40, 40 2/3, 41 1/3…): una talla EU redonda como 41 no existe en su tabla y no se asigna a la fila vecina. La tabla de adidas.co se leyó por el índice del buscador; EU, US y cm se confirmaron en el soporte oficial, y COL con Running Balboa y Falabella.",
+          "filas": [
+            {
+              "col": "33.5",
+              "eu": "36",
+              "us": "4",
+              "cm": "22.1",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "34",
+              "eu": "36 2/3",
+              "us": "4.5",
+              "cm": "22.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "35",
+              "eu": "37 1/3",
+              "us": "5",
+              "cm": "22.9",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "36",
+              "eu": "38",
+              "us": "5.5",
+              "cm": "23.3",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "36.5",
+              "eu": "38 2/3",
+              "us": "6",
+              "cm": "23.8",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "37",
+              "eu": "39 1/3",
+              "us": "6.5",
+              "cm": "24.2",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "37.5",
+              "eu": "40",
+              "us": "7",
+              "cm": "24.6",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "40 2/3",
+              "us": "7.5",
+              "cm": "25.0",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "41 1/3",
+              "us": "8",
+              "cm": "25.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "42",
+              "us": "8.5",
+              "cm": "25.9",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42 2/3",
+              "us": "9",
+              "cm": "26.3",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "43 1/3",
+              "us": "9.5",
+              "cm": "26.7",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "44",
+              "us": "10",
+              "cm": "27.1",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "41.5",
+              "eu": "44 2/3",
+              "us": "10.5",
+              "cm": "27.6",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "45 1/3",
+              "us": "11",
+              "cm": "28.0",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "42.5",
+              "eu": "46",
+              "us": "11.5",
+              "cm": "28.4",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "43",
+              "eu": "46 2/3",
+              "us": "12",
+              "cm": "28.8",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mujer",
+          "rotulo": "Mujer",
+          "nivel": "OFICIAL_DE_MARCA",
+          "sistema": "Medida del pie / US / CO / FR",
+          "metodo": "adidas Colombia publica en una sola tabla la talla CO y la FR (europea).",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "adidas-co-calzado",
+          "fuenteCruce": "adidas-global",
+          "rotuloCruce": "Talla EU y cm",
+          "contrastes": [
+            "contraste-running-balboa"
+          ],
+          "observaciones": "adidas numera en tercios (40, 40 2/3, 41 1/3…): una talla EU redonda como 41 no existe en su tabla y no se asigna a la fila vecina. La tabla de adidas.co se leyó por el índice del buscador; EU, US y cm se confirmaron en el soporte oficial, y COL con Running Balboa y Falabella. Los dos pies más largos (28.4 y 28.8 cm) no tienen CO mujer en la tabla oficial.",
+          "filas": [
+            {
+              "col": "33.5",
+              "eu": "36",
+              "us": "5",
+              "cm": "22.1",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "34",
+              "eu": "36 2/3",
+              "us": "5.5",
+              "cm": "22.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "35",
+              "eu": "37 1/3",
+              "us": "6",
+              "cm": "22.9",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "36",
+              "eu": "38",
+              "us": "6.5",
+              "cm": "23.3",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "37",
+              "eu": "38 2/3",
+              "us": "7",
+              "cm": "23.8",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "37.5",
+              "eu": "39 1/3",
+              "us": "7.5",
+              "cm": "24.2",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "40",
+              "us": "8",
+              "cm": "24.6",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "40 2/3",
+              "us": "8.5",
+              "cm": "25.0",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "41 1/3",
+              "us": "9",
+              "cm": "25.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42",
+              "us": "9.5",
+              "cm": "25.9",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "42 2/3",
+              "us": "10",
+              "cm": "26.3",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "43 1/3",
+              "us": "10.5",
+              "cm": "26.7",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "44",
+              "us": "11",
+              "cm": "27.1",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "42.5",
+              "eu": "44 2/3",
+              "us": "11.5",
+              "cm": "27.6",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": "43",
+              "eu": "45 1/3",
+              "us": "12",
+              "cm": "28.0",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "46",
+              "us": "12.5",
+              "cm": "28.4",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "46 2/3",
+              "us": "13",
+              "cm": "28.8",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "adidas-co-calzado",
+                "adidas-global"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "jordan",
+      "nombre": "Jordan",
+      "segmentos": [
+        {
+          "id": "hombre",
+          "rotulo": "Hombre",
+          "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+          "sistema": "COL/US (Nike Colombia, ficha Jordan) + US/EU (Nike Global)",
+          "metodo": "La talla COL y el largo salen de la tabla que Nike Colombia muestra en la ficha de los Air Jordan, que no publica EU. La talla EU sale de Nike Global. Ambas se relacionan por la talla US de hombre, que las dos tablas publican. No se calcula ningún valor.",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "jordan-co-hombre",
+          "fuenteCruce": "nike-global-hombre",
+          "rotuloCruce": "Talla EU",
+          "observaciones": "Jordan se vende en Colombia a través de Nike y sus fichas abren esta tabla. Solo cubre desde US 7 (EU 40). Nike Colombia advierte que la talla en cm de cajas y etiquetas es diferente al largo del pie.",
+          "filas": [
+            {
+              "col": "38",
+              "eu": "40",
+              "us": "7",
+              "cm": "25",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "38.5",
+              "eu": "40.5",
+              "us": "7.5",
+              "cm": "25.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "41",
+              "us": "8",
+              "cm": "26",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "42",
+              "us": "8.5",
+              "cm": "26.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42.5",
+              "us": "9",
+              "cm": "27",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "43",
+              "us": "9.5",
+              "cm": "27.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "44",
+              "us": "10",
+              "cm": "28",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "41.5",
+              "eu": "44.5",
+              "us": "10.5",
+              "cm": "28.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "45",
+              "us": "11",
+              "cm": "29",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "42.5",
+              "eu": "45.5",
+              "us": "11.5",
+              "cm": "29.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "43",
+              "eu": "46",
+              "us": "12",
+              "cm": "30",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "43.5",
+              "eu": "47",
+              "us": "12.5",
+              "cm": "30.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "44",
+              "eu": "47.5",
+              "us": "13",
+              "cm": "31",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-hombre",
+                "nike-global-hombre"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mujer",
+          "rotulo": "Mujer",
+          "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+          "sistema": "COL/US (Nike Colombia, ficha Jordan) + US/EU (Nike Global)",
+          "metodo": "La talla COL y el largo salen de la tabla que Nike Colombia muestra en la ficha de los Air Jordan de mujer, que no publica EU. La talla EU sale de Nike Global. Ambas se relacionan por la talla US de mujer, que las dos tablas publican. No se calcula ningún valor.",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "jordan-co-mujer",
+          "fuenteCruce": "nike-global-mujer",
+          "rotuloCruce": "Talla EU",
+          "observaciones": "Esta tabla llega hasta US 12 (COL 42); la página de guía de Nike mujer termina en US 10 (COL 40). Nike Colombia advierte que la talla en cm de cajas y etiquetas es diferente al largo del pie.",
+          "filas": [
+            {
+              "col": "35",
+              "eu": "35.5",
+              "us": "5",
+              "cm": "22",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "35.5",
+              "eu": "36",
+              "us": "5.5",
+              "cm": "22.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "36",
+              "eu": "36.5",
+              "us": "6",
+              "cm": "23",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "36.5",
+              "eu": "37.5",
+              "us": "6.5",
+              "cm": "23.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "37",
+              "eu": "38",
+              "us": "7",
+              "cm": "24",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "37.5",
+              "eu": "38.5",
+              "us": "7.5",
+              "cm": "24.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "39",
+              "us": "8",
+              "cm": "25",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "38.5",
+              "eu": "40",
+              "us": "8.5",
+              "cm": "25.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "40.5",
+              "us": "9",
+              "cm": "26",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "41",
+              "us": "9.5",
+              "cm": "26.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42",
+              "us": "10",
+              "cm": "27",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "42.5",
+              "us": "10.5",
+              "cm": "27.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "43",
+              "us": "11",
+              "cm": "28",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "41.5",
+              "eu": "44",
+              "us": "11.5",
+              "cm": "28.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "44.5",
+              "us": "12",
+              "cm": "29",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "jordan-co-mujer",
+                "nike-global-mujer"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "le-coq-sportif",
+      "nombre": "Le Coq Sportif",
+      "segmentos": [
+        {
+          "id": "hombre",
+          "rotulo": "Hombre",
+          "nivel": "OFICIAL_DE_MARCA",
+          "sistema": "EUR / US / COL / CMS",
+          "metodo": "Le Coq Sportif Colombia publica EUR y COL en su guía y en el nombre de cada variante de talla.",
+          "medidaCm": {
+            "rotulo": "CMS",
+            "tipo": "sin-definir",
+            "enFicha": false,
+            "definicion": "Le Coq Sportif llama «CMS» a esta columna y no aclara si es largo del pie, de la plantilla o del zapato. Por eso no se presenta como largo del pie."
+          },
+          "fuentePrincipal": "lcs-co-guia-hombre",
+          "fuenteCruce": "lcs-co-variantes",
+          "rotuloCruce": "Tallas a la venta",
+          "observaciones": "Las tallas 42.5 y 44.5 figuran en las variantes pero no en la imagen de la guía, por eso no tienen CMS.",
+          "filas": [
+            {
+              "col": "37",
+              "eu": "39",
+              "us": "6.5",
+              "cm": "24.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "40",
+              "us": "7.5",
+              "cm": "25.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "41",
+              "us": "8",
+              "cm": "26",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42",
+              "us": "8.5",
+              "cm": "26.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "42.5",
+              "us": "9",
+              "cm": null,
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "43",
+              "us": "9.5",
+              "cm": "27.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "44",
+              "us": "10",
+              "cm": "28",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "42.5",
+              "eu": "44.5",
+              "us": "10.5",
+              "cm": null,
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "43",
+              "eu": "45",
+              "us": "11.5",
+              "cm": "29",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-hombre",
+                "lcs-co-variantes"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mujer",
+          "rotulo": "Mujer",
+          "nivel": "OFICIAL_DE_MARCA",
+          "sistema": "EUR / US / COL / CMS",
+          "metodo": "Le Coq Sportif Colombia publica EUR y COL en su guía y en el nombre de cada variante de talla.",
+          "medidaCm": {
+            "rotulo": "CMS",
+            "tipo": "sin-definir",
+            "enFicha": false,
+            "definicion": "Le Coq Sportif llama «CMS» a esta columna y no aclara si es largo del pie, de la plantilla o del zapato. Por eso no se presenta como largo del pie."
+          },
+          "fuentePrincipal": "lcs-co-guia-mujer",
+          "fuenteCruce": "lcs-co-variantes",
+          "rotuloCruce": "Tallas a la venta",
+          "observaciones": "La talla 38.5 figura en las variantes pero no en la imagen de la guía, por eso no tiene CMS.",
+          "filas": [
+            {
+              "col": "35",
+              "eu": "36",
+              "us": "5.5",
+              "cm": "23",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-mujer",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "36",
+              "eu": "37",
+              "us": "6.5",
+              "cm": "23.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-mujer",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "37",
+              "eu": "38",
+              "us": "7",
+              "cm": "24",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-mujer",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "37.5",
+              "eu": "38.5",
+              "us": "7.5",
+              "cm": null,
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "39",
+              "us": "8",
+              "cm": "24.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-mujer",
+                "lcs-co-variantes"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "40",
+              "us": "9",
+              "cm": "25.5",
+              "nivel": "OFICIAL_DE_MARCA",
+              "fuentes": [
+                "lcs-co-guia-mujer",
+                "lcs-co-variantes"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "new-balance",
+      "nombre": "New Balance",
+      "sinCol": true,
+      "segmentos": [
+        {
+          "id": "hombre",
+          "rotulo": "Hombre",
+          "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+          "sistema": "US / UK / EU / Largo (cm)",
+          "metodo": "Tabla oficial de New Balance Colombia, sin talla colombiana.",
+          "medidaCm": {
+            "rotulo": "Largo (cm)",
+            "tipo": "largo-sin-precisar",
+            "enFicha": true,
+            "definicion": "New Balance Colombia llama «Largo (cm)» a esta columna y no precisa en la tabla si es el largo del pie."
+          },
+          "fuentePrincipal": "nb-co-hombre",
+          "observaciones": "New Balance Colombia publica US, UK, EU y largo, pero no una talla COL. Tras revisar sus guías, su catálogo, Sportline, Running Balboa, Falabella y Dafiti, ninguna fuente específica de la marca la respalda, así que no se muestra.",
+          "filas": [
+            {
+              "col": null,
+              "eu": "32.5",
+              "us": "1",
+              "uk": "0.5",
+              "cm": "19",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "33",
+              "us": "1.5",
+              "uk": "1",
+              "cm": "19.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "33.5",
+              "us": "2",
+              "uk": "1.5",
+              "cm": "20",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "34.5",
+              "us": "2.5",
+              "uk": "2",
+              "cm": "20.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "35",
+              "us": "3",
+              "uk": "2.5",
+              "cm": "21",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "35.5",
+              "us": "3.5",
+              "uk": "3",
+              "cm": "21.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "36",
+              "us": "4",
+              "uk": "3.5",
+              "cm": "22",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "37",
+              "us": "4.5",
+              "uk": "4",
+              "cm": "22.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "37.5",
+              "us": "5",
+              "uk": "4.5",
+              "cm": "23",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "38",
+              "us": "5.5",
+              "uk": "5",
+              "cm": "23.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "38.5",
+              "us": "6",
+              "uk": "5.5",
+              "cm": "24",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "39.5",
+              "us": "6.5",
+              "uk": "6",
+              "cm": "24.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "40",
+              "us": "7",
+              "uk": "6.5",
+              "cm": "25",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "40.5",
+              "us": "7.5",
+              "uk": "7",
+              "cm": "25.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "41.5",
+              "us": "8",
+              "uk": "7.5",
+              "cm": "26",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "42",
+              "us": "8.5",
+              "uk": "8",
+              "cm": "26.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "42.5",
+              "us": "9",
+              "uk": "8.5",
+              "cm": "27",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "43",
+              "us": "9.5",
+              "uk": "9",
+              "cm": "27.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "44",
+              "us": "10",
+              "uk": "9.5",
+              "cm": "28",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "44.5",
+              "us": "10.5",
+              "uk": "10",
+              "cm": "28.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "45",
+              "us": "11",
+              "uk": "10.5",
+              "cm": "29",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "45.5",
+              "us": "11.5",
+              "uk": "11",
+              "cm": "29.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "46.5",
+              "us": "12",
+              "uk": "11.5",
+              "cm": "30",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "47",
+              "us": "12.5",
+              "uk": "12",
+              "cm": "30.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "47.5",
+              "us": "13",
+              "uk": "12.5",
+              "cm": "31",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "49",
+              "us": "14",
+              "uk": "13.5",
+              "cm": "32",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "50",
+              "us": "15",
+              "uk": "14.5",
+              "cm": "33",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "51",
+              "us": "16",
+              "uk": "15.5",
+              "cm": "34",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "52",
+              "us": "17",
+              "uk": "16.5",
+              "cm": "35",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "53",
+              "us": "18",
+              "uk": "17.5",
+              "cm": "36",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "54",
+              "us": "19",
+              "uk": "18.5",
+              "cm": "37",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "55",
+              "us": "20",
+              "uk": "19.5",
+              "cm": "38",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-hombre"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mujer",
+          "rotulo": "Mujer",
+          "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+          "sistema": "US / UK / EU / Largo (cm)",
+          "metodo": "Tabla oficial de New Balance Colombia, sin talla colombiana.",
+          "medidaCm": {
+            "rotulo": "Largo (cm)",
+            "tipo": "largo-sin-precisar",
+            "enFicha": true,
+            "definicion": "New Balance Colombia llama «Largo (cm)» a esta columna y no precisa en la tabla si es el largo del pie."
+          },
+          "fuentePrincipal": "nb-co-mujer",
+          "observaciones": "New Balance Colombia publica US, UK, EU y largo, pero no una talla COL. Tras revisar sus guías, su catálogo, Sportline, Running Balboa, Falabella y Dafiti, ninguna fuente específica de la marca la respalda, así que no se muestra. La tabla de mujer asigna a EU 40 un largo de 25.5 cm; la de hombre, 25 cm.",
+          "filas": [
+            {
+              "col": null,
+              "eu": "33",
+              "us": "3",
+              "uk": "1",
+              "cm": "20",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "33.5",
+              "us": "3.5",
+              "uk": "1.5",
+              "cm": "20.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "34",
+              "us": "4",
+              "uk": "2",
+              "cm": "21",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "34.5",
+              "us": "4.5",
+              "uk": "2.5",
+              "cm": "21.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "35",
+              "us": "5",
+              "uk": "3",
+              "cm": "22",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "36",
+              "us": "5.5",
+              "uk": "3.5",
+              "cm": "22.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "36.5",
+              "us": "6",
+              "uk": "4",
+              "cm": "23",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "37",
+              "us": "6.5",
+              "uk": "4.5",
+              "cm": "23.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "37.5",
+              "us": "7",
+              "uk": "5",
+              "cm": "24",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "38",
+              "us": "7.5",
+              "uk": "5.5",
+              "cm": "24.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "39",
+              "us": "8",
+              "uk": "6",
+              "cm": "25",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "40",
+              "us": "8.5",
+              "uk": "6.5",
+              "cm": "25.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "40.5",
+              "us": "9",
+              "uk": "7",
+              "cm": "26",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "41",
+              "us": "9.5",
+              "uk": "7.5",
+              "cm": "26.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "41.5",
+              "us": "10",
+              "uk": "8",
+              "cm": "27",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "42.5",
+              "us": "10.5",
+              "uk": "8.5",
+              "cm": "27.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "43",
+              "us": "11",
+              "uk": "9",
+              "cm": "28",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "43.5",
+              "us": "11.5",
+              "uk": "9.5",
+              "cm": "28.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "44",
+              "us": "12",
+              "uk": "10",
+              "cm": "29",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "45",
+              "us": "12.5",
+              "uk": "10.5",
+              "cm": "29.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "45.5",
+              "us": "13",
+              "uk": "11",
+              "cm": "30",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "46",
+              "us": "13.5",
+              "uk": "11.5",
+              "cm": "30.5",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "46.5",
+              "us": "14",
+              "uk": "12",
+              "cm": "31",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            },
+            {
+              "col": null,
+              "eu": "48",
+              "us": "15",
+              "uk": "13",
+              "cm": "32",
+              "nivel": "SIN_EQUIVALENCIA_CONFIRMADA",
+              "fuentes": [
+                "nb-co-mujer"
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "nike",
+      "nombre": "Nike",
+      "segmentos": [
+        {
+          "id": "hombre",
+          "rotulo": "Hombre",
+          "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+          "sistema": "COL/US (Nike Colombia) + US/EU (Nike Global)",
+          "metodo": "La talla COL y el largo salen de Nike Colombia, que no publica EU. La talla EU sale de Nike Global. Ambas se relacionan por la talla US de hombre, que las dos tablas publican. No se calcula ningún valor.",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "nike-co-hombre",
+          "fuenteCruce": "nike-global-hombre",
+          "rotuloCruce": "Talla EU",
+          "observaciones": "Solo cubre desde US 7 (EU 40): Nike Colombia no publica COL de hombre por debajo. Nike Colombia advierte que la talla en cm de cajas y etiquetas es diferente al largo del pie.",
+          "filas": [
+            {
+              "col": "38",
+              "eu": "40",
+              "us": "7",
+              "cm": "25",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "38.5",
+              "eu": "40.5",
+              "us": "7.5",
+              "cm": "25.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "41",
+              "us": "8",
+              "cm": "26",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "42",
+              "us": "8.5",
+              "cm": "26.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42.5",
+              "us": "9",
+              "cm": "27",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "40.5",
+              "eu": "43",
+              "us": "9.5",
+              "cm": "27.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "41",
+              "eu": "44",
+              "us": "10",
+              "cm": "28",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "41.5",
+              "eu": "44.5",
+              "us": "10.5",
+              "cm": "28.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "42",
+              "eu": "45",
+              "us": "11",
+              "cm": "29",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "42.5",
+              "eu": "45.5",
+              "us": "11.5",
+              "cm": "29.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "43",
+              "eu": "46",
+              "us": "12",
+              "cm": "30",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "43.5",
+              "eu": "47",
+              "us": "12.5",
+              "cm": "30.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            },
+            {
+              "col": "44",
+              "eu": "47.5",
+              "us": "13",
+              "cm": "31",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-hombre",
+                "nike-global-hombre"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "mujer",
+          "rotulo": "Mujer",
+          "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+          "sistema": "COL/US (Nike Colombia) + US/EU (Nike Global)",
+          "metodo": "La talla COL y el largo salen de Nike Colombia, que no publica EU. La talla EU sale de Nike Global. Ambas se relacionan por la talla US de mujer, que las dos tablas publican. No se calcula ningún valor.",
+          "medidaCm": {
+            "rotulo": "Pie (cm)",
+            "tipo": "largo-del-pie",
+            "enFicha": true
+          },
+          "fuentePrincipal": "nike-co-mujer",
+          "fuenteCruce": "nike-global-mujer",
+          "rotuloCruce": "Talla EU",
+          "observaciones": "Tabla de tenis; la de guayos es distinta y no se usa aquí. El mismo par US hombre 7 / US mujer 8.5 figura con 25 cm en la tabla de hombre y 25.5 cm en la de mujer. Nike Colombia advierte que la talla en cm de cajas y etiquetas es diferente al largo del pie.",
+          "filas": [
+            {
+              "col": "35",
+              "eu": "35.5",
+              "us": "5",
+              "cm": "22",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "35.5",
+              "eu": "36",
+              "us": "5.5",
+              "cm": "22.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "36",
+              "eu": "36.5",
+              "us": "6",
+              "cm": "23",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "36.5",
+              "eu": "37.5",
+              "us": "6.5",
+              "cm": "23.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "37",
+              "eu": "38",
+              "us": "7",
+              "cm": "24",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "37.5",
+              "eu": "38.5",
+              "us": "7.5",
+              "cm": "24.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "38",
+              "eu": "39",
+              "us": "8",
+              "cm": "25",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "38.5",
+              "eu": "40",
+              "us": "8.5",
+              "cm": "25.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "39",
+              "eu": "40.5",
+              "us": "9",
+              "cm": "26",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "39.5",
+              "eu": "41",
+              "us": "9.5",
+              "cm": "26.5",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            },
+            {
+              "col": "40",
+              "eu": "42",
+              "us": "10",
+              "cm": "27",
+              "nivel": "OFICIAL_POR_CORRESPONDENCIA",
+              "fuentes": [
+                "nike-co-mujer",
+                "nike-global-mujer"
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

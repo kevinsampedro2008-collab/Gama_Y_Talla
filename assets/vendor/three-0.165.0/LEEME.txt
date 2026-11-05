@@ -1,0 +1,14 @@
+Three.js 0.165.0 (licencia MIT, ver LICENSE), copia local de solo los archivos que usa
+la presentación del catálogo (assets/js/catalog-intro-escena.js).
+
+Origen: https://cdn.jsdelivr.net/npm/three@0.165.0/<misma ruta>  (descargado el 2026-11-02, sin modificar)
+
+  build/three.module.min.js
+  examples/jsm/loaders/GLTFLoader.js
+  examples/jsm/loaders/DRACOLoader.js
+  examples/jsm/utils/BufferGeometryUtils.js        (lo importa GLTFLoader)
+  examples/jsm/environments/RoomEnvironment.js
+  examples/jsm/libs/draco/gltf/draco_decoder.wasm  (el GLB usa KHR_draco_mesh_compression)
+  examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js
+
+Se cargan con el import map de index.html ("three" y "three/addons/").

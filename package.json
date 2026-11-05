@@ -1,0 +1,23 @@
+{
+  "name": "yeny_oficial",
+  "version": "1.0.0",
+  "description": "Sitio web estático para **Gama & Talla**, una tienda de zapatillas en Colombia. Permite explorar un catálogo, consultar tallas europeas (EU), añadir varios productos al carrito y enviar un pedido completo por WhatsApp.",
+  "main": "app.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kevinsampedro2008-collab/Gama_Y_Talla.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kevinsampedro2008-collab/Gama_Y_Talla/issues"
+  },
+  "homepage": "https://github.com/kevinsampedro2008-collab/Gama_Y_Talla#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.6"
+  }
+}

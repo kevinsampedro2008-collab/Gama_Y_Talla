@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <rect width="800" height="800" fill="#f3f3f0"/>
+  <g transform="translate(430 470) scale(0.62 1) translate(-430 -470)">
+    <ellipse cx="430" cy="600" rx="300" ry="22" fill="#141414" opacity="0.08"/>
+    <path d="M140 520 C140 468 172 440 222 430 L332 398 C362 330 420 300 470 300 L522 300 C548 332 565 362 604 376 L652 392 C702 408 722 440 722 480 L722 520 Z" fill="#2a2a2a" stroke="#141414" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M120 520 L742 520 C746 546 736 572 700 578 L162 578 C130 574 116 548 120 520 Z" fill="#ffffff" stroke="#141414" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M300 470 C380 450 470 445 560 470" fill="none" stroke="#f3f3f0" stroke-width="18" stroke-linecap="round"/>
+    <path d="M404 340 L450 330 M396 362 L446 352 M388 384 L440 374" stroke="#141414" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <text x="40" y="70" font-family="IBM Plex Mono, monospace" font-size="26" letter-spacing="4" fill="#5e5e5a">IMAGEN DE PRUEBA</text>
+  <text x="40" y="730" font-family="Archivo, sans-serif" font-size="30" font-weight="600" fill="#141414">Prueba · Negro / blanco</text>
+  <text x="40" y="766" font-family="IBM Plex Mono, monospace" font-size="22" fill="#5e5e5a">FRONTAL · FOTO 2 DE 2</text>
+</svg>

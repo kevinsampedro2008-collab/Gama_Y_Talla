@@ -1,0 +1,29 @@
+COPIAS OPTIMIZADAS DEL MODELO 3D — Presentación de bienvenida
+=============================================================
+
+Fuente: ../af1-model.glb (original, intacto; no se modifica).
+Las tres copias se generaron a partir del original, fuera del proyecto, con:
+  - @gltf-transform/cli 4.5.1 (funciones simplify, prune, dedup, textureCompress, draco)
+  - meshoptimizer 0.24 (simplificación) · draco3dgltf 1.5 · sharp 0.34 (texturas)
+
+Proceso (igual para las tres):
+  1. Soldadura de vértices con tolerancia 1e-5 en posición y UV. El original tiene un vértice
+     por esquina de triángulo (4,48 M vértices para 1,5 M triángulos), lo que impedía simplificar.
+     Las costuras UV se conservan.
+  2. Simplificación con meshoptimizer (error máximo 2 % del radio), sin bloquear bordes.
+  3. Normales suaves ponderadas por área, recalculadas sobre la malla ya simplificada.
+  4. Texturas WebP (calidad 90) redimensionadas; metal/rugosidad a la mitad del color
+     (es casi uniforme: la diferencia visual medida fue despreciable).
+  5. Geometría comprimida con Draco (edgebreaker; cuantización: posición 14, normal 10, UV 12).
+
+Archivo                 Triángulos  Vértices  Color      Metal/rugosidad  Peso
+af1-model-high.glb      299.897     345.972   2048 px    1024 px          1,78 MB
+af1-model-medium.glb    149.947     193.968   1024 px     512 px          0,90 MB
+af1-model-low.glb       149.947     193.968    512 px     256 px          0,77 MB
+
+Por debajo de ~150 k triángulos la simplificación queda bloqueada por las costuras UV
+(114 k como mínimo) y produce facetas visibles en la puntera y la entresuela; por eso el nivel
+bajo comparte geometría con el medio y se diferencia por texturas y renderizado.
+
+Todas pasan el validador oficial de Khronos (gltf-validator) sin errores ni advertencias.
+Las elige assets/js/catalog-intro.js según el dispositivo (NIVELES).

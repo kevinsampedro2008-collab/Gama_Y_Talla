@@ -1,0 +1,4 @@
+Catálogo ficticio para probar variantes de color, galería, tallas y carrito.
+Se activa solo con la dirección index.html?datos-prueba y no se mezcla con data/productos.json.
+Las imágenes de imagenes/ son marcadores SVG generados (no son fotos de productos).
+Puede borrarse esta carpeta antes de publicar la tienda.

@@ -1,0 +1,791 @@
+
+{
+
+  "_aviso": "CATÁLOGO DE DEMOSTRACIÓN. Los precios, tallas y existencias son ficticios. Las imágenes son ilustraciones genéricas, no fotografías oficiales de los modelos. Sustituye los datos antes de vender.",
+  "productos": [
+    {
+      
+      "id": "ADD-SAM",
+      "nombre": "SAMBA",
+      "marca": "Adidas",
+      "categoria": "Urbanas",
+      "color": "Rosa / blanco / beigh",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_01.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "LCS-RET-01",
+      "nombre": "LCS Retro Classic",
+      "marca": "Le Coq Sportif",
+      "categoria": "Casual / Urbanas",
+      "color": "Blanco / Rojo / Azul / Beis",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_02.webp",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-001",
+      "nombre": "Air Jordan 1 Retro High OG",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Rojo / blanco / negro",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_03.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "GT-002",
+      "nombre": "Air Force 1 '07",
+      "marca": "Nike",
+      "categoria": "Casuales",
+      "color": "Blanco",
+      "precio": 132900,
+      "imagen": "assets/images/productos/zapatilla_04.webp",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "GT-003",
+      "nombre": "Samba OG",
+      "marca": "Adidas",
+      "categoria": "Casuales",
+      "color": "Blanco / verde",
+      "precio": 459900,
+      "imagen": "assets/images/productos/zapatilla_05.webp",
+      "tallasDisponibles": [
+        "37",
+        "38",
+        "39",
+        "40",
+        "41"
+      ],
+      "tallasAgotadas": [
+        "42"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-004",
+      "nombre": "Pegasus 41",
+      "marca": "Nike",
+      "categoria": "Running",
+      "color": "Gris / azul",
+      "precio": 529900,
+      "imagen": "assets/images/productos/zapatilla_06.webp",
+      "tallasDisponibles": [
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Marfil / lima",
+      "precio": 689900,
+      "imagen": "assets/images/productos/zapatilla_07.webp",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/productos/zapatilla_08.webp",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/productos/zapatilla_09.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-008",
+      "nombre": "550",
+      "marca": "New Balance",
+      "categoria": "Deportivas",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/productos/zapatilla_10.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Marfil / lima",
+      "precio": 689900,
+      "imagen": "assets/images/productos/zapatilla_11.webp",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/productos/zapatilla_12.webp",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false,
+      "precioAnterior": 1599900
+    },
+    {
+      "id": "GT-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/productos/zapatilla_13.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-008",
+      "nombre": "550",
+      "marca": "New Balance",
+      "categoria": "Deportivas",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/productos/zapatilla_14.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+
+    {
+      
+      "id": "ADD-SAM",
+      "nombre": "SAMBA",
+      "marca": "Adidas",
+      "categoria": "Urbanas",
+      "color": "Rosa / blanco / beigh",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_15.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "LCS-RET-01",
+      "nombre": "LCS Retro Classic",
+      "marca": "Le Coq Sportif",
+      "categoria": "Casual / Urbanas",
+      "color": "Blanco / Rojo / Azul / Beis",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_16.webp",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-001",
+      "nombre": "Air Jordan 1 Retro High OG",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Rojo / blanco / negro",
+      "precio": 120000,
+      "imagen": "assets/images/productos/zapatilla_17.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44",
+        "45"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true,
+      "precioAnterior": 290000
+    },
+    { 
+      "id": "GT-002",
+      "nombre": "Air Force 1 '07",
+      "marca": "CAMBIARRRRRRRRRRRRRRRR IMAGEN 18",
+      "categoria": "Casuales",
+      "color": "Blanco",
+      "precio": 132900,
+      "imagen": "assets/images/productos/zapatilla_18.webp",
+      "tallasDisponibles": [
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false,
+      "precioAnterior": 290000
+    },
+    {
+      "id": "GT-003",
+      "nombre": "Samba OG",
+      "marca": "Adidas",
+      "categoria": "Casuales",
+      "color": "Blanco / verde",
+      "precio": 459900,
+      "imagen": "assets/images/productos/zapatilla_19.webp",
+      "tallasDisponibles": [
+        "37",
+        "38",
+        "39",
+        "40",
+        "41"
+      ],
+      "tallasAgotadas": [
+        "42"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-004",
+      "nombre": "Pegasus 41",
+      "marca": "Nike",
+      "categoria": "Running",
+      "color": "Gris / azul",
+      "precio": 529900,
+      "imagen": "assets/images/productos/zapatilla_20.webp",
+      "tallasDisponibles": [
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44"
+      ],
+      "tallasAgotadas": [],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Marfil / lima",
+      "precio": 689900,
+      "imagen": "assets/images/productos/zapatilla_21.webp",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/productos/zapatilla_22.webp",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/productos/zapatilla_23.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-008",
+      "nombre": "550",
+      "marca": "New Balance",
+      "categoria": "Deportivas",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/productos/zapatilla_24.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-005",
+      "nombre": "Ultraboost Light",
+      "marca": "Adidas",
+      "categoria": "Running",
+      "color": "Marfil / lima",
+      "precio": 689900,
+      "imagen": "assets/images/productos/zapatilla_25.webp",
+      "tallasDisponibles": [
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "40",
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    },
+    {
+      "id": "GT-006",
+      "nombre": "Air Jordan 4 Retro",
+      "marca": "Jordan",
+      "categoria": "Urbanas",
+      "color": "Gris cemento",
+      "precio": 1249900,
+      "imagen": "assets/images/productos/zapatilla_26.webp",
+      "tallasDisponibles": [],
+      "tallasAgotadas": [
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "badge": "",
+      "disponible": false,
+      "destacado": false,
+      "nuevoIngreso": false,
+      "precioAnterior": 1599900
+    },
+    {
+      "id": "GT-007",
+      "nombre": "Dunk Low Retro",
+      "marca": "Nike",
+      "categoria": "Urbanas",
+      "color": "Negro / blanco",
+      "precio": 549900,
+      "imagen": "assets/images/productos/zapatilla_27.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43"
+      ],
+      "tallasAgotadas": [
+        "44"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": true,
+      "nuevoIngreso": false
+    },
+    {
+      "id": "GT-008",
+      "nombre": "550",
+      "marca": "New Balance",
+      "categoria": "Deportivas",
+      "color": "Marfil / azul",
+      "precio": 519900,
+      "imagen": "assets/images/productos/zapatilla_28.webp",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ],
+      "badge": "",
+      "disponible": true,
+      "destacado": false,
+      "nuevoIngreso": true
+    }
+  ],
+  "_avisoTallas": "Las tallas del catálogo son datos de demostración. La guía de Nike es para calzado de hombre y combina equivalencias de las guías oficiales de Nike Colombia y Nike Global; la talla nacional solo se muestra cuando la tabla colombiana la respalda. Confirma el ajuste de cada modelo antes de vender.",
+  "guiasTallas": {
+    "Nike": {
+      "verificada": true,
+      "fuente": "Guías oficiales de calzado de hombre de Nike Colombia y Nike Global",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-hombre",
+      "nota": "Tabla de calzado de hombre. Las tallas de mujer y niño usan tablas diferentes. La horma puede variar por modelo.",
+      "tallas": {
+        "36": {
+          "cm": "22.1",
+          "colombia": "",
+          "us": "4"
+        },
+        "36.5": {
+          "cm": "22.4",
+          "colombia": "",
+          "us": "4.5"
+        },
+        "37.5": {
+          "cm": "22.9",
+          "colombia": "",
+          "us": "5"
+        },
+        "38": {
+          "cm": "23.3",
+          "colombia": "",
+          "us": "5.5"
+        },
+        "38.5": {
+          "cm": "23.7",
+          "colombia": "",
+          "us": "6"
+        },
+        "39": {
+          "cm": "24.1",
+          "colombia": "",
+          "us": "6.5"
+        },
+        "40": {
+          "cm": "25",
+          "colombia": "38",
+          "us": "7"
+        },
+        "40.5": {
+          "cm": "25.5",
+          "colombia": "38.5",
+          "us": "7.5"
+        },
+        "41": {
+          "cm": "26",
+          "colombia": "39",
+          "us": "8"
+        },
+        "42": {
+          "cm": "26.5",
+          "colombia": "39.5",
+          "us": "8.5"
+        },
+        "42.5": {
+          "cm": "27",
+          "colombia": "40",
+          "us": "9"
+        },
+        "43": {
+          "cm": "27.5",
+          "colombia": "40.5",
+          "us": "9.5"
+        },
+        "44": {
+          "cm": "28",
+          "colombia": "41",
+          "us": "10"
+        },
+        "44.5": {
+          "cm": "28.5",
+          "colombia": "41.5",
+          "us": "10.5"
+        },
+        "45": {
+          "cm": "29",
+          "colombia": "42",
+          "us": "11"
+        },
+        "45.5": {
+          "cm": "29.5",
+          "colombia": "42.5",
+          "us": "11.5"
+        },
+        "46": {
+          "cm": "30",
+          "colombia": "43",
+          "us": "12"
+        },
+        "47": {
+          "cm": "30.5",
+          "colombia": "43.5",
+          "us": "12.5"
+        },
+        "47.5": {
+          "cm": "31",
+          "colombia": "44",
+          "us": "13"
+        }
+      },
+      "urlAlterna": "https://www.nike.com/size-fit/mens-footwear"
+    },
+    "Jordan": {
+      "verificada": false,
+      "usaGuiaDe": "Nike",
+      "fuente": "Referencia orientativa basada en la guía de Nike Colombia",
+      "url": "https://www.nike.com.co/guia-tallas/calzado-de-hombre",
+      "nota": "La tabla corresponde a calzado de hombre de Nike; confirma la equivalencia y el ajuste del modelo Jordan específico con el vendedor.",
+      "tallas": {}
+    },
+    "Adidas": {
+      "verificada": false,
+      "url": "https://www.adidas.co/ayuda/guia-de-tallas",
+      "nota": "Equivalencias pendientes de confirmar con la tabla oficial del modelo.",
+      "tallas": {}
+    },
+    "New Balance": {
+      "verificada": false,
+      "url": "https://www.newbalance.com/size-guide/",
+      "nota": "Equivalencias pendientes de confirmar con la tabla oficial del modelo.",
+      "tallas": {}
+    }
+  }
+}

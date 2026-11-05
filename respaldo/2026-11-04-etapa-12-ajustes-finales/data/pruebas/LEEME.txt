@@ -1,0 +1,14 @@
+Catálogo ficticio para probar variantes de color, galería, tallas y carrito.
+
+Productos de demostración (todos son ficticios):
+- PRUEBA-TRES: tres colores. Blanco / verde (EU 38-41, 42 agotada, 4 fotos, precio del producto);
+  Negro / blanco (EU 40-42, 38-39 agotadas, 2 fotos, precio propio con descuento);
+  Rosa / blanco (EU 36-38, 39-40 agotadas, 2 fotos). EU 38 existe en dos colores; 36-37 solo en rosa.
+- PRUEBA-DOS: dos colores. Gris / plata (EU 37-40, 41 agotada) y Azul / blanco (EU 39-43, 38 agotada).
+- PRUEBA-UNA: un solo color (Beige): la ficha no muestra selector de color.
+- PRUEBA-ANTIGUO: formato anterior del JSON (sin variantes).
+- PRUEBA-DUP: dos registros con la misma referencia y datos distintos.
+
+Se activa solo con la dirección index.html?datos-prueba y no se mezcla con data/productos.json.
+Las imágenes de imagenes/ son marcadores SVG generados (no son fotos de productos).
+Puede borrarse esta carpeta antes de publicar la tienda.

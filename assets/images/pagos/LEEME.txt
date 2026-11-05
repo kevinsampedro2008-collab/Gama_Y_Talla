@@ -1,0 +1,18 @@
+Logotipos de medios de pago (marcas registradas de sus titulares).
+Descargados el 2026-11-02 de los sitios oficiales de cada entidad, sin modificar:
+
+bancolombia.svg  <- https://www.bancolombia.com/wcm/connect/a67af2d6-c768-4f4f-a33b-fd58074f7ce9/logo-bancolombia-black.svg
+                    (logotipo de la cabecera de bancolombia.com/personas)
+nequi.svg        <- https://cdn.prod.website-files.com/6317a229ebf7723658463b4b/663a6b0d43303ddf38035997_logo-nequi.svg
+                    (logotipo de la cabecera de nequi.com.co)
+
+Para uso comercial confirma las condiciones de uso de marca con cada entidad.
+
+Iconos (recuadro de cada medio de pago), descargados el 2026-11-02 de los sitios oficiales, sin modificar:
+
+nequi-icono.png        <- https://cdn.prod.website-files.com/6317a229ebf7723658463b4b/652fd8c4a4ac25119892bb21_256x256%20N.png
+                          (apple-touch-icon declarado en nequi.com.co)
+bancolombia-icono.svg  <- https://www.bancolombia.com/favicon.svg
+                          (favicon vectorial declarado en bancolombia.com/personas)
+
+Los logotipos completos (nequi.svg, bancolombia.svg) se conservan pero ya no se usan en la página.
