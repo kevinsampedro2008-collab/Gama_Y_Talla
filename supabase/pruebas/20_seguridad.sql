@@ -36,6 +36,10 @@ begin
 end;
 $$;
 
+-- Desde 20261107010000 ninguna función nace con EXECUTE para PUBLIC, tampoco estos
+-- ayudantes, que se llaman con otros roles: la concesión tiene que ser explícita.
+grant execute on all functions in schema pg_temp to public;
+
 -- ------------------------------------------------------------- datos
 insert into public.administradores (user_id, nombre)
 values ('aaaaaaaa-0000-0000-0000-000000000001', 'Administrador');

@@ -68,6 +68,14 @@ titulo "7. Pruebas de RLS y privilegios"
 psql_ -q < supabase/pruebas/20_seguridad.sql 2>&1 | grep -E 'OK |FALLA' | sed 's/^NOTICE:  //'
 psql_ -q < supabase/pruebas/20_seguridad.sql 2>&1 | grep -q FALLA && fallos=$((fallos+1))
 
+titulo "8. Endurecimiento de funciones"
+psql_ -q < supabase/pruebas/30_endurecimiento.sql 2>&1 | grep -E 'OK |FALLA|ERROR' | sed 's/^NOTICE:  //' | tail -3
+psql_ -q < supabase/pruebas/30_endurecimiento.sql 2>&1 | grep -qE 'FALLA|ERROR' && fallos=$((fallos+1))
+
+titulo "9. Acceso a los datos internos"
+psql_ -q < supabase/pruebas/40_acceso_interno.sql 2>&1 | grep -E 'OK |FALLA|ERROR' | sed 's/^NOTICE:  //' | tail -3
+psql_ -q < supabase/pruebas/40_acceso_interno.sql 2>&1 | grep -qE 'FALLA|ERROR' && fallos=$((fallos+1))
+
 titulo "Resultado"
 if [ "$fallos" -eq 0 ]; then echo "Sin fallos."; else echo "$fallos bloque(s) con fallos."; fi
 [ "${1:-}" = "--limpiar" ] && docker rm -f "$CONTENEDOR" >/dev/null && echo "contenedor eliminado"

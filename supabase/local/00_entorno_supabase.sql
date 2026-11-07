@@ -31,3 +31,9 @@ $$;
 
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
+
+-- Supabase da a service_role acceso completo a lo que se cree en public. Se imita para
+-- poder comprobar que los disparadores funcionan aunque no pueda ejecutarlos directamente.
+grant usage on schema public to service_role;
+alter default privileges in schema public grant all on tables to service_role;
+alter default privileges in schema public grant all on sequences to service_role;
