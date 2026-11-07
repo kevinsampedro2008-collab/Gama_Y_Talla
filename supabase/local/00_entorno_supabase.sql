@@ -32,6 +32,13 @@ $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on function auth.uid() to anon, authenticated, service_role;
 
+-- Supabase trae pgcrypto instalada en el esquema «extensions», no en public. Se imita para
+-- que «create extension if not exists pgcrypto» de 20261105010000 no la deje en public y la
+-- auditoría (supabase/pruebas/auditar_funciones.sql) vea lo mismo que en Supabase.
+create schema if not exists extensions;
+grant usage on schema extensions to anon, authenticated, service_role;
+create extension if not exists pgcrypto with schema extensions;
+
 -- Supabase da a service_role acceso completo a lo que se cree en public. Se imita para
 -- poder comprobar que los disparadores funcionan aunque no pueda ejecutarlos directamente.
 grant usage on schema public to service_role;

@@ -2,7 +2,8 @@
 -- Escriben datos y se deshacen al final, PERO el ROLLBACK no devuelve las secuencias:
 -- ejecutar SOLO en un entorno local desechable, nunca en el proyecto remoto.
 -- Comprueba privilegios efectivos (no solo «cero filas»). La prueba por HTTP real está en
--- 50_postgrest_local.mjs.
+-- 50_postgrest_local.mjs. Desde 20261107030000 (etapa 14f.2) nadie de la aplicación borra
+-- tallas: el detalle de formato, borrado y fechas está en 60_integridad_tallas_vigencia.sql.
 
 begin;
 
@@ -111,8 +112,10 @@ begin
     perform pg_temp.exigir('D authenticated con SELECT en tallas.' || c, has_column_privilege('authenticated', 'public.tallas', c, 'SELECT'));
   end loop;
   perform pg_temp.exigir('D authenticated sin SELECT de tabla en tallas', not has_table_privilege('authenticated', 'public.tallas', 'SELECT'));
-  perform pg_temp.exigir('D authenticated conserva INSERT, UPDATE y DELETE en tallas', has_table_privilege('authenticated', 'public.tallas', 'INSERT')
-    and has_table_privilege('authenticated', 'public.tallas', 'UPDATE') and has_table_privilege('authenticated', 'public.tallas', 'DELETE'));
+  perform pg_temp.exigir('D authenticated conserva INSERT y UPDATE en tallas', has_table_privilege('authenticated', 'public.tallas', 'INSERT')
+    and has_table_privilege('authenticated', 'public.tallas', 'UPDATE'));
+  perform pg_temp.exigir('D authenticated sin DELETE ni TRUNCATE en tallas (14f.2: se desactivan)',
+    not has_table_privilege('authenticated', 'public.tallas', 'DELETE') and not has_table_privilege('authenticated', 'public.tallas', 'TRUNCATE'));
   perform pg_temp.exigir('D anon sin ninguna escritura en ninguna tabla',
     not exists (select 1 from pg_class t join pg_namespace n on n.oid = t.relnamespace
                  where n.nspname = 'public' and t.relkind = 'r'
@@ -309,9 +312,8 @@ begin
   update public.tallas set estado = 'AGOTADA', nota = 'pirata' where id = '30000000-4444-0000-0000-00000000000a';
   get diagnostics n = row_count;
   perform pg_temp.exigir('B cambiar disponibilidad no afecta a ninguna fila', n = 0, n::text);
-  delete from public.tallas where id = '30000000-4444-0000-0000-00000000000a';
-  get diagnostics n = row_count;
-  perform pg_temp.exigir('B borrar tallas no afecta a ninguna fila', n = 0, n::text);
+  perform pg_temp.exigir_denegado('B denegado: borrar tallas (14f.2; antes, cero filas)',
+    $q$delete from public.tallas where id = '30000000-4444-0000-0000-00000000000a'$q$);
   update public.productos set nombre = 'PIRATA' where id = '10000000-4444-0000-0000-00000000000a';
   get diagnostics n = row_count;
   perform pg_temp.exigir('B modificar productos no afecta a ninguna fila', n = 0, n::text);
@@ -411,9 +413,9 @@ begin
   update public.configuracion set valor = '50' where clave = 'vigencia_horas_predeterminada';
   get diagnostics n = row_count;
   perform pg_temp.exigir('C cambia la configuración', n = 1, n::text);
-  delete from public.tallas where id = '30000000-4444-0000-0000-00000000000b';
-  get diagnostics n = row_count;
-  perform pg_temp.exigir('C borra una talla', n = 1, n::text);
+  perform pg_temp.exigir_denegado('C denegado: borrar una talla (14f.2: se desactiva)',
+    $q$delete from public.tallas where id = '30000000-4444-0000-0000-00000000000b'$q$);
+  perform pg_temp.exigir('C la talla sigue existiendo tras el intento', exists (select 1 from public.tallas where id = '30000000-4444-0000-0000-00000000000b'));
 end;
 $$;
 

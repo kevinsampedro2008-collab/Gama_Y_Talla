@@ -1,8 +1,12 @@
 /* Etapa 14f.1 · Pruebas de acceso por HTTP real: Kong + PostgREST + Auth (GoTrue).
+ * Etapa 14f.2 · Tallas con coma y fracción, tallas que no se borran (se desactivan) y fechas futuras.
  *
  * SOLO para el stack local desechable (`supabase start`). Se niega a ejecutarse si la API
  * no está en 127.0.0.1. Crea usuarios y datos FICTICIOS y borra los datos al terminar.
  * Las sesiones son de verdad: las emite Auth, no se fabrican.
+ *
+ * Limpieza: desde 14f.2 ningún rol de la aplicación borra tallas, así que los datos de prueba
+ * los borra service_role (mantenimiento privilegiado) en el bloque final, no el administrador.
  *
  *   npx --yes supabase@3.0.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
  *   node supabase/pruebas/50_postgrest_local.mjs
@@ -110,6 +114,9 @@ const INTENTOS_LECTURA = [
   ['incrustada con filtro', `/variantes?select=id,tallas!inner(id)&tallas.nota=eq.${CENTINELA}`]
 ];
 
+// Lo que crea el administrador durante la prueba, para limpiarlo al final.
+const creados = { variantes: [], productos: [] };
+
 try {
   // ==================================================================== A
   titulo('A · Visitante (anon): solo la clave publicable, como la tienda');
@@ -140,6 +147,7 @@ try {
   for (const [nombre, x] of [
     ['insertar producto', await pedir('POST', `${REST}/productos`, { cuerpo: { nombre: 'PIRATA', marca: 'X' } })],
     ['cambiar disponibilidad', await pedir('PATCH', `${REST}/tallas?id=eq.${TALLA}`, { cuerpo: { estado: 'CONFIRMADA' } })],
+    ['borrar tallas', await pedir('DELETE', `${REST}/tallas?id=eq.${TALLA}`)],
     ['borrar fotos', await pedir('DELETE', `${REST}/fotos?orden=gte.0`)],
     ['nombrarse administrador', await pedir('POST', `${REST}/administradores`, { cuerpo: { user_id: crypto.randomUUID() } })]
   ]) esperar(`A denegado: ${nombre}`, denegado(x), breve(x));
@@ -210,7 +218,7 @@ try {
   const parche = await pedir('PATCH', `${REST}/tallas?id=eq.${TALLA}&select=id`, { ...tk, cuerpo: { estado: 'AGOTADA', nota: 'pirata' }, prefer: 'return=representation' });
   esperar('B cambiar disponibilidad no afecta a ninguna fila', sinFilas(parche), breve(parche));
   const borrar = await pedir('DELETE', `${REST}/tallas?id=eq.${TALLA2}&select=id`, { ...tk, prefer: 'return=representation' });
-  esperar('B borrar tallas no afecta a ninguna fila', sinFilas(borrar), breve(borrar));
+  esperar('B rechazado: borrar tallas (14f.2; antes, cero filas)', denegado(borrar), breve(borrar));
   const ascenso = await pedir('POST', `${REST}/administradores`, { ...tk, cuerpo: { user_id: noAdmin.id } });
   esperar('B rechazado: nombrarse administrador', denegado(ascenso), breve(ascenso));
   const hist = await pedir('POST', `${REST}/historial`, { ...tk, cuerpo: { tabla: 'x', fila_id: TALLA, operacion: 'INSERT' } });
@@ -257,7 +265,9 @@ try {
 
   const nuevo = await pedir('POST', `${REST}/productos?select=id,codigo_interno`, { ...ta, cuerpo: { nombre: 'DEL PANEL', marca: 'Local' }, prefer: 'return=representation' });
   esperar('C crea producto y el disparador asigna el código', nuevo.s === 201 && /^GT-\d{5}$/.test(nuevo.d[0]?.codigo_interno), breve(nuevo));
+  if (nuevo.d?.[0]?.id) creados.productos.push(nuevo.d[0].id);
   const nuevaV = await pedir('POST', `${REST}/variantes?select=id,codigo_variante`, { ...ta, cuerpo: { producto_id: nuevo.d[0].id, color: 'Azul' }, prefer: 'return=representation' });
+  if (nuevaV.d?.[0]?.id) creados.variantes.push(nuevaV.d[0].id);
   esperar('C crea variante y el disparador deriva el código', nuevaV.s === 201 && nuevaV.d[0]?.codigo_variante === `${nuevo.d[0].codigo_interno}-A`, breve(nuevaV));
   const nuevaT = await pedir('POST', `${REST}/tallas?select=id`, { ...ta, cuerpo: { variante_id: nuevaV.d[0].id, talla: '42', nota: 'nota del panel' }, prefer: 'return=representation' });
   esperar('C crea talla con nota', nuevaT.s === 201, breve(nuevaT));
@@ -269,11 +279,80 @@ try {
   esperar('C el disparador de historial registra el cambio y su autor', autor.d?.[0]?.autor === admin.id && autor.d?.[0]?.cambios?.includes('nota'), breve(autor));
   const borrarHist = await pedir('DELETE', `${REST}/historial?id=gte.0`, ta);
   esperar('C ni el administrador borra el historial', denegado(borrarHist), breve(borrarHist));
-  // Limpieza por las mismas vías del panel: el administrador conserva DELETE.
-  for (const [ruta, nombre] of [[`/tallas?variante_id=eq.${nuevaV.d[0].id}`, 'tallas'], [`/variantes?id=eq.${nuevaV.d[0].id}`, 'variantes'], [`/productos?id=eq.${nuevo.d[0].id}`, 'productos']]) {
-    const x = await pedir('DELETE', REST + ruta, ta);
-    esperar(`C borra ${nombre}`, x.s === 204, breve(x));
+
+  // 14f.2: el administrador ya no borra tallas; las desactiva y las reactiva.
+  const T42 = nuevaT.d[0].id;
+  const borrarT = await pedir('DELETE', `${REST}/tallas?id=eq.${T42}`, ta);
+  esperar('C rechazado: el administrador no borra una talla (403)', denegado(borrarT), breve(borrarT));
+  const borrarTodas = await pedir('DELETE', `${REST}/tallas?variante_id=eq.${nuevaV.d[0].id}`, ta);
+  esperar('C rechazado: tampoco todas las de una variante', denegado(borrarTodas), breve(borrarTodas));
+  const sigue = await servicio('GET', `${REST}/tallas?select=id&id=eq.${T42}`);
+  esperar('C la talla sigue existiendo tras los intentos', sigue.d?.length === 1, breve(sigue));
+  const desactivar = await pedir('PATCH', `${REST}/tallas?id=eq.${T42}&select=id,activa`, { ...ta, cuerpo: { activa: false }, prefer: 'return=representation' });
+  esperar('C desactiva la talla (activa = false)', desactivar.s === 200 && desactivar.d.length === 1 && desactivar.d[0].activa === false, breve(desactivar));
+  const histDes = await pedir('GET', `${REST}/historial?select=operacion,cambios,autor&fila_id=eq.${T42}&order=id.desc&limit=1`, ta);
+  esperar('C el historial registra la desactivación y su autor', histDes.d?.[0]?.operacion === 'UPDATE' && JSON.stringify(histDes.d?.[0]?.cambios) === '["activa"]' && histDes.d?.[0]?.autor === admin.id, breve(histDes));
+  const vistaSin = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].codigo_interno)}`);
+  esperar('C la talla desactivada desaparece de la vista', vistaSin.s === 200 && vistaSin.d?.[0]?.variantes?.[0]?.tallas?.length === 0, breve(vistaSin));
+  const reactivar = await pedir('PATCH', `${REST}/tallas?id=eq.${T42}&select=id,activa`, { ...ta, cuerpo: { activa: true }, prefer: 'return=representation' });
+  esperar('C reactiva la MISMA fila', reactivar.s === 200 && reactivar.d?.[0]?.id === T42 && reactivar.d?.[0]?.activa === true, breve(reactivar));
+  const cuantas = await servicio('GET', `${REST}/tallas?select=id&variante_id=eq.${nuevaV.d[0].id}&talla=eq.42`);
+  esperar('C sin duplicados: una sola fila para esa talla', cuantas.d?.length === 1, breve(cuantas));
+  const histTodo = await pedir('GET', `${REST}/historial?select=operacion,cambios&fila_id=eq.${T42}&operacion=eq.UPDATE&cambios=cs.{activa}`, ta);
+  esperar('C el historial guarda la desactivación y la reactivación', histTodo.d?.length === 2, breve(histTodo));
+
+  // ==================================================================== G
+  titulo('G · Formato de las tallas y fechas futuras (14f.2)');
+  const variG = vari.d[0].id;
+  for (const talla of ['40,5', '40 1/3']) {
+    const x = await pedir('POST', `${REST}/tallas?select=id,talla`, { ...ta, cuerpo: { variante_id: variG, talla }, prefer: 'return=representation' });
+    esperar(`G el administrador crea la talla «${talla}»`, x.s === 201 && x.d?.[0]?.talla === talla, breve(x));
   }
+  // Formas equivalentes no mínimas: se admiten y valen lo mismo que 40,5 (14f.2, revisión).
+  for (const talla of ['40,50', '40 2/4']) {
+    const x = await pedir('POST', `${REST}/tallas?select=id,talla`, { ...ta, cuerpo: { variante_id: nuevaV.d[0].id, talla }, prefer: 'return=representation' });
+    esperar(`G el administrador crea la talla equivalente «${talla}»`, x.s === 201 && x.d?.[0]?.talla === talla, breve(x));
+  }
+  const valores = [];
+  for (const talla of ['40,5', '40.5', '40,50', '40.50', '40 1/2', '40 2/4']) {
+    const x = await pedir('POST', `${REST}/rpc/fn_valor_talla`, { cuerpo: { p_talla: talla } });
+    valores.push(`${talla}=${x.s === 200 ? x.d : breve(x)}`);
+  }
+  esperar('G rpc fn_valor_talla: las seis formas de 40,5 valen 40.5', valores.every((v) => v.endsWith('=40.5')), valores.join(' '));
+  const vistaEquiv = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].codigo_interno)}`);
+  const ordenEquiv = vistaEquiv.d?.[0]?.variantes?.[0]?.tallas?.map((t) => t.talla) || [];
+  esperar('G la vista entrega las etiquetas equivalentes intactas, juntas y antes de 42',
+    ordenEquiv.length === 3 && ordenEquiv[2] === '42' && ordenEquiv.slice(0, 2).sort().join('|') === ['40 2/4', '40,50'].sort().join('|'), JSON.stringify(ordenEquiv));
+  for (const talla of ['40,5.2', '40foo', '40 1/0', 'NaN', ' 40', '40 4/3', '0040']) {
+    const x = await pedir('POST', `${REST}/tallas`, { ...ta, cuerpo: { variante_id: variG, talla } });
+    esperar(`G rechazada la talla ${JSON.stringify(talla)} (400, 23514)`, x.s === 400 && x.d?.code === '23514' && /tallas_talla_formato/.test(x.d?.message || ''), breve(x));
+  }
+  const malCambio = await pedir('PATCH', `${REST}/tallas?id=eq.${TALLA}`, { ...ta, cuerpo: { talla: '40,5.2' } });
+  esperar('G rechazado cambiar una talla a 40,5.2', malCambio.s === 400 && malCambio.d?.code === '23514', breve(malCambio));
+  const vistaComa = await pedir('GET', `${REST}/catalogo_publico?order=orden`);
+  const activosAhora = (await servicio('GET', `${REST}/productos?select=id&activo=is.true`)).d.length;
+  esperar('G el visitante lee el catálogo entero con tallas 40,5 y 40 1/3 (antes: error)', vistaComa.s === 200 && vistaComa.d.length === activosAhora, `${breve(vistaComa)} de ${activosAhora}`);
+  const ordenG = vistaComa.d.find((p) => p.id === prod.d[0].codigo_interno)?.variantes?.[0]?.tallas?.map((t) => t.talla);
+  esperar('G la vista ordena 40 < 40 1/3 < 40,5 < 41', JSON.stringify(ordenG) === '["40","40 1/3","40,5","41"]', JSON.stringify(ordenG));
+  const adminComa = await pedir('POST', `${REST}/rpc/fn_admin_tallas?select=talla`, { ...ta, cuerpo: { p_variante_id: variG } });
+  esperar('G fn_admin_tallas responde y ordena con coma', adminComa.s === 200 && JSON.stringify(adminComa.d) === '[{"talla":"40"},{"talla":"40 1/3"},{"talla":"40,5"},{"talla":"41"}]', breve(adminComa));
+
+  const futuro = new Date(Date.now() + 36e5).toISOString();
+  const pasado = new Date(Date.now() - 2 * 36e5).toISOString();
+  const futuraRpc = await pedir('POST', `${REST}/rpc/fn_confirmar_por_publicacion`, { ...ta, cuerpo: { p_talla_id: TALLA, p_publicado_en: futuro } });
+  esperar('G rpc fn_confirmar_por_publicacion con fecha futura: 400', futuraRpc.s === 400 && futuraRpc.d?.code === '23514' && /publicado_en no puede ser futura/.test(futuraRpc.d?.message || ''), breve(futuraRpc));
+  for (const campo of ['publicado_en', 'confirmado_en', 'vigencia_desde']) {
+    const x = await pedir('PATCH', `${REST}/tallas?id=eq.${TALLA}`, { ...ta, cuerpo: { [campo]: futuro } });
+    esperar(`G PATCH con ${campo} futura: 400`, x.s === 400 && x.d?.code === '23514' && new RegExp(`${campo} no puede ser futura`).test(x.d?.message || ''), breve(x));
+  }
+  const nuevaFutura = await pedir('POST', `${REST}/tallas`, { ...ta, cuerpo: { variante_id: variG, talla: '43', estado: 'CONFIRMADA', vigencia_desde: futuro } });
+  esperar('G POST de una talla con vigencia futura: 400', nuevaFutura.s === 400 && nuevaFutura.d?.code === '23514', breve(nuevaFutura));
+  const pasadaRpc = await pedir('POST', `${REST}/rpc/fn_confirmar_por_publicacion?select=vigencia_desde,vence_en`, { ...ta, cuerpo: { p_talla_id: TALLA, p_publicado_en: pasado } });
+  esperar('G con fecha pasada se acepta y vence a las 48 h de la publicación', pasadaRpc.s === 200 && (new Date(pasadaRpc.d.vence_en) - new Date(pasado)) / 36e5 === 48, breve(pasadaRpc));
+  const proveedor = await pedir('POST', `${REST}/rpc/fn_confirmar_por_proveedor?select=vigencia_desde,vence_en`, { ...ta, cuerpo: { p_talla_id: TALLA } });
+  esperar('G la confirmación del proveedor (hora del servidor) nunca se rechaza', proveedor.s === 200 && Math.abs(new Date(proveedor.d.vigencia_desde) - Date.now()) < 120000, breve(proveedor));
+  const tras = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(prod.d[0].codigo_interno)}`);
+  esperar('G el visitante ve DISPONIBLE la talla recién confirmada', tras.d?.[0]?.variantes?.[0]?.tallasDisponibles?.includes('40'), breve(tras));
 
   // ==================================================================== F
   titulo('F · Registro público de usuarios');
@@ -284,11 +363,23 @@ try {
   esperar('F la Admin API sí pudo crear al administrador con el registro cerrado', Boolean(admin.id));
   esperar('F un usuario existente sí pudo iniciar sesión', Boolean(admin.token));
 } finally {
-  // Solo se borran los datos del catálogo; los usuarios ficticios mueren con el entorno.
-  await servicio('DELETE', `${REST}/tallas?variante_id=eq.${vari.d[0].id}`);
-  await servicio('DELETE', `${REST}/variantes?id=eq.${vari.d[0].id}`);
-  await servicio('DELETE', `${REST}/productos?id=eq.${prod.d[0].id}`);
-  await servicio('DELETE', `${REST}/administradores?user_id=eq.${admin.id}`);
+  // Mantenimiento privilegiado con service_role, que conserva DELETE: no es una acción del
+  // panel. Solo se borran los datos del catálogo; los usuarios ficticios mueren con el entorno.
+  // Una limpieza fallida cuenta como fallo: no puede quedar un «Sin fallos» con restos.
+  titulo('Limpieza (service_role)');
+  const variantes = [vari.d[0].id, ...creados.variantes];
+  const productos = [prod.d[0].id, ...creados.productos];
+  for (const [ruta, nombre] of [
+    [`/tallas?variante_id=in.(${variantes.join(',')})`, 'tallas de prueba'],
+    [`/variantes?id=in.(${variantes.join(',')})`, 'variantes de prueba'],
+    [`/productos?id=in.(${productos.join(',')})`, 'productos de prueba'],
+    [`/administradores?user_id=eq.${admin.id}`, 'administrador ficticio']
+  ]) {
+    const x = await servicio('DELETE', REST + ruta);
+    esperar(`limpieza: ${nombre}`, x.s === 204, breve(x));
+  }
+  const resto = await servicio('GET', `${REST}/productos?select=id&id=in.(${productos.join(',')})`);
+  esperar('limpieza: no queda ningún producto de prueba', resto.s === 200 && resto.d.length === 0, breve(resto));
 }
 
 console.log(`\nRESULTADO: ${correctas} correctas · ${fallidas} fallidas · ${omitidas} omitidas (no cuentan como correctas) · ${avisos} avisos`);

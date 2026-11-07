@@ -1,0 +1,68 @@
+# Reproducir las verificaciones de la etapa 14f.2 · SOLO LOCAL
+
+Todo lo de esta carpeta se ejecuta contra el **stack local desechable** de Supabase (proyecto
+`Yeny_Oficial`, contenedor `supabase_db_Yeny_Oficial`) o contra un PostgreSQL local en Docker.
+**Nunca contra el proyecto remoto**: los guiones de mutación y el ciclo escriben y deshacen, y el
+`ROLLBACK` no devuelve las secuencias. Los `.mjs` hablan con la base por `docker exec` y se niegan a
+empezar si el contenedor local no está en marcha o no tiene la migración `20261107030000`; el ciclo
+trabaja en una copia temporal sin enlace a ningún proyecto y aborta si `db push --dry-run` no apunta
+al stack local. No se guardan capturas, volcados ni resultados en el repositorio.
+
+## Qué cubre cada herramienta
+
+| Qué | Cómo | Necesita |
+|---|---|---|
+| Migraciones en orden, semilla, verificación de la tienda y del carrito V3, pruebas SQL 10, 20, 30, 40 y 60, auditoría | `bash scripts/validar-esquema.sh` | Docker y la tienda servida en `127.0.0.1:8765` |
+| Atomicidad y repetibilidad por `supabase db push` | `ciclo_atomicidad.sh` | Docker y Node (Supabase CLI 3.0.0 por `npx`) |
+| Acceso por HTTP real (Kong, PostgREST, Auth) | `node supabase/pruebas/50_postgrest_local.mjs` | Stack local en marcha |
+| Que la comprobación final de la migración detecta cada protección rota | `mutaciones_comprobacion_final.mjs` | Stack local con la migración aplicada |
+| Que las pruebas 60 y 40 detectan cada protección rota | `mutaciones_pruebas.mjs` | Igual |
+| Que la auditoría por firmas detecta cada desviación, también con un `search_path` hostil | `mutaciones_auditoria.mjs` | Igual |
+| La tienda real leyendo el stack local en 3 navegadores y 5 anchos | `humo_tienda.mjs` | Stack local, tienda en `127.0.0.1:8765`, navegadores de Playwright |
+
+El validador **no** cubre la atomicidad por `db push`, la prueba HTTP ni las mutaciones ni el humo:
+usa un PostgreSQL corriente, sin Supabase CLI, Kong, PostgREST ni Auth.
+
+## Orden
+
+Desde la raíz del proyecto:
+
+```bash
+# Tienda estática (en otra terminal)
+python -m http.server 8765 --bind 127.0.0.1
+
+# Validador integral (PostgreSQL corriente; regenera supabase/local/vista-publica.json).
+# CONTENEDOR y PUERTO evitan tocar un contenedor existente.
+CONTENEDOR=gt-pg-validacion PUERTO=55436 bash scripts/validar-esquema.sh --limpiar
+
+# Stack local de Supabase: lo crea de cero con 9 migraciones, comprueba la atomicidad y deja 10.
+# OJO: borra los datos del stack LOCAL de este proyecto.
+bash supabase/pruebas/reproducir/ciclo_atomicidad.sh
+
+# Pruebas SQL contra el stack local
+for f in 10_vigencia 20_seguridad 30_endurecimiento 40_acceso_interno 60_integridad_tallas_vigencia; do
+  docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/$f.sql
+done
+docker exec -i supabase_db_Yeny_Oficial psql -X -U postgres -d postgres < supabase/pruebas/auditar_funciones.sql
+
+# HTTP real, mutaciones y humo
+node supabase/pruebas/50_postgrest_local.mjs
+node supabase/pruebas/reproducir/mutaciones_comprobacion_final.mjs
+node supabase/pruebas/reproducir/mutaciones_pruebas.mjs
+node supabase/pruebas/reproducir/mutaciones_auditoria.mjs
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -U postgres -d postgres < supabase/local/semilla-28-productos.sql   # opcional: catálogo completo para el humo
+node supabase/pruebas/reproducir/humo_tienda.mjs
+
+# Al terminar
+npx --yes supabase@3.0.0 stop --no-backup
+```
+
+Cada guion termina con código 0 solo si todo lo esperado se cumple; las pruebas omitidas (GraphQL si
+`pg_graphql` no está activo, un navegador que no se puede lanzar) se cuentan aparte, nunca como correctas.
+
+## Versiones
+
+`ciclo_atomicidad.sh` copia los archivos de versión de `supabase/.temp` (los que fija `supabase link`) para
+arrancar las mismas imágenes que el proyecto remoto. Sin ellos, Supabase CLI usa las suyas por omisión:
+compruébalo en la lista de contenedores que imprime el ciclo. En la etapa 14f.2 se usaron postgres
+`17.11.0.018`, PostgREST `v14.18`, GoTrue `v2.197.0` y Kong `2.8.1`.
