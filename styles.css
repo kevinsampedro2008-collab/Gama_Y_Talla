@@ -1353,6 +1353,20 @@
   }
   .precio-actual { font-weight: 700; }
   .tarjeta .sello-prueba { justify-self: start; margin-bottom: var(--e-1); }
+  /* Modo consulta: arriba del todo y en el flujo, nunca tapando contenido. */
+  .aviso-respaldo {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--e-2);
+    padding: var(--e-3) var(--d-margen, var(--e-4));
+    border-bottom: 1px solid #e8d5a8;
+    background: #fdf1d6;
+    color: #6b4a00;
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  .aviso-respaldo .icono { flex: none; width: 1.125rem; height: 1.125rem; margin-top: 1px; }
   .aviso-prueba {
     margin-block: calc(-1 * var(--e-3)) var(--e-5);
     padding: var(--e-3) var(--e-4);
@@ -2178,6 +2192,29 @@
     color: var(--agotado);
     cursor: not-allowed;
   }
+  /* Por revisar: se puede elegir (sirve para consultarla), pero no es comprable.
+     Se distingue por el trazo discontinuo y un punto, no solo por el color. */
+  .talla-por-revisar {
+    border-style: dashed;
+    border-color: var(--tinta-2);
+    color: var(--tinta-2);
+  }
+  .talla-por-revisar::after {
+    content: "";
+    position: absolute;
+    top: 0.3125rem;
+    right: 0.3125rem;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .talla-por-revisar[aria-pressed="true"] {
+    border-style: solid;
+    border-color: var(--tinta);
+    background: var(--tinta);
+    color: #fff;
+  }
   .tallas-nota { font-size: var(--t-xs); color: var(--tinta-2); }
   .tallas-nota:empty { display: none; }
   /* Sin talla al añadir: un anillo cobalto que se desvanece y el rótulo en rojo (sin sacudidas). */
@@ -2372,6 +2409,31 @@
   .boton-comprar .icono { width: 1.0625rem; height: 1.0625rem; color: #fff; stroke-width: 1.75; }
   .boton-agregar[data-estado="anadido"] { background: #8f1d1d; }
   .detalle-acciones .boton-whatsapp-suave { font-size: var(--t-sm); font-weight: 500; }
+  /* Explica por qué la acción está apagada: un botón gris sin motivo deja perdido. */
+  .detalle-por-revisar {
+    margin-top: var(--e-3);
+    padding-left: var(--e-3);
+    border-left: 2px solid var(--tinta-2);
+    font-size: var(--t-sm);
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--tinta-2);
+  }
+  /* Talla por revisar elegida: la acción principal se apaga y deja de parecer compra. */
+  [data-talla-por-revisar] .boton-comprar {
+    background: var(--linea);
+    color: var(--tinta-2);
+  }
+  [data-talla-por-revisar] .boton-comprar .icono { color: var(--tinta-2); }
+  /* Pedir el par es también una compra: con la talla por revisar se apaga igual. */
+  [data-accion='pedir-ahora'][data-talla-por-revisar] {
+    background: var(--linea);
+    border-color: transparent;
+    color: var(--tinta-2);
+  }
+  [data-accion='pedir-ahora'][data-talla-por-revisar] .icono { color: var(--tinta-2); }
+  [data-talla-por-revisar] .boton-comprar,
+  [data-accion='pedir-ahora'][data-talla-por-revisar] { cursor: not-allowed; }
   .oculto-sin-stock { display: none !important; }
 
   /* Abajo deja sitio a la barra fija, que al final de la ficha queda encima del texto. */
@@ -2672,6 +2734,24 @@
     align-items: start;
     padding-block: var(--e-4);
     border-bottom: 1px solid var(--linea);
+  }
+  /* Se conserva en el carrito, marcada: no entra en el pedido hasta confirmarla. */
+  .linea-por-revisar { background: var(--papel); }
+  .linea-por-revisar .linea-media { opacity: 0.75; }
+  .linea-aviso {
+    margin-top: var(--e-1);
+    padding-left: var(--e-2);
+    border-left: 2px solid var(--tinta-2);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--tinta-2);
+  }
+  /* Sin nada confirmado que pedir, el botón de envío no invita a pulsarlo. */
+  #carrito-enviar[data-sin-pedido="true"] {
+    background: var(--linea);
+    color: var(--tinta-2);
+    cursor: not-allowed;
   }
   .linea-media { overflow: hidden; aspect-ratio: 1; border-radius: 8px; background: var(--papel); }
   .linea-media img { width: 100%; height: 100%; object-fit: contain; }

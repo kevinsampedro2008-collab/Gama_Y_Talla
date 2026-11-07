@@ -1,0 +1,1040 @@
+[
+ {
+  "clave": "ADD-SAM~zapatilla-01",
+  "id": "ADD-SAM",
+  "nombre": "SAMBA",
+  "marca": "Adidas",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 0,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Rosa / blanco / beigh",
+    "referencia": "ADD-SAM",
+    "precio": 120000,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_01.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_01.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44",
+     "45"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "LCS-RET-01~zapatilla-02",
+  "id": "LCS-RET-01",
+  "nombre": "LCS Retro Classic",
+  "marca": "Le Coq Sportif",
+  "categoria": "Casual / Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 1,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco / Rojo / Azul / Beis",
+    "referencia": "LCS-RET-01",
+    "precio": 120000,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_02.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_02.webp",
+    "tallasDisponibles": [
+     "36",
+     "37",
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-001~zapatilla-03",
+  "id": "GT-001",
+  "nombre": "Air Jordan 1 Retro High OG",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 2,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Rojo / blanco / negro",
+    "referencia": "GT-001",
+    "precio": 120000,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_03.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_03.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44",
+     "45"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-002~zapatilla-04",
+  "id": "GT-002",
+  "nombre": "Air Force 1 '07",
+  "marca": "Nike",
+  "categoria": "Casuales",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 3,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco",
+    "referencia": "GT-002",
+    "precio": 132900,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_04.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_04.webp",
+    "tallasDisponibles": [
+     "36",
+     "37",
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-003~zapatilla-05",
+  "id": "GT-003",
+  "nombre": "Samba OG",
+  "marca": "Adidas",
+  "categoria": "Casuales",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 4,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco / verde",
+    "referencia": "GT-003",
+    "precio": 459900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_05.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_05.webp",
+    "tallasDisponibles": [
+     "37",
+     "38",
+     "39",
+     "40",
+     "41"
+    ],
+    "tallasAgotadas": [
+     "42"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-004~zapatilla-06",
+  "id": "GT-004",
+  "nombre": "Pegasus 41",
+  "marca": "Nike",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 5,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris / azul",
+    "referencia": "GT-004",
+    "precio": 529900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_06.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_06.webp",
+    "tallasDisponibles": [
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-005~zapatilla-07",
+  "id": "GT-005",
+  "nombre": "Ultraboost Light",
+  "marca": "Adidas",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 6,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / lima",
+    "referencia": "GT-005",
+    "precio": 689900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_07.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_07.webp",
+    "tallasDisponibles": [
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "40",
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-006~zapatilla-08",
+  "id": "GT-006",
+  "nombre": "Air Jordan 4 Retro",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 7,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris cemento",
+    "referencia": "GT-006",
+    "precio": 1249900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_08.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_08.webp",
+    "tallasDisponibles": [],
+    "tallasAgotadas": [
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "disponible": false
+   }
+  ]
+ },
+ {
+  "clave": "GT-007~zapatilla-09",
+  "id": "GT-007",
+  "nombre": "Dunk Low Retro",
+  "marca": "Nike",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 8,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Negro / blanco",
+    "referencia": "GT-007",
+    "precio": 549900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_09.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_09.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-008~zapatilla-10",
+  "id": "GT-008",
+  "nombre": "550",
+  "marca": "New Balance",
+  "categoria": "Deportivas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 9,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / azul",
+    "referencia": "GT-008",
+    "precio": 519900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_10.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_10.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42"
+    ],
+    "tallasAgotadas": [
+     "43"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-005~zapatilla-11",
+  "id": "GT-005",
+  "nombre": "Ultraboost Light",
+  "marca": "Adidas",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 10,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / lima",
+    "referencia": "GT-005",
+    "precio": 689900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_11.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_11.webp",
+    "tallasDisponibles": [
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "40",
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-006~zapatilla-12",
+  "id": "GT-006",
+  "nombre": "Air Jordan 4 Retro",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 11,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris cemento",
+    "referencia": "GT-006",
+    "precio": 1249900,
+    "precioAnterior": 1599900,
+    "imagenes": [
+     "assets/images/productos/zapatilla_12.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_12.webp",
+    "tallasDisponibles": [],
+    "tallasAgotadas": [
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "disponible": false
+   }
+  ]
+ },
+ {
+  "clave": "GT-007~zapatilla-13",
+  "id": "GT-007",
+  "nombre": "Dunk Low Retro",
+  "marca": "Nike",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 12,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Negro / blanco",
+    "referencia": "GT-007",
+    "precio": 549900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_13.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_13.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-008~zapatilla-14",
+  "id": "GT-008",
+  "nombre": "550",
+  "marca": "New Balance",
+  "categoria": "Deportivas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 13,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / azul",
+    "referencia": "GT-008",
+    "precio": 519900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_14.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_14.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42"
+    ],
+    "tallasAgotadas": [
+     "43"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "ADD-SAM~zapatilla-15",
+  "id": "ADD-SAM",
+  "nombre": "SAMBA",
+  "marca": "Adidas",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 14,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Rosa / blanco / beigh",
+    "referencia": "ADD-SAM",
+    "precio": 120000,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/zapatilla_15.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_15.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44",
+     "45"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "LCS-RET-01~zapatilla-16",
+  "id": "LCS-RET-01",
+  "nombre": "LCS Retro Classic",
+  "marca": "Le Coq Sportif",
+  "categoria": "Casual / Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 15,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco / Rojo / Azul / Beis",
+    "referencia": "LCS-RET-01",
+    "precio": 120000,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_16.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_16.webp",
+    "tallasDisponibles": [
+     "36",
+     "37",
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-001~zapatilla-17",
+  "id": "GT-001",
+  "nombre": "Air Jordan 1 Retro High OG",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 16,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Rojo / blanco / negro",
+    "referencia": "GT-001",
+    "precio": 120000,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/zapatilla_17.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_17.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44",
+     "45"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-002~zapatilla-18",
+  "id": "GT-002",
+  "nombre": "Air Force 1 '07",
+  "marca": "CAMBIARRRRRRRRRRRRRRRR IMAGEN 18",
+  "categoria": "Casuales",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 17,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco",
+    "referencia": "GT-002",
+    "precio": 132900,
+    "precioAnterior": 290000,
+    "imagenes": [
+     "assets/images/productos/zapatilla_18.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_18.webp",
+    "tallasDisponibles": [
+     "36",
+     "37",
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-003~zapatilla-19",
+  "id": "GT-003",
+  "nombre": "Samba OG",
+  "marca": "Adidas",
+  "categoria": "Casuales",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 18,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Blanco / verde",
+    "referencia": "GT-003",
+    "precio": 459900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_19.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_19.webp",
+    "tallasDisponibles": [
+     "37",
+     "38",
+     "39",
+     "40",
+     "41"
+    ],
+    "tallasAgotadas": [
+     "42"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-004~zapatilla-20",
+  "id": "GT-004",
+  "nombre": "Pegasus 41",
+  "marca": "Nike",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 19,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris / azul",
+    "referencia": "GT-004",
+    "precio": 529900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_20.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_20.webp",
+    "tallasDisponibles": [
+     "39",
+     "40",
+     "41",
+     "42",
+     "43",
+     "44"
+    ],
+    "tallasAgotadas": [],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-005~zapatilla-21",
+  "id": "GT-005",
+  "nombre": "Ultraboost Light",
+  "marca": "Adidas",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 20,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / lima",
+    "referencia": "GT-005",
+    "precio": 689900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_21.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_21.webp",
+    "tallasDisponibles": [
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "40",
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-006~zapatilla-22",
+  "id": "GT-006",
+  "nombre": "Air Jordan 4 Retro",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 21,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris cemento",
+    "referencia": "GT-006",
+    "precio": 1249900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_22.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_22.webp",
+    "tallasDisponibles": [],
+    "tallasAgotadas": [
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "disponible": false
+   }
+  ]
+ },
+ {
+  "clave": "GT-007~zapatilla-23",
+  "id": "GT-007",
+  "nombre": "Dunk Low Retro",
+  "marca": "Nike",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 22,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Negro / blanco",
+    "referencia": "GT-007",
+    "precio": 549900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_23.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_23.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-008~zapatilla-24",
+  "id": "GT-008",
+  "nombre": "550",
+  "marca": "New Balance",
+  "categoria": "Deportivas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 23,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / azul",
+    "referencia": "GT-008",
+    "precio": 519900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_24.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_24.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42"
+    ],
+    "tallasAgotadas": [
+     "43"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-005~zapatilla-25",
+  "id": "GT-005",
+  "nombre": "Ultraboost Light",
+  "marca": "Adidas",
+  "categoria": "Running",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 24,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / lima",
+    "referencia": "GT-005",
+    "precio": 689900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_25.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_25.webp",
+    "tallasDisponibles": [
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "40",
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-006~zapatilla-26",
+  "id": "GT-006",
+  "nombre": "Air Jordan 4 Retro",
+  "marca": "Jordan",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 25,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Gris cemento",
+    "referencia": "GT-006",
+    "precio": 1249900,
+    "precioAnterior": 1599900,
+    "imagenes": [
+     "assets/images/productos/zapatilla_26.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_26.webp",
+    "tallasDisponibles": [],
+    "tallasAgotadas": [
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "disponible": false
+   }
+  ]
+ },
+ {
+  "clave": "GT-007~zapatilla-27",
+  "id": "GT-007",
+  "nombre": "Dunk Low Retro",
+  "marca": "Nike",
+  "categoria": "Urbanas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": true,
+  "nuevoIngreso": false,
+  "referenciaRepetida": true,
+  "indice": 26,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Negro / blanco",
+    "referencia": "GT-007",
+    "precio": 549900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/editadas/zapatilla_27.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_27.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42",
+     "43"
+    ],
+    "tallasAgotadas": [
+     "44"
+    ],
+    "disponible": true
+   }
+  ]
+ },
+ {
+  "clave": "GT-008~zapatilla-28",
+  "id": "GT-008",
+  "nombre": "550",
+  "marca": "New Balance",
+  "categoria": "Deportivas",
+  "descripcion": "",
+  "segmento": "",
+  "destacado": false,
+  "nuevoIngreso": true,
+  "referenciaRepetida": true,
+  "indice": 27,
+  "variantes": [
+   {
+    "id": "unica",
+    "color": "Marfil / azul",
+    "referencia": "GT-008",
+    "precio": 519900,
+    "precioAnterior": 0,
+    "imagenes": [
+     "assets/images/productos/zapatilla_28.webp"
+    ],
+    "fotoPrincipal": "assets/images/productos/zapatilla_28.webp",
+    "tallasDisponibles": [
+     "38",
+     "39",
+     "40",
+     "41",
+     "42"
+    ],
+    "tallasAgotadas": [
+     "43"
+    ],
+    "disponible": true
+   }
+  ]
+ }
+]

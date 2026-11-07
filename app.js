@@ -13,6 +13,13 @@ const CONFIG = {
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
   datosUrl: "data/productos.json",
+  // Vista pública de Supabase. Vacío = se lee el JSON local (comportamiento actual).
+  // Al rellenarla, la tienda pasa a leer de Supabase sin tocar nada más.
+  catalogoUrl: "",
+  catalogoClave: "",          // clave pública (sb_publishable_ o anon). Nunca la secreta: iría al navegador.
+  claveRechazada: "",         // se rellena sola si la clave declarada era secreta (ver más abajo)
+  // Último catálogo bueno, para poder seguir mostrando la tienda si Supabase no responde.
+  claveCache: "gama-talla-catalogo-cache",
   // Tablas de tallas por marca; su origen está documentado en data/guias-tallas-fuentes.md.
   guiasUrl: "data/guias-tallas.json",
   // Catálogo ficticio para probar variantes de color. Solo se carga con «?datos-prueba»
@@ -34,6 +41,51 @@ const CONFIG = {
     "zapatilla_48.webp"
   ]
 };
+
+/* La conexión a Supabase se configura FUERA del código, para no tener que editar
+   app.js al publicar. Basta con una línea antes de cargar este archivo:
+     <script>window.GAMA_TALLA_CONFIG = { catalogoUrl: "...", catalogoClave: "..." };</script>
+   Solo se admite la clave PÚBLICA (anon): la secreta nunca debe llegar al navegador.
+   Sin configuración, la tienda lee el JSON del repositorio, como hasta ahora. */
+/* ¿Es una clave SECRETA? Se decide por su forma, sin llamar a nadie:
+     · «sb_secret_…»  → clave secreta nueva.
+     · JWT antiguo cuyo `role` es «service_role» → clave secreta antigua.
+   Se acepta todo lo demás (sb_publishable_…, anon…). Es una RED DE SEGURIDAD contra
+   un descuido al publicar, no una barrera: si una clave secreta llegó hasta aquí, ya
+   está escrita en el código de la página y hay que revocarla. La seguridad real la dan
+   el RLS y los permisos de Supabase, no esta comprobación.
+   Devuelve el TIPO detectado, nunca la clave. */
+function tipoDeClaveSecreta(clave) {
+  const texto = String(clave || "").trim();
+  if (/^sb_secret_/i.test(texto)) return "sb_secret_";
+  const partes = texto.split(".");
+  if (partes.length === 3 && partes[0].startsWith("eyJ")) {
+    try {
+      const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
+      const carga = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
+      if (carga?.role === "service_role") return "service_role";
+    } catch {
+      // Un JWT ilegible no permite afirmar nada: no se rechaza por sospecha.
+    }
+  }
+  return "";
+}
+
+Object.assign(CONFIG, (() => {
+  const fuera = globalThis.GAMA_TALLA_CONFIG;
+  if (!fuera || typeof fuera !== "object") return {};
+  const texto = ["catalogoUrl", "catalogoClave"];
+  const salida = Object.fromEntries(texto
+    .filter((clave) => typeof fuera[clave] === "string")
+    .map((clave) => [clave, fuera[clave].trim()]));
+  // fuenteLocal fuerza (true) o descarta (false) fiarse del JSON del repositorio.
+  // Sin indicarlo, se deduce del entorno: ver esEntornoDePruebas().
+  if (typeof fuera.fuenteLocal === "boolean") salida.fuenteLocal = fuera.fuenteLocal;
+  // Una clave secreta se descarta aquí mismo: ningún otro punto del código llega a verla.
+  const secreta = tipoDeClaveSecreta(salida.catalogoClave);
+  if (secreta) { salida.catalogoClave = ""; salida.claveRechazada = secreta; }
+  return salida;
+})());
 
 const NUMERO_PROVISIONAL = "573000000000";
 const TODOS = "Todos";
@@ -156,6 +208,47 @@ function crearMensajeAlternativo(lineas) {
   return [ENCABEZADO_PEDIDO, SEPARADOR_PEDIDO, "", textoUnidades(resumen.unidades), "", ...cierreTotales(resumen), "", "Te envío el detalle completo en el siguiente mensaje."].join("\n");
 }
 
+/* ---------- Mensaje de consulta de disponibilidad ----------
+   Es OTRO mensaje, con su propia función: NUEVO PEDIDO no se toca. Solo recibe líneas
+   POR REVISAR, nunca se mezcla con un pedido, y no lleva subtotal ni total porque nada
+   está confirmado. Pide confirmar dos cosas: que siga disponible y que el precio
+   publicado siga vigente. La redacción pasa a plural con más de un producto. */
+const ENCABEZADO_CONSULTA = `*${CONFIG.tienda.toUpperCase()} — CONSULTA DE DISPONIBILIDAD*`;
+
+function crearMensajeConsulta(lineas) {
+  const varios = lineas.length > 1;
+  const partes = [ENCABEZADO_CONSULTA, SEPARADOR_PEDIDO, ""];
+  if (lineas.some((linea) => linea.producto.prueba)) partes.push("Nota: consulta de prueba con productos ficticios.", "");
+  lineas.forEach(({ producto, variante, talla, cantidad }, indice) => {
+    const campos = [
+      ["Marca", producto.marca],
+      ["Color", variante.color],
+      ["Referencia", variante.referencia],
+      ["Talla EU", talla],
+      ["Cantidad", cantidad],
+      ["Precio publicado", precioMensaje(variante.precio)],
+    ];
+    partes.push(`${indice + 1}. ${producto.nombre.toLocaleUpperCase("es-CO")}`, ...campos.filter(([, valor]) => limpiarTexto(valor)).map(([rotulo, valor]) => `* ${rotulo}: ${valor}`), "");
+  });
+  partes.push(
+    SEPARADOR_PEDIDO,
+    varios
+      ? "🔎 ¿Me confirmas si estos modelos y estas tallas siguen disponibles y si los precios publicados continúan vigentes?"
+      : "🔎 ¿Me confirmas si este modelo y esta talla siguen disponibles y si el precio publicado continúa vigente?",
+    "",
+    varios
+      ? "Si están disponibles y los precios siguen vigentes, confirmo el pedido. ¡Gracias!"
+      : "Si están disponibles y el precio sigue vigente, confirmo el pedido. ¡Gracias!"
+  );
+  return partes.join("\n");
+}
+
+// Igual que en el pedido: si no cabe en el enlace, se abre el chat con lo esencial y el detalle se pega aparte.
+function crearConsultaAlternativa(lineas) {
+  const unidades = lineas.reduce((suma, linea) => suma + linea.cantidad, 0);
+  return [ENCABEZADO_CONSULTA, SEPARADOR_PEDIDO, "", textoUnidades(unidades), "", "Te envío el detalle completo en el siguiente mensaje."].join("\n");
+}
+
 function nombreCompleto(producto) {
   const nombre = normalizarTexto(producto.nombre);
   const marca = normalizarTexto(producto.marca);
@@ -169,6 +262,8 @@ const estado = {
   segmentoGuia: "hombre",
   firmaDatos: "",
   catalogoListo: false,
+  // null = datos verificados. Si no, {motivo, desde} y TODAS las tallas pasan a POR REVISAR.
+  respaldo: null,
   cargando: false,
   busqueda: "",
   marca: TODOS,
@@ -193,11 +288,27 @@ const estado = {
 };
 
 const ordenadores = {
-  destacados: (a, b) => Number(b.destacado) - Number(a.destacado) || Number(b.disponible) - Number(a.disponible) || a.indice - b.indice,
+  // «ofrecida», no «disponible»: una vigencia vencida no debe reordenar el catálogo.
+  destacados: (a, b) => Number(b.destacado) - Number(a.destacado) || Number(b.ofrecida) - Number(a.ofrecida) || a.indice - b.indice,
   "precio-asc": (a, b) => a.precio - b.precio || a.indice - b.indice,
   "precio-desc": (a, b) => b.precio - a.precio || a.indice - b.indice,
   nombre: (a, b) => a.nombre.localeCompare(b.nombre, "es", { sensitivity: "base" })
 };
+
+/* ---------- Disponibilidad por talla ----------
+   Tres estados, calculados en Supabase y entregados por la vista pública:
+     DISPONIBLE  el proveedor lo confirmó y la vigencia no ha vencido -> se puede comprar
+     POR_REVISAR vencida, sin fecha fiable, o estamos en modo respaldo -> solo consulta
+     AGOTADO     el proveedor confirmó que no hay -> se retira del carrito
+   Con el JSON local (y en el modo de prueba) no hay estados: las tallas disponibles
+   son DISPONIBLE y las agotadas AGOTADO, igual que hasta ahora. */
+const DISPONIBLE = "DISPONIBLE";
+const POR_REVISAR = "POR_REVISAR";
+const AGOTADO = "AGOTADO";
+const AUSENTE = "AUSENTE";           // la talla ya no figura en el catálogo
+
+// Lo activa leerCatalogo antes de normalizar: en respaldo nada se da por confirmado.
+let modoRespaldoActivo = false;
 
 function listaDeTallas(valor) {
   if (!Array.isArray(valor)) return [];
@@ -233,9 +344,41 @@ function listaDeImagenes(...fuentes) {
 /* Variante = un color del modelo, con sus fotos, sus tallas EU y, si lo indica, su precio.
    Los productos con el formato anterior (sin variantes[]) reciben una variante única
    «heredada» construida con color, imagen/imagenes, tallas y precios del propio producto. */
+// Estados por talla de una variante. La vista de Supabase manda; si no viene
+// (JSON local o datos de prueba), se deducen de las listas de siempre.
+function estadosDeTallas(bruto) {
+  const estados = new Map();
+  const detalle = Array.isArray(bruto.tallas) ? bruto.tallas : null;
+  if (detalle) {
+    detalle.forEach((fila) => {
+      const talla = limpiarTexto(fila?.talla);
+      if (!talla) return;
+      const valor = String(fila?.estado || "").toUpperCase();
+      estados.set(talla, valor === DISPONIBLE || valor === AGOTADO ? valor : POR_REVISAR);
+    });
+  } else {
+    listaDeTallas(bruto.tallasAgotadas).forEach((talla) => estados.set(talla, AGOTADO));
+    listaDeTallas(bruto.tallasPorRevisar).forEach((talla) => estados.set(talla, POR_REVISAR));
+    listaDeTallas(bruto.tallasDisponibles).forEach((talla) => {
+      if (!estados.has(talla)) estados.set(talla, DISPONIBLE);
+    });
+  }
+  /* En modo consulta no sabemos nada con certeza: ni que algo esté disponible, ni
+     que esté agotado. Un «agotada» de hace días es tan poco fiable como un
+     «disponible». Todas pasan a POR REVISAR, así el producto sigue visible y
+     consultable, y no afirmamos lo que no podemos comprobar. */
+  if (modoRespaldoActivo) {
+    estados.forEach((_, talla) => estados.set(talla, POR_REVISAR));
+  }
+  return estados;
+}
+
 function normalizarVariante(bruto, base, idsUsados) {
-  const agotadas = listaDeTallas(bruto.tallasAgotadas);
-  const disponibles = listaDeTallas(bruto.tallasDisponibles).filter((talla) => !agotadas.includes(talla)).sort(compararTallas);
+  const estados = estadosDeTallas(bruto);
+  const porEstado = (valor) => [...estados].filter(([, e]) => e === valor).map(([talla]) => talla).sort(compararTallas);
+  const agotadas = porEstado(AGOTADO);
+  const disponibles = porEstado(DISPONIBLE);
+  const porRevisar = porEstado(POR_REVISAR);
   const color = limpiarTexto(bruto.color, "Color por confirmar");
   // Con precio propio, el precio anterior solo viene de la variante: no se hereda un descuento.
   const precioPropio = !base.heredada && definido(bruto.precio);
@@ -259,8 +402,17 @@ function normalizarVariante(bruto, base, idsUsados) {
     fotoPrincipal: imagenes[0],
     imagenes: imagenes.map(rutaImagen),
     tallasDisponibles: disponibles,
-    tallasAgotadas: agotadas.sort(compararTallas),
+    tallasAgotadas: agotadas,
+    tallasPorRevisar: porRevisar,
+    // Todas las que se siguen ofreciendo, estén confirmadas o por revisar.
+    tallasOfrecidas: [...disponibles, ...porRevisar].sort(compararTallas),
+    estadosTalla: Object.fromEntries(estados),
+    // «disponible» = se puede comprar ahora. Es lo que miran el carrito y la compra.
     disponible: bruto.disponible !== false && disponibles.length > 0,
+    // «ofrecida» = sigue en el catálogo aunque su disponibilidad no esté confirmada.
+    // La usan la insignia «Agotado», el orden y los filtros: una vigencia vencida
+    // no debe esconder ni reordenar un producto.
+    ofrecida: bruto.disponible !== false && (disponibles.length + porRevisar.length) > 0,
     precio,
     precioAnterior,
     descuento: calcularDescuento(precio, precioAnterior)
@@ -281,14 +433,18 @@ function normalizarProducto(bruto, indice) {
     : [normalizarVariante(bruto, { ...base, heredada: true }, idsVariantes)];
 
   const aLaVenta = variantes.filter((variante) => variante.disponible);
-  const principal = aLaVenta[0] || variantes[0];
-  const referencias = aLaVenta.length ? aLaVenta : variantes;
+  const ofrecidas = variantes.filter((variante) => variante.ofrecida);
+  const principal = aLaVenta[0] || ofrecidas[0] || variantes[0];
+  const referencias = aLaVenta.length ? aLaVenta : (ofrecidas.length ? ofrecidas : variantes);
   const conPrecio = referencias.map((variante) => variante.precio).filter((precio) => precio > 0);
   // Si los colores tienen precios distintos, la tarjeta muestra «Desde» y no anuncia un descuento único.
   const preciosDistintos = new Set(referencias.map((variante) => variante.precio)).size > 1;
   const tallasDisponibles = [...new Set(aLaVenta.flatMap((variante) => variante.tallasDisponibles))].sort(compararTallas);
-  const tallasAgotadas = [...new Set(variantes.flatMap((variante) => variante.tallasAgotadas))]
+  const tallasPorRevisar = [...new Set(ofrecidas.flatMap((variante) => variante.tallasPorRevisar))]
     .filter((talla) => !tallasDisponibles.includes(talla)).sort(compararTallas);
+  const tallasOfrecidas = [...tallasDisponibles, ...tallasPorRevisar].sort(compararTallas);
+  const tallasAgotadas = [...new Set(variantes.flatMap((variante) => variante.tallasAgotadas))]
+    .filter((talla) => !tallasOfrecidas.includes(talla)).sort(compararTallas);
 
   const producto = {
     id,
@@ -308,8 +464,11 @@ function normalizarProducto(bruto, indice) {
     precioDesde: preciosDistintos,
     descuento: preciosDistintos ? 0 : principal.descuento,
     tallasDisponibles,
+    tallasPorRevisar,
+    tallasOfrecidas,
     tallasAgotadas,
     disponible: bruto.disponible !== false && aLaVenta.length > 0,
+    ofrecida: bruto.disponible !== false && ofrecidas.length > 0,
     destacado: bruto.destacado === true,
     nuevoIngreso: bruto.nuevoIngreso === true,
     prueba: MODO_PRUEBA,
@@ -466,17 +625,114 @@ function mostrarEstado({ titulo, mensaje, textoBoton = "", accion = "" }) {
   contenedor.setAttribute("aria-busy", "false");
 }
 
-async function leerCatalogo() {
-  const respuesta = await fetch(MODO_PRUEBA ? CONFIG.datosPruebaUrl : CONFIG.datosUrl, { cache: "no-cache" });
+/* ---------- De dónde salen los productos ----------
+   1. Supabase (vista pública), si CONFIG.catalogoUrl está puesta.
+   2. Si no responde: el último catálogo bueno guardado en este navegador.
+   3. Si tampoco lo hay: el JSON del repositorio.
+   Los niveles 2 y 3 son MODO RESPALDO: los datos comerciales pueden estar
+   desactualizados y ninguna talla se presenta como confirmada. */
+/* ¿Podemos presentar las disponibilidades del JSON del repositorio como vigentes?
+   SOLO en desarrollo y pruebas. En producción, un despliegue al que se le olvidó la
+   configuración NO debe mostrar las tallas antiguas del JSON como confirmadas: entra
+   en modo consulta. Se decide así:
+     1. CONFIG.fuenteLocal, si se indicó explícitamente (true o false).
+     2. Si no, el entorno: file://, localhost o 127.0.0.1 son desarrollo. */
+function esEntornoDePruebas() {
+  if (MODO_PRUEBA) return true;
+  if (typeof CONFIG.fuenteLocal === "boolean") return CONFIG.fuenteLocal;
+  if (location.protocol === "file:") return true;
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(location.hostname);
+}
+
+// Devuelve la URL de Supabase solo si es utilizable; si no, null (configuración inválida).
+function urlCatalogoValida() {
+  const valor = String(CONFIG.catalogoUrl || "").trim();
+  if (!valor) return null;
+  try {
+    // Sin base a propósito: una dirección relativa no es una URL de Supabase.
+    const url = new URL(valor);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+async function traerTexto(url, opciones = {}) {
+  const respuesta = await fetch(url, { cache: "no-cache", ...opciones });
   if (!respuesta.ok) throw new Error(`Respuesta HTTP ${respuesta.status}`);
-  const texto = await respuesta.text();
-  const datos = JSON.parse(texto);
+  return respuesta.text();
+}
+
+function guardarCacheCatalogo(texto) {
+  try {
+    localStorage.setItem(CONFIG.claveCache, JSON.stringify({ texto, fecha: Date.now() }));
+  } catch { /* sin espacio o sin permiso: el respaldo siguiente será el JSON */ }
+}
+
+function leerCacheCatalogo() {
+  try {
+    const guardado = JSON.parse(localStorage.getItem(CONFIG.claveCache) || "null");
+    return guardado && typeof guardado.texto === "string" ? guardado : null;
+  } catch { return null; }
+}
+
+async function leerFuente() {
+  // El modo de prueba no toca Supabase: su catálogo ficticio es siempre local y válido.
+  if (MODO_PRUEBA) return { texto: await traerTexto(CONFIG.datosPruebaUrl), respaldo: null };
+
+  // Una clave secreta en el navegador es un error grave de publicación. No se contacta
+  // con Supabase y la tienda queda en modo consulta, también en desarrollo, para que se vea.
+  // El aviso nombra el TIPO de clave, jamás su valor.
+  if (CONFIG.claveRechazada) {
+    console.warn(`Gama & Talla: la clave de Supabase declarada es SECRETA (${CONFIG.claveRechazada}) y se ha rechazado. Nunca debe estar en el navegador: revócala en Supabase y usa la clave publicable. La tienda queda en modo consulta.`);
+    return leerRespaldo();
+  }
+
+  const url = urlCatalogoValida();
+  if (!url) {
+    // Sin configuración o con una URL inválida. En desarrollo el JSON vale; en
+    // producción, NO: se muestra como respaldo y todo queda por revisar.
+    const texto = await traerTexto(CONFIG.datosUrl);
+    if (esEntornoDePruebas()) return { texto, respaldo: null };
+    const motivo = CONFIG.catalogoUrl ? "configuracion-invalida" : "sin-configuracion";
+    console.warn(`Gama & Talla: ${motivo}. La tienda queda en modo consulta.`);
+    return { texto, respaldo: { motivo, desde: null } };
+  }
+
+  try {
+    const cabeceras = CONFIG.catalogoClave
+      ? { apikey: CONFIG.catalogoClave, Authorization: `Bearer ${CONFIG.catalogoClave}` }
+      : {};
+    const texto = await traerTexto(url, { headers: cabeceras });
+    JSON.parse(texto);                       // si no es JSON válido, vamos al respaldo
+    guardarCacheCatalogo(texto);
+    return { texto, respaldo: null };
+  } catch (error) {
+    console.warn("Gama & Talla: no pudimos leer la disponibilidad. Modo consulta.", error);
+    return leerRespaldo();
+  }
+}
+
+// Modo consulta: el último catálogo bueno de este navegador o, si no hay, el JSON del repositorio.
+async function leerRespaldo() {
+  const cache = leerCacheCatalogo();
+  if (cache) return { texto: cache.texto, respaldo: { motivo: "cache", desde: cache.fecha } };
+  return { texto: await traerTexto(CONFIG.datosUrl), respaldo: { motivo: "json", desde: null } };
+}
+
+async function leerCatalogo() {
+  const fuente = await leerFuente();
+  const datos = JSON.parse(fuente.texto);
   const lista = Array.isArray(datos) ? datos : datos?.productos;
   if (!Array.isArray(lista)) throw new Error("El JSON no contiene una lista de productos.");
+  // Debe quedar puesto ANTES de normalizar: decide si alguna talla puede ser DISPONIBLE.
+  modoRespaldoActivo = Boolean(fuente.respaldo);
   const productos = lista.map((bruto, indice) => normalizarProducto(bruto, indice)).filter(Boolean);
+  modoRespaldoActivo = false;
   const conflictos = asignarClaves(productos);
   return {
-    firma: texto,
+    firma: fuente.texto,
+    respaldo: fuente.respaldo,
     productos,
     conflictos,
     identificadoresV2: identificadoresV2(lista, productos),
@@ -485,7 +741,8 @@ async function leerCatalogo() {
 }
 
 function aplicarCatalogo(catalogo) {
-  const cambio = catalogo.firma !== estado.firmaDatos;
+  const cambio = catalogo.firma !== estado.firmaDatos || Boolean(catalogo.respaldo) !== Boolean(estado.respaldo);
+  estado.respaldo = catalogo.respaldo || null;
   estado.firmaDatos = catalogo.firma;
   estado.productos = catalogo.productos;
   estado.guias = catalogo.guias;
@@ -497,6 +754,7 @@ function aplicarCatalogo(catalogo) {
   }
   estado.conflictos = catalogo.conflictos;
   estado.catalogoListo = true;
+  pintarAvisoRespaldo();
   if (cambio) {
     estado.productosVisibles = 12;
     estado.firmaVistaCatalogo = "";
@@ -529,6 +787,25 @@ async function cargarProductos() {
   }
 }
 
+/* Modo consulta: el visitante debe saber que ni los precios ni la disponibilidad
+   están verificados. Se coloca arriba del todo, no sobre el contenido. */
+function pintarAvisoRespaldo() {
+  const existente = $("#aviso-respaldo");
+  if (!estado.respaldo) { existente?.remove(); return; }
+  const cuando = estado.respaldo.desde
+    ? ` Última información del ${new Date(estado.respaldo.desde).toLocaleString("es-CO", { dateStyle: "short", timeStyle: "short" })}.`
+    : "";
+  const texto = `Modo consulta: no pudimos verificar precios ni disponibilidad.${cuando} Confírmalos por WhatsApp antes de comprar.`;
+  // El motivo técnico queda en la consola, para quien publica; el cliente solo ve el aviso.
+  if (!$("#aviso-respaldo")) console.info(`Gama & Talla: modo consulta (${estado.respaldo.motivo}).`);
+  if (existente) { $(".aviso-respaldo-texto", existente).textContent = texto; return; }
+  const aviso = crearElemento("div", "aviso-respaldo");
+  aviso.id = "aviso-respaldo";
+  aviso.setAttribute("role", "status");
+  aviso.append(crearIcono("icono-info"), crearElemento("span", "aviso-respaldo-texto", texto));
+  $("#contenido")?.prepend(aviso);
+}
+
 // Modo de prueba: un aviso visible deja claro que el catálogo es ficticio.
 function mostrarAvisoPrueba() {
   if ($("#aviso-prueba")) return;
@@ -546,6 +823,8 @@ async function refrescarCatalogo() {
       construirFiltros();
       renderizarCatalogo();
       validarCarrito(false);
+      // La ficha abierta se pone al día sin cerrarse ni perder la galería.
+      refrescarDisponibilidadDetalle();
     }
     return true;
   } catch (error) {
@@ -607,7 +886,7 @@ function construirFiltros() {
 function tallasCatalogo() {
   const tallas = new Set();
   estado.productos.forEach((producto) => {
-    if (producto.disponible) producto.tallasDisponibles.forEach((talla) => tallas.add(talla));
+    if (producto.ofrecida) producto.tallasOfrecidas.forEach((talla) => tallas.add(talla));
   });
   return [...tallas].sort(compararTallas);
 }
@@ -727,7 +1006,7 @@ function filtrarProductos(criterios = estado) {
     (criterios.marca === TODOS || producto.marca === criterios.marca)
     && (criterios.categoria === TODOS || producto.categoria === criterios.categoria)
     && (!criterios.soloNuevos || producto.nuevoIngreso)
-    && (criterios.talla === TODOS || (producto.disponible && producto.tallasDisponibles.includes(criterios.talla)))
+    && (criterios.talla === TODOS || (producto.ofrecida && producto.tallasOfrecidas.includes(criterios.talla)))
     && terminos.every((termino) => producto.textoBusqueda.includes(termino)));
 }
 
@@ -868,7 +1147,7 @@ function crearImagen(producto, { perezosa = true } = {}) {
 
 // Insignia única por tarjeta. Prioridad: Agotado > descuento > Nuevo.
 function crearInsignia(producto) {
-  if (!producto.disponible) return crearElemento("span", "insignia-producto insignia-agotado", "Agotado");
+  if (!producto.ofrecida) return crearElemento("span", "insignia-producto insignia-agotado", "Agotado");
   if (producto.descuento) {
     // Sello estrellado «SALE» + placa con el porcentaje (diseño original).
     const insignia = crearElemento("span", "insignia-producto insignia-descuento");
@@ -885,8 +1164,8 @@ function crearInsignia(producto) {
 
 // Tira de tallas EU disponibles; la talla filtrada siempre queda visible y resaltada.
 function crearTiraTallas(producto) {
-  if (!producto.disponible) return crearElemento("p", "tarjeta-sin-tallas", "Sin tallas disponibles");
-  const tallas = producto.tallasDisponibles;
+  if (!producto.ofrecida) return crearElemento("p", "tarjeta-sin-tallas", "Sin tallas disponibles");
+  const tallas = producto.tallasOfrecidas;
   let visibles = tallas.slice(0, MAX_TALLAS_TARJETA);
   if (estado.talla !== TODOS && tallas.includes(estado.talla) && !visibles.includes(estado.talla)) {
     visibles = [...visibles.slice(0, MAX_TALLAS_TARJETA - 1), estado.talla].sort(compararTallas);
@@ -908,7 +1187,7 @@ function crearTiraTallas(producto) {
 }
 
 function crearTarjeta(producto, indiceVisible = 12) {
-  const agotado = !producto.disponible;
+  const agotado = !producto.ofrecida;
   const tarjeta = crearElemento("article", `tarjeta${agotado ? " tarjeta-agotada" : ""}`);
   tarjeta.dataset.id = producto.clave;
 
@@ -1038,8 +1317,21 @@ function iniciarDialogos() {
 /* ---------- Variante y talla elegidas ---------- */
 const varianteDe = (producto, id) => producto?.variantes.find((variante) => variante.id === id) || null;
 
+// Estado de una talla concreta. AUSENTE = ya no figura en el catálogo.
+function estadoTalla(producto, variante, talla) {
+  if (!producto || !variante || !talla) return AUSENTE;
+  return variante.estadosTalla?.[String(talla)] || AUSENTE;
+}
+
+// «Válida» = se puede comprar. Solo DISPONIBLE. Lo miran el carrito y la compra.
 function tallaValida(producto, variante, talla) {
-  return Boolean(producto && variante && variante.disponible && talla && variante.tallasDisponibles.includes(String(talla)));
+  return Boolean(variante?.disponible) && estadoTalla(producto, variante, talla) === DISPONIBLE;
+}
+
+// Sigue en el catálogo aunque su disponibilidad no esté confirmada.
+function tallaOfrecida(producto, variante, talla) {
+  const valor = estadoTalla(producto, variante, talla);
+  return valor === DISPONIBLE || valor === POR_REVISAR;
 }
 
 // Selección recordada de un producto (color + talla), solo si sigue siendo válida.
@@ -1207,11 +1499,11 @@ function construirDetalle(producto) {
   // (la foto grande ya lo muestra).
   if (producto.variantes.length > 1) {
     producto.variantes.forEach((variante) => {
-      const nombreColor = `${variante.color}${variante.disponible ? "" : ", agotado"}`;
+      const nombreColor = `${variante.color}${variante.ofrecida ? "" : ", agotado"}`;
       const pieza = crearBoton("variante", crearImagenRuta(variante.imagenes[0], "", { perezosa: false }), { variante: variante.id });
       pieza.setAttribute("aria-label", nombreColor);
       pieza.title = nombreColor;
-      pieza.classList.toggle("variante-agotada", !variante.disponible);
+      pieza.classList.toggle("variante-agotada", !variante.ofrecida);
       variantes.append(pieza);
     });
     colores.append(tituloColor, variantes);
@@ -1319,13 +1611,50 @@ function pintarVariante(producto, variante) {
   $("#detalle-referencia").textContent = variante.referencia;
   const barras = crearCodigoBarras(variante.referencia);
   enDetalle(".compra-barras").replaceChildren(...(barras ? [barras] : []));
+  pintarEstadoVariante(producto, variante);
+}
+
+// Lo que depende de la disponibilidad del color. Separado de pintarVariante para
+// poder refrescarlo solo, sin reconstruir la galería.
+function pintarEstadoVariante(producto, variante) {
   const disponibilidad = $("#detalle-disponibilidad");
-  disponibilidad.textContent = variante.disponible ? "Disponible" : producto.variantes.length > 1 ? "Agotado en este color" : "Agotado";
-  disponibilidad.className = `estado-stock${variante.disponible ? "" : " no"}`;
-  enDetalle(".galeria .etiqueta-agotado").hidden = variante.disponible;
-  // Un color agotado se puede ver, pero no comprar.
-  $$(".detalle-compra, [data-accion='pedir-ahora'], .detalle-barra", modalProducto()).forEach((nodo) => nodo.classList.toggle("oculto-sin-stock", !variante.disponible));
-  enDetalle(".detalle-sin-stock").hidden = variante.disponible;
+  if (!disponibilidad) return;
+  /* El rótulo general hablaba del COLOR y, junto a una talla por revisar, decía «Disponible»
+     y confundía. El estado vive en cada talla, así que mientras el color se ofrezca la fila
+     se retira por completo. Solo queda cuando el color entero está agotado, que es un hecho
+     del color y no choca con ninguna talla. */
+  const fila = disponibilidad.closest("div");
+  if (fila) fila.hidden = variante.ofrecida;
+  disponibilidad.textContent = variante.ofrecida
+    ? ""
+    : producto.variantes.length > 1 ? "Agotado en este color" : "Agotado";
+  disponibilidad.className = variante.ofrecida ? "" : "estado-stock no";
+  enDetalle(".galeria .etiqueta-agotado").hidden = variante.ofrecida;
+  // Solo un color agotado de verdad oculta la compra. «Por revisar» se sigue viendo.
+  $$(".detalle-compra, [data-accion='pedir-ahora'], .detalle-barra", modalProducto()).forEach((nodo) => nodo.classList.toggle("oculto-sin-stock", !variante.ofrecida));
+  enDetalle(".detalle-sin-stock").hidden = variante.ofrecida;
+}
+
+/* El catálogo cambió mientras la ficha estaba abierta. Se repinta SOLO lo que depende
+   de la disponibilidad: tallas, estado del color y acciones. La galería, la foto
+   visible y el desplazamiento se quedan donde estaban, y la ficha no se cierra. */
+function refrescarDisponibilidadDetalle() {
+  if (!modalProducto()?.open) return;
+  const actual = detalleActual();
+  if (!actual) return;
+  const { producto, variante } = actual;
+  const elegida = estado.detalle.talla;
+  // Una talla que ya no se puede ni consultar deja de estar elegida: así el botón
+  // de compra nunca queda habilitado para algo que el sistema va a rechazar.
+  if (elegida && !tallaOfrecida(producto, variante, elegida)) {
+    estado.detalle.talla = "";
+    estado.seleccion.set(producto.clave, { variante: variante.id, talla: "" });
+    const motivo = estadoTalla(producto, variante, elegida) === AGOTADO ? "se agotó" : "ya no está disponible";
+    mostrarAvisoDetalle(`La talla EU ${elegida} ${motivo}. Elige otra talla.`, "info");
+    anunciarDetalle(`La talla EU ${elegida} ${motivo}.`);
+  }
+  pintarTallas(producto, variante);          // rejilla + pintarTallaElegida
+  pintarEstadoVariante(producto, variante);
 }
 
 function pintarPrecio(contenedor, variante) {
@@ -1340,13 +1669,18 @@ function pintarPrecio(contenedor, variante) {
 function pintarTallas(producto, variante) {
   const talla = estado.detalle.talla;
   const rejilla = enDetalle(".tallas");
-  rejilla.replaceChildren(...[...variante.tallasDisponibles.map((valor) => [valor, false]), ...variante.tallasAgotadas.map((valor) => [valor, true])]
-    .sort((a, b) => compararTallas(a[0], b[0]))
-    .map(([valor, sinStock]) => {
-      const boton = crearBoton(`talla${sinStock ? " talla-agotada" : ""}`, valor, { talla: valor });
-      boton.disabled = sinStock || !variante.disponible;
+  const ROTULO = { [DISPONIBLE]: "", [POR_REVISAR]: ", por revisar", [AGOTADO]: ", agotada" };
+  rejilla.replaceChildren(...[...variante.tallasOfrecidas, ...variante.tallasAgotadas]
+    .sort(compararTallas)
+    .map((valor) => {
+      const suEstado = estadoTalla(producto, variante, valor);
+      const agotada = suEstado === AGOTADO;
+      const porRevisar = suEstado === POR_REVISAR;
+      const boton = crearBoton(`talla${agotada ? " talla-agotada" : ""}${porRevisar ? " talla-por-revisar" : ""}`, valor, { talla: valor });
+      // Una talla por revisar SÍ se puede elegir: sirve para consultarla.
+      boton.disabled = agotada;
       boton.setAttribute("aria-pressed", String(valor === talla));
-      boton.setAttribute("aria-label", boton.disabled ? `EU ${valor}, agotada` : `EU ${valor}`);
+      boton.setAttribute("aria-label", `EU ${valor}${ROTULO[suEstado] || ""}`);
       return boton;
     }));
   // Tabla completa: en celular, ocho tallas son 4 + 4 (no 6 + 2); en escritorio, una sola fila.
@@ -1354,7 +1688,11 @@ function pintarTallas(producto, variante) {
   rejilla.style.setProperty("--tallas-total", total);
   rejilla.style.setProperty("--tallas-fila", total <= 6 ? total : Math.ceil(total / 2));
   const nota = enDetalle(".tallas-nota");
-  nota.textContent = !variante.disponible ? "Este color no tiene tallas disponibles." : variante.tallasAgotadas.length ? "Las tallas tachadas están agotadas en este color." : "";
+  nota.textContent = !variante.ofrecida
+    ? "Este color no tiene tallas disponibles."
+    : variante.tallasPorRevisar.length
+      ? "Las tallas marcadas están por revisar: consúltalas antes de comprar."
+      : variante.tallasAgotadas.length ? "Las tallas tachadas están agotadas en este color." : "";
   pintarTallaElegida(producto, variante);
 }
 
@@ -1373,7 +1711,44 @@ function pintarTallaElegida(producto, variante) {
   const enBarra = enDetalle(".detalle-barra-talla");
   enBarra.textContent = talla ? `EU ${talla}` : "Sin talla";
   enBarra.classList.toggle("pendiente", !talla);
+  // Con una talla por revisar, la acción de compra no debe invitar a pulsarla:
+  // se puede elegir para consultarla, pero no es una compra.
+  const porRevisar = estadoTalla(producto, variante, talla) === POR_REVISAR;
+  $$(".detalle-compra, .detalle-barra, [data-accion='pedir-ahora']", modalProducto())
+    .forEach((nodo) => nodo.toggleAttribute("data-talla-por-revisar", porRevisar));
+  /* Apagarlas con color no basta. Un boton que parece pulsable y no hace nada deja al
+     cliente sin saber si fallo el o la tienda, y un lector de pantalla lo sigue
+     anunciando como disponible. Se marcan como inertes de verdad. No se usa `disabled`
+     porque entonces el boton pierde el foco y la nota que lo explica nunca se lee. */
+  $$(".boton-comprar, [data-accion='pedir-ahora']", modalProducto()).forEach((nodo) => {
+    if (porRevisar) {
+      nodo.setAttribute("aria-disabled", "true");
+      nodo.setAttribute("aria-describedby", NOTA_POR_REVISAR);
+    } else {
+      nodo.removeAttribute("aria-disabled");
+      nodo.removeAttribute("aria-describedby");
+    }
+  });
+  pintarNotaPorRevisar(porRevisar, talla);
   pintarEquivalencias(producto, talla);
+}
+
+const NOTA_POR_REVISAR = "detalle-nota-por-revisar";
+
+/* Un botón apagado sin explicación deja al cliente sin saber qué hacer. Esta nota
+   aparece junto a las acciones solo cuando la talla elegida está por revisar. */
+function pintarNotaPorRevisar(mostrar, talla) {
+  const acciones = enDetalle(".detalle-acciones");
+  if (!acciones) return;
+  let nota = enDetalle(".detalle-por-revisar");
+  if (!mostrar) { nota?.remove(); return; }
+  if (!nota) {
+    nota = crearElemento("p", "detalle-por-revisar");
+    nota.id = NOTA_POR_REVISAR;
+    nota.setAttribute("role", "note");
+    acciones.after(nota);
+  }
+  nota.textContent = `La talla EU ${talla} necesita confirmación: todavía no podemos venderla. Escríbenos y la comprobamos con el proveedor.`;
 }
 
 // Al elegir, el número se estampa en la etiqueta: confirma que la talla quedó impresa.
@@ -1660,7 +2035,8 @@ function elegirTalla(talla) {
   const actual = detalleActual();
   if (!actual) return;
   const { producto, variante } = actual;
-  if (!tallaValida(producto, variante, talla)) {
+  // Se admite DISPONIBLE y POR REVISAR: la segunda no se compra, pero sí se consulta.
+  if (!tallaOfrecida(producto, variante, talla)) {
     mostrarAvisoDetalle("Esa talla no está disponible en este color. Elige otra talla.");
     return;
   }
@@ -1706,6 +2082,11 @@ function agregarDesdeDetalle() {
   const actual = detalleActual();
   if (!actual) return;
   const { producto, variante } = actual;
+  // Por revisar: se conserva la talla elegida, pero no se añade como compra.
+  if (estadoTalla(producto, variante, estado.detalle.talla) === POR_REVISAR) {
+    mostrarAvisoDetalle("Esta talla está por revisar. Consúltanos su disponibilidad antes de comprarla.");
+    return;
+  }
   if (!tallaValida(producto, variante, estado.detalle.talla)) { pedirTalla(); return; }
   if (!cantidadValida(estado.detalle.cantidad)) { mostrarAvisoDetalle(`Elige una cantidad entre 1 y ${CONFIG.cantidadMaxima}.`); return; }
   // Un doble clic accidental no añade dos veces.
@@ -1740,6 +2121,11 @@ function pedirDesdeDetalle() {
   const actual = detalleActual();
   if (!actual) return;
   const { producto, variante } = actual;
+  // El mensaje de consulta para tallas por revisar se define y aprueba en la etapa 15.
+  if (estadoTalla(producto, variante, estado.detalle.talla) === POR_REVISAR) {
+    mostrarAvisoDetalle("Esta talla está por revisar. Escríbenos por WhatsApp para confirmar su disponibilidad.", "info");
+    return;
+  }
   if (!tallaValida(producto, variante, estado.detalle.talla)) { pedirTalla(); return; }
   enviarPedidoWhatsApp([{ producto, variante, talla: estado.detalle.talla, cantidad: estado.detalle.cantidad }]);
 }
@@ -2091,19 +2477,37 @@ function resolverLinea(linea) {
 // guardar = false: solo se revisa lo que se muestra (p. ej. al recibir el carrito de otra pestaña,
 // que puede tener un catálogo más reciente). No se borra nada: las líneas que esta pestaña no
 // reconoce se conservan guardadas, aunque no se muestran ni se cuentan.
+/* Una línea solo se retira si el proveedor confirmó que esa talla se agotó, o si
+   el producto ya no figura en el catálogo. Que la vigencia haya vencido NO la
+   retira: pasa a POR REVISAR y se conserva, marcada. Y con datos de respaldo no
+   se retira nada, porque un fallo de conexión no es un agotado. */
+function motivoRetiro(linea) {
+  const { producto, variante } = resolverLinea(linea);
+  if (!producto || !variante) return "ausente";
+  const suEstado = estadoTalla(producto, variante, linea.talla);
+  if (suEstado === AGOTADO) return "agotada";
+  if (suEstado === AUSENTE) return "ausente";
+  return null;
+}
+
 function validarCarrito(notificar = true, { guardar = true } = {}) {
   if (!estado.catalogoListo) return [];
+  // Datos de respaldo: no sabemos lo suficiente para retirar nada.
+  if (estado.respaldo) { actualizarInsignia(); if (carritoDialogo()?.open) renderizarCarrito(); return []; }
   const retirados = [];
   const validas = estado.carrito.filter((linea) => {
+    if (!motivoRetiro(linea)) return true;
     const { producto, variante } = resolverLinea(linea);
-    if (tallaValida(producto, variante, linea.talla)) return true;
     retirados.push(producto ? `${nombreCompleto(producto)}${variante ? ` · ${variante.color}` : ""} (EU ${linea.talla})` : `${linea.producto} (EU ${linea.talla})`);
     return false;
   });
   if (retirados.length && guardar) {
     estado.carrito = validas;
     guardarCarrito();
-    if (notificar) notificarCarrito(`Retiramos del carrito los productos que ya no están disponibles: ${retirados.join(", ")}.`);
+    const aviso = `Retiramos del carrito los productos que el proveedor confirmó como agotados: ${retirados.join(", ")}.`;
+    // Si la validación es silenciosa (al refrescar en segundo plano), el aviso espera
+    // a que se abra el carrito en lugar de perderse.
+    if (notificar) notificarCarrito(aviso); else estado.avisoCarrito = aviso;
   }
   actualizarInsignia();
   if (carritoDialogo()?.open) renderizarCarrito();
@@ -2114,7 +2518,10 @@ function agregarAlCarrito(claveProducto, idVariante, talla, cantidad = 1) {
   const producto = productoPorClave(claveProducto);
   const variante = varianteDe(producto, idVariante);
   if (!tallaValida(producto, variante, talla)) {
-    mostrarAvisoFlotante("Esa talla ya no está disponible en este color. Elige otra.", false);
+    // Una talla por revisar no entra al carrito como compra: primero se consulta.
+    mostrarAvisoFlotante(estadoTalla(producto, variante, talla) === POR_REVISAR
+      ? "Esa talla está por revisar. Consúltanos su disponibilidad antes de comprarla."
+      : "Esa talla ya no está disponible en este color. Elige otra.", false);
     return false;
   }
   const pedido = Math.max(1, Math.min(CONFIG.cantidadMaxima, Math.floor(Number(cantidad) || 1)));
@@ -2164,7 +2571,7 @@ const confirmacionDialogo = () => $("#confirmacion-carrito");
 let temporizadorConfirmacion = 0;
 
 function pintarResumenConfirmacion() {
-  const resumen = resumenCarrito(lineasCarrito());
+  const resumen = resumenCarrito(lineasComprables());
   const total = resumen.todosPorConfirmar ? "Por confirmar" : pesos(resumen.subtotal);
   $("#confirmacion-unidades").textContent = textoUnidades(resumen.unidades);
   $("#confirmacion-costo").textContent = total;
@@ -2262,15 +2669,27 @@ function resumenCarrito(lineas) {
   return { unidades: unidades(lineas), subtotal, hayPorConfirmar: conPrecio.length < lineas.length, todosPorConfirmar: conPrecio.length === 0 };
 }
 
+/* Todas las líneas que siguen en el catálogo, cada una con su estado.
+   Las agotadas y las que ya no existen las retira validarCarrito. */
 function lineasCarrito() {
-  return estado.carrito.map(resolverLinea).filter((linea) => tallaValida(linea.producto, linea.variante, linea.talla));
+  return estado.carrito
+    .map(resolverLinea)
+    .filter((linea) => tallaOfrecida(linea.producto, linea.variante, linea.talla))
+    .map((linea) => ({ ...linea, estado: estadoTalla(linea.producto, linea.variante, linea.talla) }));
 }
+
+// Las que se pueden pedir ahora: son las únicas que entran en NUEVO PEDIDO.
+const lineasComprables = (lineas = lineasCarrito()) => lineas.filter((linea) => linea.estado === DISPONIBLE);
+// Las que hay que consultar antes de comprar.
+const lineasPorRevisar = (lineas = lineasCarrito()) => lineas.filter((linea) => linea.estado === POR_REVISAR);
 
 function crearLineaCarrito(linea) {
   const { producto, variante, talla, cantidad } = linea;
   const clave = claveLinea(producto.clave, variante.id, talla);
-  const item = crearElemento("li", "linea");
+  const porRevisar = linea.estado === POR_REVISAR;
+  const item = crearElemento("li", `linea${porRevisar ? " linea-por-revisar" : ""}`);
   item.dataset.clave = clave;
+  if (porRevisar) item.dataset.estado = POR_REVISAR;
   const media = crearElemento("div", "linea-media");
   media.append(crearImagenRuta(variante.imagenes[0], `${nombreCompleto(producto)}, color ${variante.color}`));
   const info = crearElemento("div", "linea-info");
@@ -2279,6 +2698,12 @@ function crearLineaCarrito(linea) {
     crearElemento("p", "linea-meta", `EU ${talla} · ${variante.color}`),
     crearElemento("p", "linea-unitario", `${formatearPrecio(variante.precio)}${variante.precio > 0 ? " c/u" : ""} · Ref. ${variante.referencia}`)
   );
+  // Se conserva en el carrito, pero no se envía como compra confirmada.
+  if (porRevisar) {
+    const marca = crearElemento("p", "linea-aviso", "Por revisar: no se incluye en el pedido hasta confirmarla.");
+    marca.setAttribute("role", "note");
+    info.append(marca);
+  }
   const controles = crearElemento("div", "linea-controles");
   controles.append(crearSelectorCantidad(cantidad, `Cantidad de ${nombreCompleto(producto)}, ${variante.color}, talla EU ${talla}`, { linea: clave }));
   const eliminar = crearBoton("boton-icono", crearIcono("icono-papelera"), { eliminar: clave });
@@ -2341,20 +2766,77 @@ function renderizarCarrito({ selectorFoco = "" } = {}) {
   lineas.forEach((linea) => lista.append(crearLineaCarrito(linea)));
   cuerpo.replaceChildren(...bloques, lista);
   pie.hidden = false;
-  const resumen = resumenCarrito(lineas);
+  // El resumen y el pedido cuentan solo lo que se puede pedir ahora.
+  const comprables = lineasComprables(lineas);
+  const porRevisar = lineasPorRevisar(lineas);
+  const resumen = resumenCarrito(comprables);
   $("#carrito-unidades").textContent = String(resumen.unidades);
-  $("#carrito-subtotal").textContent = resumen.todosPorConfirmar ? "Por confirmar" : pesos(resumen.subtotal);
-  $("#carrito-nota").textContent = resumen.hayPorConfirmar && !resumen.todosPorConfirmar
-    ? "Subtotal estimado sin incluir productos con precio por confirmar ni el envío. El vendedor confirmará el precio final."
-    : "El subtotal es estimado y no incluye envío. El vendedor confirmará precio final y disponibilidad.";
+  $("#carrito-subtotal").textContent = comprables.length === 0
+    ? "Por confirmar"
+    : resumen.todosPorConfirmar ? "Por confirmar" : pesos(resumen.subtotal);
+  $("#carrito-nota").textContent = porRevisar.length && comprables.length === 0
+    ? `${porRevisar.length === 1 ? "El producto de tu carrito está" : "Todos los productos de tu carrito están"} por revisar. Los conservamos aquí; escríbenos por WhatsApp y confirmamos su disponibilidad.`
+    : porRevisar.length
+    ? `${porRevisar.length} ${porRevisar.length === 1 ? "producto está" : "productos están"} por revisar y no ${porRevisar.length === 1 ? "entra" : "entran"} en el pedido. Los conservamos aquí para que los consultes.`
+    : resumen.hayPorConfirmar && !resumen.todosPorConfirmar
+      ? "Subtotal estimado sin incluir productos con precio por confirmar ni el envío. El vendedor confirmará el precio final."
+      : "El subtotal es estimado y no incluye envío. El vendedor confirmará precio final y disponibilidad.";
 
-  const mensaje = crearMensajePedido(lineas);
-  const demasiadoLargo = enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp;
   const enviar = $("#carrito-enviar");
-  enviar.href = enlaceWhatsApp(demasiadoLargo ? crearMensajeAlternativo(lineas) : mensaje);
-  enviar.dataset.largo = String(demasiadoLargo);
-  $("#carrito-respaldo").hidden = !demasiadoLargo;
+  const copiar = $("#carrito-copiar");
+  const consultar = botonConsultar();
+  const sinPedido = comprables.length === 0;
+  /* Sin nada que pedir, «Unidades 0» y «Subtotal $0» junto a productos visibles
+     confunden: esas dos filas se ocultan y la nota explica la situación.
+     «Envío: Por confirmar» se queda, porque sigue siendo cierto. */
+  [$("#carrito-unidades"), $("#carrito-subtotal")].forEach((celda) => {
+    const fila = celda?.closest("div");
+    if (fila) fila.hidden = sinPedido;
+  });
+  enviar.dataset.sinPedido = String(sinPedido);
+  enviar.setAttribute("aria-disabled", String(sinPedido));
+  // Si no hay nada confirmado, no se ofrece ninguna acción de pedido normal.
+  enviar.hidden = sinPedido;
+  if (copiar) copiar.hidden = sinPedido;
+  if (sinPedido) {
+    enviar.removeAttribute("href");
+    enviar.dataset.largo = "false";
+    $("#carrito-respaldo").hidden = true;
+  } else {
+    const mensaje = crearMensajePedido(comprables);
+    const demasiadoLargo = enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp;
+    enviar.href = enlaceWhatsApp(demasiadoLargo ? crearMensajeAlternativo(comprables) : mensaje);
+    enviar.dataset.largo = String(demasiadoLargo);
+    $("#carrito-respaldo").hidden = !demasiadoLargo;
+  }
+  // CONSULTAR DISPONIBILIDAD: solo existe si hay algo por revisar, y solo lleva eso.
+  consultar.hidden = porRevisar.length === 0;
+  if (porRevisar.length) {
+    const mensaje = crearMensajeConsulta(porRevisar);
+    const demasiadoLargo = enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp;
+    consultar.href = enlaceWhatsApp(demasiadoLargo ? crearConsultaAlternativa(porRevisar) : mensaje);
+    consultar.dataset.largo = String(demasiadoLargo);
+    consultar.lastChild.textContent = "Consultar disponibilidad";
+  } else {
+    consultar.removeAttribute("href");
+    consultar.dataset.largo = "false";
+  }
   if (selectorFoco) $(selectorFoco, cuerpo)?.focus();
+}
+
+/* El pie del carrito viene de index.html, que no se modifica: la segunda acción se
+   crea aquí, una sola vez, justo antes de «Copiar pedido». */
+function botonConsultar() {
+  let boton = $("#carrito-consultar");
+  if (boton) return boton;
+  boton = crearElemento("a", "boton boton-whatsapp-suave boton-ancho");
+  boton.id = "carrito-consultar";
+  boton.target = "_blank";
+  boton.rel = "noopener noreferrer";
+  boton.hidden = true;
+  boton.append(crearIcono("icono-whatsapp-solido"), document.createTextNode("Consultar disponibilidad"));
+  $("#carrito-copiar").before(boton);
+  return boton;
 }
 
 async function abrirCarrito(origen) {
@@ -2364,6 +2846,11 @@ async function abrirCarrito(origen) {
   abrirDialogo(carritoDialogo(), origen);
   await refrescarCatalogo();
   validarCarrito();
+  // Al refrescar se pudo retirar algo en silencio: ese aviso se muestra ahora.
+  if (estado.avisoCarrito) {
+    notificarCarrito(estado.avisoCarrito);
+    estado.avisoCarrito = "";
+  }
   renderizarCarrito();
 }
 
@@ -2430,10 +2917,12 @@ function iniciarCarrito() {
   });
 
   $("#carrito-enviar")?.addEventListener("click", async (evento) => {
-    const lineas = lineasCarrito();
+    const lineas = lineasComprables();
     if (!lineas.length) {
       evento.preventDefault();
-      notificarCarrito("Tu carrito está vacío. Añade al menos un producto.");
+      notificarCarrito(lineasPorRevisar().length
+        ? "Todos los productos del carrito están por revisar. Consúltanos su disponibilidad antes de hacer el pedido."
+        : "Tu carrito está vacío. Añade al menos un producto.");
       return;
     }
     if (evento.currentTarget.dataset.largo === "true") {
@@ -2445,9 +2934,27 @@ function iniciarCarrito() {
     // No se vacía el carrito: abrir WhatsApp no confirma una compra.
   });
 
+  // Consultar no confirma nada ni vacía el carrito: los productos siguen guardados.
+  botonConsultar().addEventListener("click", async (evento) => {
+    const lineas = lineasPorRevisar();
+    if (!lineas.length) {
+      evento.preventDefault();
+      notificarCarrito("No hay productos por revisar que consultar.");
+      return;
+    }
+    if (evento.currentTarget.dataset.largo === "true") {
+      evento.preventDefault();
+      const ventana = window.open(enlaceWhatsApp(crearConsultaAlternativa(lineas)), "_blank", "noopener,noreferrer");
+      const copiado = await copiarTexto(crearMensajeConsulta(lineas));
+      notificarCarrito(copiado ? "Copiamos la consulta completa. Pégala en el chat de WhatsApp que se abrió." : (ventana ? "La consulta es larga y no pudimos copiarla. Inténtalo con menos productos." : "La consulta es larga. Abre WhatsApp manualmente y vuelve a intentarlo."));
+    }
+  });
+
   $("#carrito-copiar")?.addEventListener("click", async () => {
-    const lineas = lineasCarrito();
-    if (!lineas.length) return notificarCarrito("Tu carrito está vacío.");
+    const lineas = lineasComprables();
+    if (!lineas.length) return notificarCarrito(lineasPorRevisar().length
+      ? "No hay productos confirmados que copiar: están todos por revisar."
+      : "Tu carrito está vacío.");
     const copiado = await copiarTexto(crearMensajePedido(lineas));
     notificarCarrito(copiado ? "Pedido copiado. Ya puedes pegarlo en WhatsApp." : "No pudimos copiar automáticamente. Selecciona y copia el pedido de nuevo.");
   });

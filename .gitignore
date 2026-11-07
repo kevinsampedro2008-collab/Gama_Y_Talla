@@ -6,3 +6,25 @@ node_modules/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Credenciales y secretos locales: NUNCA al repositorio.
+# Los archivos de ejemplo (sin valores reales) SI se pueden subir.
+.env
+.env.*
+!.env.example
+!.env.*.example
+supabase/.env
+supabase/.env.*
+!supabase/.env.example
+!supabase/.env.*.example
+.env.keys
+*.pem
+*.key
+*.p12
+*.pfx
+.pgpass
+pgpass.conf
+*.secret
+secrets.json
+credentials.json
+service-account*.json

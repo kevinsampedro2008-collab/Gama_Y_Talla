@@ -220,7 +220,14 @@ test.describe('Casos fallidos: la ficha no se cierra', () => {
         await enTienda({ browser, browserName }, vista, async (pagina) => {
           const dialogo = await abrirDetalle(pagina, 'SAMBA');
           await pulsar(dialogo.locator('.talla[data-talla="40"]'), vista);
-          await pagina.evaluate(() => { const v = estado.productos.find((x) => x.nombre === 'SAMBA').variantes[0]; v.tallasDisponibles = v.tallasDisponibles.filter((t) => t !== '40'); });
+          // La talla deja de ofrecerse. Desde la etapa 14 el estado de cada talla vive
+          // en estadosTalla, así que hay que retirarla también de ahí.
+          await pagina.evaluate(() => {
+            const v = estado.productos.find((x) => x.nombre === 'SAMBA').variantes[0];
+            v.tallasDisponibles = v.tallasDisponibles.filter((t) => t !== '40');
+            v.tallasOfrecidas = v.tallasOfrecidas.filter((t) => t !== '40');
+            delete v.estadosTalla['40'];
+          });
           await dialogo.locator('.detalle-acciones [data-accion="agregar"]').evaluate((b) => b.click());
           await expect(dialogo.locator('#detalle-aviso')).toContainText('Elige una talla EU');
           await sigueAbierta(pagina, dialogo);
@@ -284,18 +291,34 @@ test.describe('Casos fallidos: la ficha no se cierra', () => {
 test.describe('Añadido rápido desde el catálogo', () => {
   test('confirma sin abrir ni cerrar fichas, y Escape devuelve el foco al botón', async ({ browser, browserName }) => {
     await enTienda({ browser, browserName }, CELULAR, async (pagina) => {
+      /* El evento `close` de un <dialog> NO llega en el mismo instante en que `open` pasa a
+         false: llega aproximadamente un fotograma después (medido: 11–16 ms en Chromium,
+         hasta 32 ms en Firefox). El oyente de esta prueba se instalaba DESPUÉS de ver
+         `open === false`, así que a veces recibía el cierre de la preparación y lo contaba
+         como un cierre del añadido rápido.
+         Ahora el oyente se instala ANTES de abrir la ficha y cada cierre queda anotado con
+         la fase en la que llegó. El cierre de la preparación es esperado y se ESPERA a que
+         llegue (no se da por hecho que ya llegó); a partir de ahí cualquier cierre es
+         inesperado. Nada se reinicia: la lista se conserva entera. */
+      await pagina.evaluate(() => {
+        window.__cierres = [];
+        window.__fase = 'preparacion';
+        document.querySelector('#modal-producto').addEventListener('close', () => { window.__cierres.push(window.__fase); });
+      });
       const dialogo = await abrirDetalle(pagina, 'SAMBA');
       await dialogo.locator('.talla[data-talla="40"]').tap();
       await dialogo.getByRole('button', { name: 'Cerrar detalles' }).tap();
       await expect(dialogo).toHaveJSProperty('open', false);
+      await expect.poll(() => pagina.evaluate(() => window.__cierres), 'llega el único cierre esperado de la preparación').toEqual(['preparacion']);
+      await pagina.evaluate(() => { window.__fase = 'anadido'; });
       await vigilarSolapes(pagina);
-      await pagina.evaluate(() => { window.__fichas = 0; document.querySelector('#modal-producto').addEventListener('close', () => { window.__fichas += 1; }); });
       const rapido = pagina.locator('.tarjeta-rapido').first();
       await rapido.scrollIntoViewIfNeeded();
       await rapido.tap();
       const ventana = await ventanaLista(pagina);
       expect(await abiertos(pagina)).toEqual(['confirmacion-carrito']);
-      expect(await pagina.evaluate(() => window.__fichas), 'no se cerró ninguna ficha').toBe(0);
+      expect(await pagina.evaluate(() => window.__cierres.filter((fase) => fase === 'anadido').length), 'no se cerró ninguna ficha').toBe(0);
+      expect(await pagina.evaluate(() => window.__cierres), 'solo existió el cierre esperado de la preparación').toEqual(['preparacion']);
       expect(await solapes(pagina)).toEqual([]);
       await pagina.keyboard.press('Escape');
       await expect(ventana).toHaveJSProperty('open', false);

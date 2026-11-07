@@ -1,0 +1,197 @@
+{
+  "_aviso": "CATÁLOGO FICTICIO DE PRUEBA. Solo se carga con ?datos-prueba. No contiene productos, precios, tallas ni fotos reales. Puede borrarse antes de publicar.",
+  "productos": [
+    {
+      "id": "PRUEBA-TRES",
+      "nombre": "Modelo de prueba · tres colores",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "precio": 300000,
+      "precioAnterior": 0,
+      "descripcion": "Texto de prueba para comprobar la sección «Sobre este modelo». No describe un producto real. Sirve para revisar que un texto largo se recorta con elegancia y que el botón «Leer más» lo despliega por completo sin mover el resto de la ficha. También permite comprobar la lectura con lectores de pantalla, el contraste y el ancho de línea en escritorio y en celular. Cuando exista el inventario definitivo, este texto se sustituirá por la descripción real de cada modelo.",
+      "destacado": true,
+      "nuevoIngreso": true,
+      "variantes": [
+        {
+          "id": "PRUEBA-TRES-BV",
+          "color": "Blanco / verde",
+          "imagenes": [
+            "data/pruebas/imagenes/tres-bv-1.svg",
+            "data/pruebas/imagenes/tres-bv-2.svg",
+            "data/pruebas/imagenes/tres-bv-3.svg",
+            "data/pruebas/imagenes/tres-bv-4.svg"
+          ],
+          "tallasDisponibles": [
+            "38",
+            "39",
+            "40",
+            "41"
+          ],
+          "tallasAgotadas": [
+            "42"
+          ],
+          "precio": null
+        },
+        {
+          "id": "PRUEBA-TRES-NB",
+          "color": "Negro / blanco",
+          "imagenes": [
+            "data/pruebas/imagenes/tres-nb-1.svg",
+            "data/pruebas/imagenes/tres-nb-2.svg"
+          ],
+          "tallasDisponibles": [
+            "40",
+            "41",
+            "42"
+          ],
+          "tallasAgotadas": [
+            "38",
+            "39"
+          ],
+          "precio": 320000,
+          "precioAnterior": 400000
+        },
+        {
+          "id": "PRUEBA-TRES-RB",
+          "color": "Rosa / blanco",
+          "imagenes": [
+            "data/pruebas/imagenes/tres-rb-1.svg",
+            "data/pruebas/imagenes/tres-rb-2.svg"
+          ],
+          "tallasDisponibles": [
+            "36",
+            "37",
+            "38"
+          ],
+          "tallasAgotadas": [
+            "39",
+            "40"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PRUEBA-DOS",
+      "nombre": "Modelo de prueba · dos colores",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "precio": 280000,
+      "precioAnterior": 350000,
+      "variantes": [
+        {
+          "id": "PRUEBA-DOS-GP",
+          "color": "Gris / plata",
+          "imagenes": [
+            "data/pruebas/imagenes/dos-gp-1.svg",
+            "data/pruebas/imagenes/dos-gp-2.svg",
+            "data/pruebas/imagenes/dos-gp-3.svg"
+          ],
+          "tallasDisponibles": [
+            "37",
+            "38",
+            "39",
+            "40"
+          ],
+          "tallasAgotadas": [
+            "41"
+          ]
+        },
+        {
+          "id": "PRUEBA-DOS-AB",
+          "color": "Azul / blanco",
+          "imagenes": [
+            "data/pruebas/imagenes/dos-ab-1.svg",
+            "data/pruebas/imagenes/dos-ab-2.svg"
+          ],
+          "tallasDisponibles": [
+            "39",
+            "40",
+            "41",
+            "42",
+            "43"
+          ],
+          "tallasAgotadas": [
+            "38"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PRUEBA-UNA",
+      "nombre": "Modelo de prueba · un color",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "precio": 250000,
+      "descripcion": "Texto de prueba breve: no describe un producto real.",
+      "variantes": [
+        {
+          "id": "PRUEBA-UNA-BE",
+          "color": "Beige",
+          "imagenes": [
+            "data/pruebas/imagenes/una-be-1.svg",
+            "data/pruebas/imagenes/una-be-2.svg",
+            "data/pruebas/imagenes/una-be-3.svg"
+          ],
+          "tallasDisponibles": [
+            "36",
+            "37",
+            "38",
+            "39",
+            "40"
+          ],
+          "tallasAgotadas": [
+            "41"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "PRUEBA-ANTIGUO",
+      "nombre": "Modelo de prueba · formato anterior",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "color": "Negro",
+      "precio": 199900,
+      "precioAnterior": 249900,
+      "imagen": "data/pruebas/imagenes/antiguo-1.svg",
+      "tallasDisponibles": [
+        "38",
+        "39",
+        "40",
+        "41",
+        "42"
+      ],
+      "tallasAgotadas": [
+        "43"
+      ]
+    },
+    {
+      "id": "PRUEBA-DUP",
+      "nombre": "Modelo de prueba · referencia repetida",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "color": "Verde",
+      "precio": 210000,
+      "imagen": "data/pruebas/imagenes/dup-verde-1.svg",
+      "tallasDisponibles": [
+        "39",
+        "40"
+      ],
+      "tallasAgotadas": []
+    },
+    {
+      "id": "PRUEBA-DUP",
+      "nombre": "Modelo de prueba · referencia repetida",
+      "marca": "Marca de prueba",
+      "categoria": "Pruebas",
+      "color": "Naranja",
+      "precio": 230000,
+      "imagen": "data/pruebas/imagenes/dup-naranja-1.svg",
+      "tallasDisponibles": [
+        "40",
+        "41"
+      ],
+      "tallasAgotadas": []
+    }
+  ]
+}

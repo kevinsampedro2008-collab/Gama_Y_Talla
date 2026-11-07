@@ -1,0 +1,2216 @@
+{
+    "productos": [
+        {
+            "id": "ADD-SAM~zapatilla-01",
+            "marca": "Adidas",
+            "orden": 0,
+            "nombre": "SAMBA",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Rosa / blanco / beigh",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        },
+                        {
+                            "talla": "45",
+                            "estado": "DISPONIBLE",
+                            "venceEn": "2026-11-07T17:30:24.023612+00:00",
+                            "vigenciaDesde": "2026-11-05T17:30:24.023612+00:00"
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_01.webp"
+                    ],
+                    "referencia": "ADD-SAM",
+                    "codigoVariante": "GT-00001-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                    ],
+                    "tallasDisponibles": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44",
+                        "45"
+                    ]
+                }
+            ],
+            "referencia": "ADD-SAM",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00001"
+        },
+        {
+            "id": "LCS-RET-01~zapatilla-02",
+            "marca": "Le Coq Sportif",
+            "orden": 1,
+            "nombre": "LCS Retro Classic",
+            "segmento": null,
+            "categoria": "Casual / Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco / Rojo / Azul / Beis",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "36",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_02.webp"
+                    ],
+                    "referencia": "LCS-RET-01",
+                    "codigoVariante": "GT-00002-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "36",
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "LCS-RET-01",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00002"
+        },
+        {
+            "id": "GT-001~zapatilla-03",
+            "marca": "Jordan",
+            "orden": 2,
+            "nombre": "Air Jordan 1 Retro High OG",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Rojo / blanco / negro",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "45",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_03.webp"
+                    ],
+                    "referencia": "GT-001",
+                    "codigoVariante": "GT-00003-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44",
+                        "45"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-001",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00003"
+        },
+        {
+            "id": "GT-002~zapatilla-04",
+            "marca": "Nike",
+            "orden": 3,
+            "nombre": "Air Force 1 '07",
+            "segmento": null,
+            "categoria": "Casuales",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco",
+                    "precio": 132900,
+                    "tallas": [
+                        {
+                            "talla": "36",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_04.webp"
+                    ],
+                    "referencia": "GT-002",
+                    "codigoVariante": "GT-00004-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "36",
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-002",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00004"
+        },
+        {
+            "id": "GT-003~zapatilla-05",
+            "marca": "Adidas",
+            "orden": 4,
+            "nombre": "Samba OG",
+            "segmento": null,
+            "categoria": "Casuales",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco / verde",
+                    "precio": 459900,
+                    "tallas": [
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_05.webp"
+                    ],
+                    "referencia": "GT-003",
+                    "codigoVariante": "GT-00005-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-003",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00005"
+        },
+        {
+            "id": "GT-004~zapatilla-06",
+            "marca": "Nike",
+            "orden": 5,
+            "nombre": "Pegasus 41",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris / azul",
+                    "precio": 529900,
+                    "tallas": [
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_06.webp"
+                    ],
+                    "referencia": "GT-004",
+                    "codigoVariante": "GT-00006-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-004",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00006"
+        },
+        {
+            "id": "GT-005~zapatilla-07",
+            "marca": "Adidas",
+            "orden": 6,
+            "nombre": "Ultraboost Light",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / lima",
+                    "precio": 689900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_07.webp"
+                    ],
+                    "referencia": "GT-005",
+                    "codigoVariante": "GT-00007-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-005",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00007"
+        },
+        {
+            "id": "GT-006~zapatilla-08",
+            "marca": "Jordan",
+            "orden": 7,
+            "nombre": "Air Jordan 4 Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris cemento",
+                    "precio": 1249900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_08.webp"
+                    ],
+                    "referencia": "GT-006",
+                    "codigoVariante": "GT-00008-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-006",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00008"
+        },
+        {
+            "id": "GT-007~zapatilla-09",
+            "marca": "Nike",
+            "orden": 8,
+            "nombre": "Dunk Low Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Negro / blanco",
+                    "precio": 549900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_09.webp"
+                    ],
+                    "referencia": "GT-007",
+                    "codigoVariante": "GT-00009-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-007",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00009"
+        },
+        {
+            "id": "GT-008~zapatilla-10",
+            "marca": "New Balance",
+            "orden": 9,
+            "nombre": "550",
+            "segmento": null,
+            "categoria": "Deportivas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / azul",
+                    "precio": 519900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_10.webp"
+                    ],
+                    "referencia": "GT-008",
+                    "codigoVariante": "GT-00010-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-008",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00010"
+        },
+        {
+            "id": "GT-005~zapatilla-11",
+            "marca": "Adidas",
+            "orden": 10,
+            "nombre": "Ultraboost Light",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / lima",
+                    "precio": 689900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_11.webp"
+                    ],
+                    "referencia": "GT-005",
+                    "codigoVariante": "GT-00011-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-005",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00011"
+        },
+        {
+            "id": "GT-006~zapatilla-12",
+            "marca": "Jordan",
+            "orden": 11,
+            "nombre": "Air Jordan 4 Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris cemento",
+                    "precio": 1249900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_12.webp"
+                    ],
+                    "referencia": "GT-006",
+                    "codigoVariante": "GT-00012-A",
+                    "precioAnterior": 1599900,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-006",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00012"
+        },
+        {
+            "id": "GT-007~zapatilla-13",
+            "marca": "Nike",
+            "orden": 12,
+            "nombre": "Dunk Low Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Negro / blanco",
+                    "precio": 549900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_13.webp"
+                    ],
+                    "referencia": "GT-007",
+                    "codigoVariante": "GT-00013-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-007",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00013"
+        },
+        {
+            "id": "GT-008~zapatilla-14",
+            "marca": "New Balance",
+            "orden": 13,
+            "nombre": "550",
+            "segmento": null,
+            "categoria": "Deportivas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / azul",
+                    "precio": 519900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_14.webp"
+                    ],
+                    "referencia": "GT-008",
+                    "codigoVariante": "GT-00014-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-008",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00014"
+        },
+        {
+            "id": "ADD-SAM~zapatilla-15",
+            "marca": "Adidas",
+            "orden": 14,
+            "nombre": "SAMBA",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Rosa / blanco / beigh",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "45",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_15.webp"
+                    ],
+                    "referencia": "ADD-SAM",
+                    "codigoVariante": "GT-00015-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44",
+                        "45"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "ADD-SAM",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00015"
+        },
+        {
+            "id": "LCS-RET-01~zapatilla-16",
+            "marca": "Le Coq Sportif",
+            "orden": 15,
+            "nombre": "LCS Retro Classic",
+            "segmento": null,
+            "categoria": "Casual / Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco / Rojo / Azul / Beis",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "36",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_16.webp"
+                    ],
+                    "referencia": "LCS-RET-01",
+                    "codigoVariante": "GT-00016-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "36",
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "LCS-RET-01",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00016"
+        },
+        {
+            "id": "GT-001~zapatilla-17",
+            "marca": "Jordan",
+            "orden": 16,
+            "nombre": "Air Jordan 1 Retro High OG",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Rojo / blanco / negro",
+                    "precio": 120000,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "45",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_17.webp"
+                    ],
+                    "referencia": "GT-001",
+                    "codigoVariante": "GT-00017-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44",
+                        "45"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-001",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00017"
+        },
+        {
+            "id": "GT-002~zapatilla-18",
+            "marca": "CAMBIARRRRRRRRRRRRRRRR IMAGEN 18",
+            "orden": 17,
+            "nombre": "Air Force 1 '07",
+            "segmento": null,
+            "categoria": "Casuales",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco",
+                    "precio": 132900,
+                    "tallas": [
+                        {
+                            "talla": "36",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_18.webp"
+                    ],
+                    "referencia": "GT-002",
+                    "codigoVariante": "GT-00018-A",
+                    "precioAnterior": 290000,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "36",
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-002",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00018"
+        },
+        {
+            "id": "GT-003~zapatilla-19",
+            "marca": "Adidas",
+            "orden": 18,
+            "nombre": "Samba OG",
+            "segmento": null,
+            "categoria": "Casuales",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Blanco / verde",
+                    "precio": 459900,
+                    "tallas": [
+                        {
+                            "talla": "37",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_19.webp"
+                    ],
+                    "referencia": "GT-003",
+                    "codigoVariante": "GT-00019-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "37",
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-003",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00019"
+        },
+        {
+            "id": "GT-004~zapatilla-20",
+            "marca": "Nike",
+            "orden": 19,
+            "nombre": "Pegasus 41",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris / azul",
+                    "precio": 529900,
+                    "tallas": [
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_20.webp"
+                    ],
+                    "referencia": "GT-004",
+                    "codigoVariante": "GT-00020-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-004",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00020"
+        },
+        {
+            "id": "GT-005~zapatilla-21",
+            "marca": "Adidas",
+            "orden": 20,
+            "nombre": "Ultraboost Light",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / lima",
+                    "precio": 689900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_21.webp"
+                    ],
+                    "referencia": "GT-005",
+                    "codigoVariante": "GT-00021-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-005",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00021"
+        },
+        {
+            "id": "GT-006~zapatilla-22",
+            "marca": "Jordan",
+            "orden": 21,
+            "nombre": "Air Jordan 4 Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris cemento",
+                    "precio": 1249900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_22.webp"
+                    ],
+                    "referencia": "GT-006",
+                    "codigoVariante": "GT-00022-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-006",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00022"
+        },
+        {
+            "id": "GT-007~zapatilla-23",
+            "marca": "Nike",
+            "orden": 22,
+            "nombre": "Dunk Low Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Negro / blanco",
+                    "precio": 549900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_23.webp"
+                    ],
+                    "referencia": "GT-007",
+                    "codigoVariante": "GT-00023-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-007",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00023"
+        },
+        {
+            "id": "GT-008~zapatilla-24",
+            "marca": "New Balance",
+            "orden": 23,
+            "nombre": "550",
+            "segmento": null,
+            "categoria": "Deportivas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / azul",
+                    "precio": 519900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_24.webp"
+                    ],
+                    "referencia": "GT-008",
+                    "codigoVariante": "GT-00024-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-008",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00024"
+        },
+        {
+            "id": "GT-005~zapatilla-25",
+            "marca": "Adidas",
+            "orden": 24,
+            "nombre": "Ultraboost Light",
+            "segmento": null,
+            "categoria": "Running",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / lima",
+                    "precio": 689900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_25.webp"
+                    ],
+                    "referencia": "GT-005",
+                    "codigoVariante": "GT-00025-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-005",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00025"
+        },
+        {
+            "id": "GT-006~zapatilla-26",
+            "marca": "Jordan",
+            "orden": 25,
+            "nombre": "Air Jordan 4 Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Gris cemento",
+                    "precio": 1249900,
+                    "tallas": [
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_26.webp"
+                    ],
+                    "referencia": "GT-006",
+                    "codigoVariante": "GT-00026-A",
+                    "precioAnterior": 1599900,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-006",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00026"
+        },
+        {
+            "id": "GT-007~zapatilla-27",
+            "marca": "Nike",
+            "orden": 26,
+            "nombre": "Dunk Low Retro",
+            "segmento": null,
+            "categoria": "Urbanas",
+            "destacado": true,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Negro / blanco",
+                    "precio": 549900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "44",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/editadas/zapatilla_27.webp"
+                    ],
+                    "referencia": "GT-007",
+                    "codigoVariante": "GT-00027-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43",
+                        "44"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-007",
+            "descripcion": null,
+            "nuevoIngreso": false,
+            "codigoInterno": "GT-00027"
+        },
+        {
+            "id": "GT-008~zapatilla-28",
+            "marca": "New Balance",
+            "orden": 27,
+            "nombre": "550",
+            "segmento": null,
+            "categoria": "Deportivas",
+            "destacado": false,
+            "variantes": [
+                {
+                    "id": "unica",
+                    "color": "Marfil / azul",
+                    "precio": 519900,
+                    "tallas": [
+                        {
+                            "talla": "38",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "39",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "40",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "41",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "42",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        },
+                        {
+                            "talla": "43",
+                            "estado": "POR_REVISAR",
+                            "venceEn": null,
+                            "vigenciaDesde": null
+                        }
+                    ],
+                    "imagenes": [
+                        "assets/images/productos/zapatilla_28.webp"
+                    ],
+                    "referencia": "GT-008",
+                    "codigoVariante": "GT-00028-A",
+                    "precioAnterior": 0,
+                    "tallasAgotadas": [
+                    ],
+                    "tallasPorRevisar": [
+                        "38",
+                        "39",
+                        "40",
+                        "41",
+                        "42",
+                        "43"
+                    ],
+                    "tallasDisponibles": [
+                    ]
+                }
+            ],
+            "referencia": "GT-008",
+            "descripcion": null,
+            "nuevoIngreso": true,
+            "codigoInterno": "GT-00028"
+        }
+    ]
+}
