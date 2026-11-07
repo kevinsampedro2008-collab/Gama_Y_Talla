@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es-CO">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f3f3f0">
+  <!-- Panel privado: fuera de buscadores y sin enviar la dirección a otros sitios. -->
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <!-- Solo scripts del propio sitio y conexiones a Supabase (proyecto y stack local de pruebas). -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; connect-src 'self' https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; base-uri 'none'; form-action 'self'; object-src 'none'">
+  <title>Panel · Gama &amp; Talla</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <script src="vendor/supabase-js-2.118.0/supabase.js" defer></script>
+  <!-- Configuración local (no versionada): ver config.ejemplo.js y LEEME.md. -->
+  <script src="config.js" defer></script>
+  <script src="admin.js" defer></script>
+</head>
+<body>
+  <!-- Mientras se comprueba la sesión no se muestra nada administrativo. -->
+  <div class="vista vista-inicio" id="vista-inicio" aria-busy="true">
+    <p class="nota-inicio" role="status">Comprobando tu sesión…</p>
+  </div>
+
+  <!-- ======================================================= INGRESO -->
+  <main class="vista vista-ingreso" id="vista-ingreso" hidden>
+    <section class="ingreso" aria-labelledby="ingreso-titulo">
+      <div class="ingreso-marca">
+        <span class="logotipo" aria-label="Gama &amp; Talla">
+          <span class="logotipo-sello" aria-hidden="true">G&amp;T</span>
+          <span class="logotipo-texto" aria-hidden="true">Gama<span class="logotipo-amp">&amp;</span>Talla</span>
+        </span>
+        <h1 class="ingreso-titulo" id="ingreso-titulo">Panel de la tienda</h1>
+        <p class="ingreso-texto">Ingresa con la cuenta de administración para consultar el catálogo.</p>
+      </div>
+
+      <form class="ingreso-formulario" id="formulario-ingreso" novalidate>
+        <p class="aviso aviso-info" id="aviso-ingreso" role="status" hidden></p>
+        <p class="aviso aviso-error" id="error-ingreso" role="alert" hidden></p>
+
+        <div class="campo">
+          <label for="correo">Correo</label>
+          <input id="correo" name="correo" type="email" inputmode="email" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        </div>
+
+        <div class="campo">
+          <label for="clave">Contraseña</label>
+          <div class="campo-clave">
+            <input id="clave" name="clave" type="password" autocomplete="current-password" required>
+            <button class="boton-ver" id="boton-ver-clave" type="button" aria-controls="clave" aria-pressed="false">Mostrar</button>
+          </div>
+        </div>
+
+        <button class="boton boton-principal boton-ancho" id="boton-ingresar" type="submit">
+          <span class="boton-texto">Ingresar</span>
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <!-- ============================================== SIN CONFIGURACIÓN -->
+  <main class="vista vista-mensaje" id="vista-configuracion" hidden>
+    <section class="mensaje" aria-labelledby="configuracion-titulo">
+      <span class="logotipo" aria-label="Gama &amp; Talla">
+        <span class="logotipo-sello" aria-hidden="true">G&amp;T</span>
+        <span class="logotipo-texto" aria-hidden="true">Gama<span class="logotipo-amp">&amp;</span>Talla</span>
+      </span>
+      <h1 id="configuracion-titulo">Falta configurar el panel</h1>
+      <p>Este panel necesita la dirección del proyecto de Supabase y su clave publicable. Copia
+        <code>admin/config.ejemplo.js</code> como <code>admin/config.js</code> y complétalo.</p>
+    </section>
+  </main>
+
+  <!-- ================================================ SIN PERMISO -->
+  <main class="vista vista-mensaje" id="vista-denegado" hidden>
+    <section class="mensaje" aria-labelledby="denegado-titulo">
+      <span class="logotipo" aria-label="Gama &amp; Talla">
+        <span class="logotipo-sello" aria-hidden="true">G&amp;T</span>
+        <span class="logotipo-texto" aria-hidden="true">Gama<span class="logotipo-amp">&amp;</span>Talla</span>
+      </span>
+      <h1 id="denegado-titulo" tabindex="-1">Esta cuenta no tiene acceso al panel</h1>
+      <p id="denegado-texto">Ingresaste como <strong id="denegado-correo"></strong>, pero esta cuenta no figura como
+        administradora de la tienda. Si crees que es un error, revisa los permisos en Supabase.</p>
+      <button class="boton boton-principal" type="button" data-accion="salir">Cerrar sesión</button>
+    </section>
+  </main>
+
+  <!-- ============================================ ERROR DE CONEXIÓN -->
+  <main class="vista vista-mensaje" id="vista-error" hidden>
+    <section class="mensaje" aria-labelledby="error-titulo">
+      <span class="logotipo" aria-label="Gama &amp; Talla">
+        <span class="logotipo-sello" aria-hidden="true">G&amp;T</span>
+        <span class="logotipo-texto" aria-hidden="true">Gama<span class="logotipo-amp">&amp;</span>Talla</span>
+      </span>
+      <h1 id="error-titulo" tabindex="-1">No pudimos comprobar tu acceso</h1>
+      <p id="error-texto">Revisa tu conexión a internet e inténtalo de nuevo.</p>
+      <div class="mensaje-acciones">
+        <button class="boton boton-principal" type="button" data-accion="reintentar">Reintentar</button>
+        <button class="boton boton-secundario" type="button" data-accion="salir">Cerrar sesión</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===================================================== TABLERO -->
+  <div class="vista vista-tablero" id="vista-tablero" hidden>
+    <header class="barra">
+      <div class="barra-interior">
+        <span class="logotipo logotipo-barra" aria-label="Gama &amp; Talla">
+          <span class="logotipo-sello" aria-hidden="true">G&amp;T</span>
+          <span class="logotipo-texto" aria-hidden="true">Gama<span class="logotipo-amp">&amp;</span>Talla</span>
+        </span>
+        <span class="barra-panel">Panel</span>
+        <div class="barra-sesion">
+          <span class="barra-correo" id="barra-correo"></span>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="salir">Cerrar sesión</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="tablero" id="tablero">
+      <div class="tablero-cabecera">
+        <div>
+          <h1 class="tablero-titulo">Catálogo</h1>
+          <p class="tablero-resumen" id="tablero-resumen"></p>
+        </div>
+        <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
+      </div>
+
+      <form class="buscador" role="search" id="formulario-buscar">
+        <label class="buscador-etiqueta" for="buscar">Buscar por código interno, referencia, marca o modelo</label>
+        <input class="buscador-campo" id="buscar" type="search" autocomplete="off" spellcheck="false" placeholder="Ej.: GT-00012, Samba o Nike">
+      </form>
+
+      <dl class="leyenda" id="leyenda" aria-label="Estados de las tallas" hidden>
+        <div><dt><span class="talla talla-disponible" aria-hidden="true">40</span></dt><dd>Disponible</dd></div>
+        <div><dt><span class="talla talla-revisar" aria-hidden="true">40</span></dt><dd>Por revisar</dd></div>
+        <div><dt><span class="talla talla-agotada" aria-hidden="true">40</span></dt><dd>Agotada</dd></div>
+        <div><dt><span class="talla talla-oculta" aria-hidden="true">40</span></dt><dd>No visible en la tienda</dd></div>
+      </dl>
+
+      <p class="tablero-estado" id="tablero-estado" role="status" aria-live="polite"></p>
+      <div class="tablero-aviso" id="tablero-aviso" hidden></div>
+      <ul class="productos" id="lista-productos" aria-label="Zapatillas del catálogo"></ul>
+    </main>
+  </div>
+</body>
+</html>

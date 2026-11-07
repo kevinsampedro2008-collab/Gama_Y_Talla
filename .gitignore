@@ -18,6 +18,8 @@ supabase/.env.*
 !supabase/.env.example
 !supabase/.env.*.example
 .env.keys
+# Configuración local del panel privado (URL y clave publicable). Se versiona config.ejemplo.js.
+admin/config.js
 *.pem
 *.key
 *.p12
