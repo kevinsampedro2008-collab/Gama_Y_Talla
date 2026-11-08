@@ -127,13 +127,31 @@
           <h1 class="tablero-titulo">Catálogo</h1>
           <p class="tablero-resumen" id="tablero-resumen"></p>
         </div>
-        <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
+        <div class="tablero-botones">
+          <button class="boton boton-secundario boton-compacto" id="boton-historial" type="button" data-accion="historial" aria-controls="historial" aria-expanded="false">Historial</button>
+          <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
+        </div>
       </div>
+
+      <!-- Resultado de la última acción de disponibilidad: se conserva tras recargar los datos. -->
+      <div class="resultado-accion" id="resultado-accion" role="status" aria-live="polite" tabindex="-1" hidden></div>
+
+      <section class="historial" id="historial" aria-labelledby="historial-titulo" hidden>
+        <div class="historial-cabecera">
+          <h2 id="historial-titulo">Historial reciente de disponibilidad</h2>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="historial">Cerrar</button>
+        </div>
+        <p class="historial-estado" id="historial-estado" role="status" aria-live="polite"></p>
+        <ol class="historial-lista" id="historial-lista"></ol>
+        <button class="boton boton-secundario" id="historial-mas" type="button" data-accion="historial-mas" hidden>Ver cambios anteriores</button>
+      </section>
 
       <form class="buscador" role="search" id="formulario-buscar">
         <label class="buscador-etiqueta" for="buscar">Buscar por código interno, referencia, marca o modelo</label>
         <input class="buscador-campo" id="buscar" type="search" autocomplete="off" spellcheck="false" placeholder="Ej.: GT-00012, Samba o Nike">
       </form>
+
+      <div class="filtros" id="filtros" role="group" aria-label="Mostrar zapatillas según el estado de sus tallas" hidden></div>
 
       <dl class="leyenda" id="leyenda" aria-label="Estados de las tallas" hidden>
         <div><dt><span class="talla talla-disponible" aria-hidden="true">40</span></dt><dd>Disponible</dd></div>
@@ -146,6 +164,33 @@
       <div class="tablero-aviso" id="tablero-aviso" hidden></div>
       <ul class="productos" id="lista-productos" aria-label="Zapatillas del catálogo"></ul>
     </main>
+
+    <!-- Acciones sobre las tallas seleccionadas (una variante a la vez). -->
+    <div class="barra-acciones" id="barra-acciones" role="region" aria-label="Acciones de disponibilidad" hidden>
+      <div class="barra-acciones-interior">
+        <p class="barra-acciones-resumen" id="seleccion-resumen"></p>
+        <div class="barra-acciones-botones">
+          <button class="boton boton-principal boton-compacto" type="button" data-accion="proveedor">Confirmó el proveedor</button>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="publicacion">Nueva publicación</button>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="agotada">Marcar agotada</button>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="revisar">Dejar por revisar</button>
+          <button class="boton boton-texto boton-compacto" type="button" data-accion="deseleccionar">Quitar selección</button>
+        </div>
+      </div>
+    </div>
+
+    <dialog class="dialogo" id="dialogo-accion" aria-labelledby="dialogo-titulo">
+      <form class="dialogo-formulario" id="formulario-accion" method="dialog" novalidate>
+        <h2 class="dialogo-titulo" id="dialogo-titulo"></h2>
+        <div class="dialogo-cuerpo" id="dialogo-cuerpo"></div>
+        <p class="aviso aviso-error" id="dialogo-error" role="alert" hidden></p>
+        <p class="dialogo-progreso" id="dialogo-progreso" role="status" aria-live="polite"></p>
+        <div class="dialogo-acciones">
+          <button class="boton boton-secundario" type="button" data-accion="cancelar-dialogo">Cancelar</button>
+          <button class="boton boton-principal" id="dialogo-confirmar" type="submit"></button>
+        </div>
+      </form>
+    </dialog>
   </div>
 </body>
 </html>

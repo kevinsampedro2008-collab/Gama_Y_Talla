@@ -1,7 +1,47 @@
-# Panel privado de Gama & Talla · etapa 15A
+# Panel privado de Gama & Talla · etapas 15A y 15B
 
-Ingreso con correo y contraseña y tablero de **consulta** del catálogo. Todavía no edita nada: la
-disponibilidad y la carga del catálogo llegan en 15B; la administración completa, en la etapa 16.
+Ingreso con correo y contraseña, tablero del catálogo y **gestión de la disponibilidad de las tallas**
+(15B). La creación y edición de productos, colores, precios y fotos llega en la etapa 16; hasta
+entonces el catálogo remoto sigue vacío.
+
+## Gestionar la disponibilidad (15B)
+
+1. Busca la zapatilla (código interno, referencia, marca o modelo) y, si quieres, filtra por
+   «Con tallas disponibles», «por revisar», «agotadas» o «Con elementos ocultos». Un producto aparece
+   en todos los filtros que le correspondan: puede tener tallas en varios estados a la vez.
+2. Pulsa una o varias tallas **de un mismo color**. Debajo aparece su detalle (estado en la tienda,
+   estado guardado, vigencia y procedencia) y abajo la barra de acciones. Pulsar una talla de otro
+   color empieza una selección nueva. La selección se guarda por el UUID real de cada talla.
+3. Elige la acción. Un diálogo resume modelo, color y tallas, explica el efecto y pide confirmación:
+
+| Acción | Qué hace | Cuándo usarla |
+|---|---|---|
+| **Confirmó el proveedor** | `fn_confirmar_por_proveedor`: el servidor pone la fecha de confirmación; la vigencia empieza ahí y dura las horas indicadas (por omisión, la de la tienda: 48 h; máximo 60). La publicación original se conserva | El proveedor te confirmó directamente que hay |
+| **Nueva publicación** | `fn_confirmar_por_publicacion`: pide la **fecha y hora originales** de la publicación, en hora de Colombia (UTC−5, sin horario de verano); no se rellena con «ahora». La vigencia empieza en esa fecha. Si ya pasó, la talla queda por revisar | El proveedor volvió a publicar el modelo |
+| **Marcar agotada** | `fn_marcar_agotada`, con nota interna opcional. No borra nada | El proveedor confirmó que no hay |
+| **Dejar por revisar** | Pone el estado en `REVISAR` (una sola escritura, permitida por el RLS de administrador). No inventa fechas ni confirma nada | No sabes si hay; distinto de «agotada» |
+
+- Las confirmaciones **reactivan** una talla desactivada (`activa = true`); el diálogo lo avisa antes.
+  Ninguna acción publica un producto o un color ocultos.
+- El estado que ve el cliente lo sigue calculando Supabase; el panel no usa el reloj del navegador.
+- **Historial:** el botón «Historial» muestra los cambios recientes de las tallas (fecha en hora de
+  Colombia, qué cambió y quién: «Tú», otra cuenta o «Sistema o mantenimiento»). Es solo lectura.
+
+### Cómo se protege cada operación
+
+- Antes de escribir se comprueban la sesión, el permiso (`fn_es_administrador()`) y que la selección
+  siga vigente: si alguna talla cambió desde que se cargó (`actualizado_en`), no se aplica nada.
+- Mientras se aplica, todo lo demás queda bloqueado: no hay envíos dobles ni acciones cruzadas.
+- Las tres funciones trabajan **talla a talla**: con varias tallas son varias solicitudes, no una
+  operación única, y el resultado dice cuáles se aplicaron y cuáles no. «Dejar por revisar» es una
+  sola escritura para toda la selección.
+- Sin reintentos automáticos. Si se pierde la conexión, el panel vuelve a consultar la talla antes de
+  permitir repetir: informa si se aplicó o no. Si tampoco puede comprobarlo, vacía la lista y bloquea
+  las acciones hasta que «Actualizar» traiga el estado real.
+- Después de cada acción los datos se recargan desde el servidor, conservando búsqueda, filtro y
+  posición. Las lecturas se piden por páginas ordenadas, sin truncarse en el límite de la API.
+- Las columnas internas de las tallas se leen con `fn_admin_tallas()`; las escrituras solo devuelven
+  columnas públicas.
 
 ## Abrirlo en local
 
@@ -72,6 +112,13 @@ npx --yes supabase@3.0.0 stop --no-backup
 ```
 
 Las pruebas crean usuarios y productos **ficticios** en el stack local con su clave de servicio
-local, los borran al terminar y se niegan a correr si la API no está en `127.0.0.1`. Usan un solo
+local, los borran al terminar y se niegan a correr si la API no está en `127.0.0.1`. Necesitan el
+catálogo local vacío al empezar. Si una ejecución anterior se interrumpió antes de limpiar (por
+ejemplo, si cae el navegador), retiran primero esos restos —solo los nombres, marcas y correos
+`@gamaytalla.test` que ellas mismas crean— y lo anuncian en la salida.
+
+Para ver el panel con muchos productos se pueden cargar en local los 28 **ejemplos** de la tienda
+(`supabase/local/semilla-28-productos.sql`). Son datos de demostración: nunca se cargan en el
+proyecto remoto. Usan un solo
 proceso (`--workers=1`): el servidor de Python no aguanta conexiones en paralelo. Las capturas se
 guardan en la carpeta temporal del sistema (`gama-talla-15a-capturas`), fuera del repositorio.

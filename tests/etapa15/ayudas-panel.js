@@ -114,6 +114,74 @@ export async function borrarCatalogo(catalogo) {
   if (productos) await servicio('DELETE', `/rest/v1/productos?id=in.(${productos})`);
 }
 
+// Restos de una ejecución INTERRUMPIDA (p. ej. si el navegador cae antes del afterAll): solo los
+// datos con los nombres, marcas y correos que crean estas pruebas. Se anuncia lo que se retira;
+// no se usa entre pruebas de una misma ejecución.
+export async function limpiarRestosDePruebas() {
+  const nombres = ['Corredora Ficticia', 'Clásica Pérez', 'Retirada', 'Disponibilidad', 'Oculta'];
+  const marcas = ['Marca Norte', 'Marca Sur', 'Marca Este', 'Marca Prueba'];
+  const productos = (await servicio('GET', `/rest/v1/productos?select=id,nombre,variantes(id)&marca=in.(${marcas.map((m) => `"${m}"`).join(',')})`))
+    .filter((p) => nombres.some((n) => p.nombre.startsWith(`${n} `)));
+  if (productos.length) {
+    await borrarCatalogo({ productos, variantes: productos.flatMap((p) => p.variantes) });
+  }
+  const usuarios = (await servicio('GET', '/auth/v1/admin/users?per_page=1000')).users
+    .filter((u) => String(u.email).endsWith('@gamaytalla.test'));
+  for (const u of usuarios) { await quitarAdmin(u.id).catch(() => null); await borrarUsuario(u.id); }
+  if (productos.length || usuarios.length) {
+    console.log(`Restos de una ejecución interrumpida retirados: ${productos.length} productos y ${usuarios.length} usuarios ficticios.`);
+  }
+}
+
+// 15B · Catálogo FICTICIO para la disponibilidad: un producto visible con un color visible
+// (tallas 38–42 por revisar y la 43 desactivada) y un color oculto, y un producto oculto.
+export async function crearCatalogoDisponibilidad(sufijo) {
+  const creado = { productos: [], variantes: [] };
+  try {
+    creado.productos = await servicio('POST', '/rest/v1/productos?select=id,codigo_interno', [
+      { nombre: `Disponibilidad ${sufijo}`, marca: 'Marca Prueba', categoria: 'Running', referencia_proveedor: `DISP-${sufijo}`, orden: 1, activo: true },
+      { nombre: `Oculta ${sufijo}`, marca: 'Marca Prueba', categoria: 'Urbanas', referencia_proveedor: `OCUL-${sufijo}`, orden: 2, activo: false }
+    ], 'return=representation');
+    const [pv, po] = creado.productos;
+    creado.variantes = await servicio('POST', '/rest/v1/variantes?select=id,codigo_variante,producto_id', [
+      { producto_id: pv.id, color: 'Negro', precio: 250000, precio_anterior: 0, orden: 1, activa: true },
+      { producto_id: pv.id, color: 'Verde', precio: 250000, precio_anterior: 0, orden: 2, activa: false },
+      { producto_id: po.id, color: 'Gris', precio: 199000, precio_anterior: 0, orden: 1, activa: true }
+    ], 'return=representation');
+    const [vNegro, vVerde, vGris] = creado.variantes;
+    const filas = [
+      ...['38', '39', '40', '41', '42'].map((t) => ({ variante_id: vNegro.id, talla: t, activa: true })),
+      { variante_id: vNegro.id, talla: '43', activa: false },
+      { variante_id: vVerde.id, talla: '40', activa: true },
+      { variante_id: vGris.id, talla: '39', activa: true }
+    ];
+    const tallas = await servicio('POST', '/rest/v1/tallas?select=id,talla,variante_id', filas, 'return=representation');
+    const id = (variante, talla) => tallas.find((t) => t.variante_id === variante.id && t.talla === talla).id;
+    return {
+      ...creado,
+      negro: vNegro, verde: vVerde, gris: vGris,
+      talla: (color, t) => id({ negro: vNegro, verde: vVerde, gris: vGris }[color], t),
+      tallas
+    };
+  } catch (error) {
+    await borrarCatalogo(creado).catch(() => null);
+    throw error;
+  }
+}
+
+const COLUMNAS = 'id,talla,estado,activa,publicado_en,confirmado_en,vigencia_desde,vence_en,vigencia_horas,origen,nota,actualizado_en';
+export async function leerTallas(ids) {
+  const filas = await servicio('GET', `/rest/v1/tallas?select=${COLUMNAS}&id=in.(${ids.join(',')})`);
+  return Object.fromEntries(filas.map((f) => [f.id, f]));
+}
+export const ajustarTalla = (id, campos) => servicio('PATCH', `/rest/v1/tallas?id=eq.${id}`, campos);
+export async function leerProductos(ids) {
+  return servicio('GET', `/rest/v1/productos?select=id,activo,variantes(id,activa)&id=in.(${ids.join(',')})`);
+}
+export async function historialDe(id) {
+  return servicio('GET', `/rest/v1/historial?select=operacion,cambios,autor,fila_nueva&tabla=eq.tallas&fila_id=eq.${id}&order=id.asc`);
+}
+
 // El panel recibe la configuración del stack local en lugar de admin/config.js.
 export async function configurarPanel(page, { url, clave } = {}) {
   const e = entorno();

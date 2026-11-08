@@ -14,7 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   PANEL, SITIO, CLAVE_SESION, entorno, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin,
-  contarProductos, crearCatalogo, borrarCatalogo, configurarPanel, ingresar, revisarDisposicion
+  contarProductos, crearCatalogo, borrarCatalogo, configurarPanel, ingresar, revisarDisposicion, limpiarRestosDePruebas
 } from './ayudas-panel.js';
 
 test.describe.configure({ mode: 'serial' });
@@ -28,6 +28,7 @@ let admin; let sinPermiso; let revocable; let catalogo = null; let sufijo;
 
 test.beforeAll(async ({}, info) => {
   entorno(); // se niega a seguir si la API no es local
+  await limpiarRestosDePruebas();
   sufijo = `${info.project.name}-${Date.now().toString(36)}`;
   admin = await crearUsuario(`admin-${sufijo}@gamaytalla.test`);
   sinPermiso = await crearUsuario(`sesion-${sufijo}@gamaytalla.test`);
