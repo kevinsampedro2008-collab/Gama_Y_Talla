@@ -6,7 +6,14 @@ import { nuevaPagina, irATienda, URL_REAL } from '../etapa9/ayudas.js';
 // URL ficticia de la vista pública: las pruebas la interceptan, no hay red real.
 export const URL_SUPABASE = 'https://ejemplo.supabase.co/rest/v1/catalogo_publico?select=*&order=orden';
 export const CLAVE_CARRITO = 'gama-talla-carrito-v3';
-export const CLAVE_CACHE = 'gama-talla-catalogo-cache';
+// Clave publicable FICTICIA con formato válido (etapa 16: solo se admiten formatos explícitos).
+export const CLAVE_PUBLICABLE_FICTICIA = 'sb_publishable_CLAVE_FICTICIA_DE_PRUEBA_14';
+// Etapa 16: la caché lleva formato y proyecto; la anterior se retira y nunca se usa.
+export const CLAVE_CACHE = 'gama-talla-catalogo-v2';
+export const CLAVE_CACHE_ANTERIOR = 'gama-talla-catalogo-cache';
+export const PROYECTO = new URL(URL_SUPABASE).origin;
+// Un catálogo REAL guardado en este navegador para el proyecto de las pruebas.
+export const cacheReal = (productos, fecha = Date.now() - 36e5, proyecto = PROYECTO) => ({ formato: 2, proyecto, fecha, productos });
 
 // Catálogo migrado real, generado en la etapa 13 por la migración en seco.
 export const CATALOGO_MIGRADO = JSON.parse(fs.readFileSync('supabase/local/vista-publica.json', 'utf8')).productos;
@@ -48,12 +55,12 @@ export function sinTalla(catalogo, nombre, talla) {
 /* Abre la tienda leyendo de «Supabase». `respuesta` decide qué contesta el servidor:
    un catálogo (array), o {fallo: 500 | 'red'} para simular que no responde. */
 export async function tiendaConSupabase({ browser, browserName }, vista, cuerpo, opciones = {}) {
-  const { respuesta = CATALOGO_MIGRADO, carrito = null, cache = null, reducido = true } = opciones;
+  const { respuesta = CATALOGO_MIGRADO, carrito = null, cache = null, reducido = true, tarjetas = true } = opciones;
   // `config` sustituye por completo a GAMA_TALLA_CONFIG; null = no se declara ninguna.
   // Así se simula un despliegue sin configurar (fuenteLocal: false = «esto es producción»).
   const config = 'config' in opciones
     ? opciones.config
-    : { catalogoUrl: URL_SUPABASE, catalogoClave: 'clave-publica-de-prueba' };
+    : { catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA };
   const { contexto, pagina, problemas } = await nuevaPagina(browser, browserName, vista, { reducido });
   try {
     await pagina.addInitScript(([conf, carritoPrevio, claveCarrito, cacheGuardada, claveCache]) => {
@@ -73,7 +80,7 @@ export async function tiendaConSupabase({ browser, browserName }, vista, cuerpo,
       await ruta.fulfill({ status: 200, contentType: 'application/json; charset=utf-8', body: JSON.stringify(actual) });
     });
 
-    await irATienda(pagina, opciones.url || URL_REAL);
+    await irATienda(pagina, opciones.url || URL_REAL, { tarjetas });
     await cuerpo(pagina, { peticiones, problemas });
   } finally {
     await contexto.close();

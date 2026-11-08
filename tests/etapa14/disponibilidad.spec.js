@@ -4,7 +4,8 @@ import { test, expect } from '@playwright/test';
 import { VISTAS, CELULAR, ESCRITORIO, enTienda, abrirDetalle, mostrarTodo, sinDesborde } from '../etapa9/ayudas.js';
 import {
   CATALOGO_MIGRADO, conEstados, sinTalla, tiendaConSupabase, estadosDeTallas,
-  lineasDelCarrito, guardadoV3, abrirCarritoDesdeCabecera, textoDe, CLAVE_CARRITO, CLAVE_CACHE
+  lineasDelCarrito, guardadoV3, abrirCarritoDesdeCabecera, textoDe, CLAVE_CARRITO, CLAVE_CACHE,
+  CLAVE_CACHE_ANTERIOR, PROYECTO, cacheReal
 } from './ayudas-etapa14.js';
 
 const SAMBA = 'SAMBA';
@@ -284,7 +285,7 @@ test.describe('Modo respaldo', () => {
 
   for (const [nombre, fallo] of [['error 500', { fallo: 500 }], ['caída de red', { fallo: 'red' }]]) {
     test(`${nombre} con caché: modo consulta, todo por revisar y el carrito intacto`, async ({ browser, browserName }) => {
-      const cache = { texto: JSON.stringify(conEstados(CATALOGO_MIGRADO, SAMBA, { 40: 'DISPONIBLE' })), fecha: Date.now() - 36e5 };
+      const cache = cacheReal(conEstados(CATALOGO_MIGRADO, SAMBA, { 40: 'DISPONIBLE' }));
       await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
         const r = await pagina.evaluate(() => ({
           respaldo: estado.respaldo,
@@ -305,18 +306,35 @@ test.describe('Modo respaldo', () => {
     });
   }
 
-  test('sin caché: se usa el JSON del repositorio, también en modo consulta', async ({ browser, browserName }) => {
+  // Etapa 16: los 28 productos del JSON son EJEMPLOS y nunca sustituyen al catálogo real.
+  test('sin caché: no se muestran los ejemplos del JSON; aviso de conexión y carrito intacto', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
-      const r = await pagina.evaluate(() => ({
-        respaldo: estado.respaldo,
-        productos: estado.productos.length,
-        disponibles: estado.productos.reduce((a, p) => a + p.tallasDisponibles.length, 0)
-      }));
-      expect(r.respaldo?.motivo).toBe('json');
-      expect(r.productos).toBe(28);
-      expect(r.disponibles, 'el JSON tampoco se presenta como confirmado').toBe(0);
-      await expect(pagina.locator('#aviso-respaldo')).toBeVisible();
-    }, { respuesta: { fallo: 500 }, carrito });
+      const r = await pagina.evaluate(() => ({ productos: estado.productos.length, listo: estado.catalogoListo }));
+      expect(r.productos, 'ningún ejemplo se presenta como catálogo').toBe(0);
+      expect(r.listo).toBe(false);
+      await expect(pagina.locator('.estado-catalogo h3')).toHaveText('No pudimos cargar las zapatillas');
+      await expect(pagina.locator('.estado-catalogo')).toContainText('Comprueba tu conexión');
+      await expect(pagina.locator('.tarjeta')).toHaveCount(0);
+      const pedidos = await pagina.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+      expect(pedidos.filter((n) => n.includes('productos.json')), 'ni se pidió el JSON de ejemplos').toEqual([]);
+      expect((await guardadoV3(pagina)).lineas, 'un fallo de conexión no vacía el carrito').toHaveLength(1);
+    }, { respuesta: { fallo: 500 }, carrito, tarjetas: false });
+  });
+
+  test('una caché antigua (sin proyecto) o de otro proyecto no se usa como catálogo', async ({ browser, browserName }) => {
+    for (const cache of [
+      { clave: CLAVE_CACHE_ANTERIOR, valor: { texto: JSON.stringify(CATALOGO_MIGRADO), fecha: Date.now() } },
+      { clave: CLAVE_CACHE, valor: cacheReal(CATALOGO_MIGRADO, Date.now(), 'https://otro-proyecto.supabase.co') },
+      { clave: CLAVE_CACHE, valor: { ...cacheReal(CATALOGO_MIGRADO), formato: 1 } }
+    ]) {
+      await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
+        await pagina.evaluate(([c, v]) => localStorage.setItem(c, JSON.stringify(v)), [cache.clave, cache.valor]);
+        await pagina.reload();
+        await expect(pagina.locator('.estado-catalogo h3')).toHaveText('No pudimos cargar las zapatillas');
+        expect(await pagina.evaluate(() => estado.productos.length)).toBe(0);
+        expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_CACHE_ANTERIOR), 'la caché anterior se retira').toBeNull();
+      }, { respuesta: { fallo: 'red' }, tarjetas: false });
+    }
   });
 
   test('al recuperarse la conexión, el aviso desaparece y vuelven los estados reales', async ({ browser, browserName }) => {
@@ -331,14 +349,14 @@ test.describe('Modo respaldo', () => {
       }));
       expect(r.respaldo).toBeNull();
       expect(r.disponibles).toBeGreaterThan(0);
-    }, { respuesta: (n) => (n === 1 ? { fallo: 500 } : bueno) });
+    }, { respuesta: (n) => (n === 1 ? { fallo: 500 } : bueno), cache: cacheReal(CATALOGO_MIGRADO) });
   });
 
   test('el catálogo bueno se guarda en caché para el próximo fallo', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       const cache = await pagina.evaluate((c) => JSON.parse(localStorage.getItem(c) || 'null'), CLAVE_CACHE);
-      expect(cache?.texto, 'se guardó el catálogo').toBeTruthy();
-      expect(JSON.parse(cache.texto)).toHaveLength(28);
+      expect(cache, 'se guardó el catálogo con su formato y su proyecto').toMatchObject({ formato: 2, proyecto: PROYECTO });
+      expect(cache.productos).toHaveLength(28);
     });
   });
 });

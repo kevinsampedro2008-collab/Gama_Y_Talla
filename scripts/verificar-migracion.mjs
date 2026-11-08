@@ -34,6 +34,7 @@ const exigir = (prueba, ok, detalle = '') => {
 
 const navegador = await chromium.launch();
 const contexto = await navegador.newContext();
+await contexto.route(new URL('/config.js', URL_TIENDA).href, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
 const pagina = await contexto.newPage();
 const problemas = [];
 pagina.on('pageerror', (e) => problemas.push(`EXCEPCIÓN: ${e.message}`));
@@ -165,8 +166,10 @@ const conEstados = (texto, cambios) => {
 
 // Abre la tienda en un contexto nuevo. El carrito se siembra solo si no existe, para que
 // una recarga demuestre que lo que queda es lo que la tienda guardó.
-async function abrirTienda({ catalogo, carritoGuardado, configuracion = null }) {
+async function abrirTienda({ catalogo, carritoGuardado, configuracion = null, cache = null }) {
   const ctx = await navegador.newContext();
+  // Etapa 16: la tienda carga config.js (no versionado); aquí se sirve vacío.
+  await ctx.route(new URL('/config.js', URL_TIENDA).href, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
   const p = await ctx.newPage();
   const excepciones = [];
   p.on('pageerror', (e) => excepciones.push(e.message));
@@ -177,6 +180,7 @@ async function abrirTienda({ catalogo, carritoGuardado, configuracion = null }) 
     await p.route(`${configuracion.catalogoUrl}*`, (r) => r.abort('connectionrefused'));
     await p.addInitScript((c) => { window.GAMA_TALLA_CONFIG = c; }, configuracion);
   }
+  if (cache) await p.addInitScript((c) => { localStorage.setItem('gama-talla-catalogo-v2', JSON.stringify(c)); }, cache);
   await p.addInitScript(([clave, texto]) => {
     if (localStorage.getItem(clave) === null) localStorage.setItem(clave, texto);
   }, [CLAVE_CARRITO, JSON.stringify(carritoGuardado)]);
@@ -298,17 +302,19 @@ exigir('Escenarios con productos de nombre distinto (para leer los mensajes sin 
 }
 
 // ---- C. Fallo de conexión: la fuente de Supabase no responde --------------------------
-// El JSON de respaldo dice incluso que la talla A está agotada: un fallo de conexión no es
-// un agotado, así que no se retira nada y todo queda para consultar.
+// El último catálogo real guardado (caché del mismo proyecto) dice incluso que la talla A
+// está agotada: un fallo de conexión no es un agotado, así que no se retira nada y todo queda
+// para consultar. Etapa 16: el respaldo ya no es el JSON de ejemplos, sino esa caché real.
 {
   const catalogo = conEstados(migrado, [
     { producto: lineaA.producto, variante: lineaA.variante, talla: lineaA.talla, estado: 'AGOTADO' },
     { producto: lineaB.producto, variante: lineaB.variante, talla: lineaB.talla, estado: 'DISPONIBLE' }
   ]);
   const configuracion = { catalogoUrl: 'http://127.0.0.1:9/rest/v1/catalogo_publico', catalogoClave: 'sb_publishable_verificacion_local' };
-  const { ctx, p, excepciones } = await abrirTienda({ catalogo, carritoGuardado: carritoPrevio, configuracion });
+  const cache = { formato: 2, proyecto: 'http://127.0.0.1:9', fecha: Date.now() - 36e5, productos: JSON.parse(catalogo).productos };
+  const { ctx, p, excepciones } = await abrirTienda({ catalogo, carritoGuardado: carritoPrevio, configuracion, cache });
   const c = await leerEstado(p);
-  exigir('Sin conexión: la tienda entra en modo consulta con el JSON de respaldo', c.respaldo === 'json', `respaldo=${c.respaldo}`);
+  exigir('Sin conexión: la tienda entra en modo consulta con el último catálogo real guardado', c.respaldo === 'cache', `respaldo=${c.respaldo}`);
   exigir('Sin conexión: no se retira ninguna línea, ni la que el respaldo da por agotada',
     JSON.stringify(c.memoria) === JSON.stringify(esencial(carritoPrevio.lineas)) && c.guardado === JSON.stringify(carritoPrevio) && c.aviso === '',
     JSON.stringify(c.memoria));

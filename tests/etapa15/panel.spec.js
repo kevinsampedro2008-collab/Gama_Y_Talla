@@ -22,7 +22,8 @@ test.describe.configure({ mode: 'serial' });
 const CAPTURAS = path.join(os.tmpdir(), 'gama-talla-15a-capturas');
 const ANCHOS = [360, 390, 768, 1024, 1440];
 const CARRITO = { version: 3, lineas: [{ producto: 'ADD-SAM~zapatilla-01', variante: 'unica', talla: '40', cantidad: 2, precio: 100000 }], pendientes: [] };
-const CACHE = { texto: '{"productos":[]}', fecha: 1700000000000 };
+// Etapa 16: la caché de la tienda usa una clave con formato y proyecto (la anterior se retira al visitarla).
+const CACHE = { formato: 2, proyecto: 'https://ejemplo.supabase.co', fecha: 1700000000000, productos: [] };
 
 let admin; let sinPermiso; let revocable; let catalogo = null; let sufijo;
 
@@ -281,14 +282,14 @@ test('cierre de sesión y conservación del carrito y la caché de la tienda', a
   await page.goto(PANEL);
   await page.evaluate(([c, ca]) => {
     localStorage.setItem('gama-talla-carrito-v3', JSON.stringify(c));
-    localStorage.setItem('gama-talla-catalogo-cache', JSON.stringify(ca));
+    localStorage.setItem('gama-talla-catalogo-v2', JSON.stringify(ca));
   }, [CARRITO, CACHE]);
-  const antes = await page.evaluate(() => ({ carrito: localStorage.getItem('gama-talla-carrito-v3'), cache: localStorage.getItem('gama-talla-catalogo-cache') }));
+  const antes = await page.evaluate(() => ({ carrito: localStorage.getItem('gama-talla-carrito-v3'), cache: localStorage.getItem('gama-talla-catalogo-v2') }));
 
   await ingresar(page, admin);
   await expect(tablero(page)).toBeVisible();
   const refresco = await page.evaluate((k) => JSON.parse(localStorage.getItem(k)).refresh_token, CLAVE_SESION);
-  const clavesPanel = await page.evaluate(() => Object.keys(localStorage).filter((k) => !k.startsWith('gama-talla-carrito') && k !== 'gama-talla-catalogo-cache'));
+  const clavesPanel = await page.evaluate(() => Object.keys(localStorage).filter((k) => !k.startsWith('gama-talla-carrito') && k !== 'gama-talla-catalogo-v2'));
   expect(clavesPanel.every((k) => k.startsWith('gama-talla-panel-sesion')), `el panel solo usa su clave: ${clavesPanel}`).toBe(true);
 
   // La tienda, en el mismo navegador, sigue consultando como visitante y conserva el carrito.
@@ -306,7 +307,7 @@ test('cierre de sesión y conservación del carrito y la caché de la tienda', a
   await expect(page.locator('#aviso-ingreso')).toHaveText('Cerraste la sesión en este dispositivo.');
   const despues = await page.evaluate(() => ({
     carrito: localStorage.getItem('gama-talla-carrito-v3'),
-    cache: localStorage.getItem('gama-talla-catalogo-cache'),
+    cache: localStorage.getItem('gama-talla-catalogo-v2'),
     panel: Object.keys(localStorage).filter((k) => k.startsWith('gama-talla-panel-sesion'))
   }));
   expect(despues.panel, 'no queda sesión del panel').toEqual([]);

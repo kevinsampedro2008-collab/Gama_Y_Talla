@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 import { VISTAS, CELULAR, ESCRITORIO, abrirDetalle, detalleQuieto, sinDesborde } from '../etapa9/ayudas.js';
 import {
   CATALOGO_MIGRADO, conEstados, tiendaConSupabase, guardadoV3, abrirCarritoDesdeCabecera,
-  textoDe, CLAVE_CARRITO
+  textoDe, CLAVE_CARRITO, URL_SUPABASE, cacheReal, CLAVE_PUBLICABLE_FICTICIA
 } from './ayudas-etapa14.js';
 
 const SAMBA = 'SAMBA';
@@ -238,7 +238,7 @@ test.describe('Generar un mensaje nunca vacía el carrito', () => {
     }, { carrito });
   });
 
-  test('modo consulta (producción sin configuración): se puede consultar y no pedir', async ({ browser, browserName }) => {
+  test('modo consulta (Supabase sin respuesta, caché real): se puede consultar y no pedir', async ({ browser, browserName }) => {
     const carrito = carritoV3([lineaV3(CATALOGO_MIGRADO, SAMBA, '40', 2)]);
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await abrirCarritoDesdeCabecera(pagina);
@@ -248,7 +248,7 @@ test.describe('Generar un mensaje nunca vacía el carrito', () => {
       const mensaje = textoDe(await href(pagina, '#carrito-consultar'));
       expect(mensaje).toContain('CONSULTA DE DISPONIBILIDAD');
       expect(mensaje).toContain('* Cantidad: 2');
-    }, { config: { fuenteLocal: false }, carrito });
+    }, { config: { fuenteLocal: false, catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, respuesta: { fallo: 500 }, cache: cacheReal(CATALOGO_MIGRADO), carrito });
   });
 });
 

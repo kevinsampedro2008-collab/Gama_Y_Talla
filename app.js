@@ -12,14 +12,25 @@ const CONFIG = {
   whatsapp: "573124745942", // Sustituir por el número real antes de publicar.
   horario: "",
   mensajeGeneral: "Hola, quiero consultar los modelos y tallas disponibles en Gama & Talla.",
+  // Los 28 productos de este JSON son EJEMPLOS: solo se muestran en desarrollo (localhost,
+  // file://) o con fuenteLocal: true. Nunca son el respaldo del catálogo real.
   datosUrl: "data/productos.json",
-  // Vista pública de Supabase. Vacío = se lee el JSON local (comportamiento actual).
-  // Al rellenarla, la tienda pasa a leer de Supabase sin tocar nada más.
+  // Proyecto de Supabase (o la URL completa de su vista catalogo_publico). Vacío = sin
+  // configurar. Se declara FUERA del código, en config.js (ver config.ejemplo.js).
   catalogoUrl: "",
   catalogoClave: "",          // clave pública (sb_publishable_ o anon). Nunca la secreta: iría al navegador.
-  claveRechazada: "",         // se rellena sola si la clave declarada era secreta (ver más abajo)
-  // Último catálogo bueno, para poder seguir mostrando la tienda si Supabase no responde.
-  claveCache: "gama-talla-catalogo-cache",
+  claveRechazada: "",         // se rellena sola si la clave declarada no es un formato admitido (ver más abajo)
+  tipoClave: "",              // «publicable» o «jwt-anon»: decide las cabeceras (ver cabecerasPublicas)
+  claveSecreta: false,        // la clave rechazada era secreta (el aviso pide revocarla)
+  // Último catálogo REAL bueno, para seguir mostrando la tienda en modo consulta si Supabase no
+  // responde. Lleva el proyecto y la versión de formato: una caché de otro proyecto, de otro
+  // formato o anterior a la etapa 16 (que podía contener los ejemplos) no se usa.
+  claveCache: "gama-talla-catalogo-v2",
+  claveCacheAnterior: "gama-talla-catalogo-cache",
+  formatoCache: 2,
+  // Filas por petición a la vista: menos que el límite de la API, y se piden todas las páginas.
+  filasPorPagina: 500,
+  paginasMaximas: 40,
   // Tablas de tallas por marca; su origen está documentado en data/guias-tallas-fuentes.md.
   guiasUrl: "data/guias-tallas.json",
   // Catálogo ficticio para probar variantes de color. Solo se carga con «?datos-prueba»
@@ -42,48 +53,77 @@ const CONFIG = {
   ]
 };
 
-/* La conexión a Supabase se configura FUERA del código, para no tener que editar
-   app.js al publicar. Basta con una línea antes de cargar este archivo:
-     <script>window.GAMA_TALLA_CONFIG = { catalogoUrl: "...", catalogoClave: "..." };</script>
-   Solo se admite la clave PÚBLICA (anon): la secreta nunca debe llegar al navegador.
-   Sin configuración, la tienda lee el JSON del repositorio, como hasta ahora. */
-/* ¿Es una clave SECRETA? Se decide por su forma, sin llamar a nadie:
-     · «sb_secret_…»  → clave secreta nueva.
-     · JWT antiguo cuyo `role` es «service_role» → clave secreta antigua.
-   Se acepta todo lo demás (sb_publishable_…, anon…). Es una RED DE SEGURIDAD contra
-   un descuido al publicar, no una barrera: si una clave secreta llegó hasta aquí, ya
-   está escrita en el código de la página y hay que revocarla. La seguridad real la dan
-   el RLS y los permisos de Supabase, no esta comprobación.
-   Devuelve el TIPO detectado, nunca la clave. */
-function tipoDeClaveSecreta(clave) {
-  const texto = String(clave || "").trim();
-  if (/^sb_secret_/i.test(texto)) return "sb_secret_";
-  const partes = texto.split(".");
-  if (partes.length === 3 && partes[0].startsWith("eyJ")) {
-    try {
-      const base64 = partes[1].replace(/-/g, "+").replace(/_/g, "/");
-      const carga = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
-      if (carga?.role === "service_role") return "service_role";
-    } catch {
-      // Un JWT ilegible no permite afirmar nada: no se rechaza por sospecha.
-    }
+/* La conexión a Supabase se configura FUERA del código, en config.js (no versionado; la
+   plantilla es config.ejemplo.js), que index.html carga antes que este archivo:
+     window.GAMA_TALLA_CONFIG = { supabaseUrl: "https://<ref>.supabase.co", clavePublicable: "sb_publishable_…" };
+   Se aceptan también los nombres anteriores, catalogoUrl y catalogoClave.
+   Solo se admite la clave PÚBLICA: la secreta nunca debe llegar al navegador.
+   La tienda consulta siempre como visitante: nunca usa la sesión del panel privado.
+   Sin configuración: en desarrollo se ven los ejemplos del JSON; en producción, un aviso. */
+/* Lista EXPLÍCITA de claves admitidas (etapa 16). Se decide por su forma, sin llamar a nadie:
+     · «sb_publishable_…» con caracteres válidos   → «publicable»: viaja solo en apikey.
+     · JWT antiguo legible cuyo `role` es «anon»   → «jwt-anon»: apikey y Bearer.
+   Todo lo demás se RECHAZA y no se envía en ninguna cabecera:
+     · «sb_secret_…» y JWT con role «service_role» → claves secretas (hay que revocarlas);
+     · JWT con role «authenticated»                → el token de una sesión de usuario;
+     · JWT sin rol o con otro rol, JWT ilegible, cualquier otro texto, o ninguna clave.
+   Es una RED DE SEGURIDAD contra un descuido al publicar: la seguridad real la dan el RLS y
+   los permisos de Supabase. Devuelve el TIPO, nunca la clave. */
+function leerParteJwt(parte) {
+  if (!/^[A-Za-z0-9_-]+$/.test(parte)) return null;
+  try {
+    const base64 = parte.replace(/-/g, "+").replace(/_/g, "/");
+    const objeto = JSON.parse(atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")));
+    return objeto && typeof objeto === "object" && !Array.isArray(objeto) ? objeto : null;
+  } catch {
+    return null;
   }
-  return "";
+}
+
+function clasificarClave(clave) {
+  const texto = String(clave || "").trim();
+  if (!texto) return { rechazo: "sin-clave" };
+  if (/^sb_secret_/i.test(texto)) return { rechazo: "sb_secret_", secreta: true };
+  if (/^sb_publishable_[A-Za-z0-9_-]+$/.test(texto)) return { tipo: "publicable" };
+  const partes = texto.split(".");
+  if (partes.length === 3 && texto.startsWith("eyJ")) {
+    const cabecera = leerParteJwt(partes[0]);
+    const carga = leerParteJwt(partes[1]);
+    if (!cabecera || !carga || typeof cabecera.alg !== "string" || !/^[A-Za-z0-9_-]+$/.test(partes[2])) return { rechazo: "jwt-ilegible" };
+    if (carga.role === "anon") return { tipo: "jwt-anon" };
+    if (carga.role === "service_role") return { rechazo: "service_role", secreta: true };
+    if (carga.role === "authenticated") return { rechazo: "authenticated" };
+    return { rechazo: "rol-desconocido" };
+  }
+  return { rechazo: "formato-no-admitido" };
 }
 
 Object.assign(CONFIG, (() => {
   const fuera = globalThis.GAMA_TALLA_CONFIG;
   if (!fuera || typeof fuera !== "object") return {};
-  const texto = ["catalogoUrl", "catalogoClave"];
-  const salida = Object.fromEntries(texto
-    .filter((clave) => typeof fuera[clave] === "string")
-    .map((clave) => [clave, fuera[clave].trim()]));
+  const leer = (...claves) => {
+    const clave = claves.find((c) => typeof fuera[c] === "string");
+    return clave ? fuera[clave].trim() : undefined;
+  };
+  const salida = {};
+  const url = leer("supabaseUrl", "catalogoUrl");
+  const clave = leer("clavePublicable", "catalogoClave");
+  if (url !== undefined) salida.catalogoUrl = url;
+  if (clave !== undefined) salida.catalogoClave = clave;
   // fuenteLocal fuerza (true) o descarta (false) fiarse del JSON del repositorio.
   // Sin indicarlo, se deduce del entorno: ver esEntornoDePruebas().
   if (typeof fuera.fuenteLocal === "boolean") salida.fuenteLocal = fuera.fuenteLocal;
-  // Una clave secreta se descarta aquí mismo: ningún otro punto del código llega a verla.
-  const secreta = tipoDeClaveSecreta(salida.catalogoClave);
-  if (secreta) { salida.catalogoClave = ""; salida.claveRechazada = secreta; }
+  // Una clave no admitida se descarta aquí mismo: ningún otro punto del código llega a verla.
+  if (salida.catalogoUrl || salida.catalogoClave) {
+    const { tipo, rechazo, secreta } = clasificarClave(salida.catalogoClave);
+    if (rechazo) {
+      salida.catalogoClave = "";
+      salida.claveRechazada = rechazo;
+      salida.claveSecreta = Boolean(secreta);
+    } else {
+      salida.tipoClave = tipo;
+    }
+  }
   return salida;
 })());
 
@@ -626,11 +666,13 @@ function mostrarEstado({ titulo, mensaje, textoBoton = "", accion = "" }) {
 }
 
 /* ---------- De dónde salen los productos ----------
-   1. Supabase (vista pública), si CONFIG.catalogoUrl está puesta.
-   2. Si no responde: el último catálogo bueno guardado en este navegador.
-   3. Si tampoco lo hay: el JSON del repositorio.
-   Los niveles 2 y 3 son MODO RESPALDO: los datos comerciales pueden estar
-   desactualizados y ninguna talla se presenta como confirmada. */
+   1. Supabase (vista pública catalogo_publico), si hay configuración válida. Una respuesta
+      200 con [] es un catálogo VACÍO de verdad: no se rellena con nada.
+   2. Si no responde: el último catálogo REAL guardado en este navegador para ese mismo
+      proyecto, en MODO CONSULTA (precios y disponibilidad sin verificar, todo por revisar).
+   3. Si tampoco lo hay: un estado claro de conexión. Nunca los ejemplos del JSON.
+   Los 28 productos de data/productos.json son ejemplos de desarrollo: solo se ven en local
+   (o con fuenteLocal: true) y sin configuración de Supabase. */
 /* ¿Podemos presentar las disponibilidades del JSON del repositorio como vigentes?
    SOLO en desarrollo y pruebas. En producción, un despliegue al que se le olvidó la
    configuración NO debe mostrar las tallas antiguas del JSON como confirmadas: entra
@@ -644,14 +686,31 @@ function esEntornoDePruebas() {
   return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(location.hostname);
 }
 
-// Devuelve la URL de Supabase solo si es utilizable; si no, null (configuración inválida).
+/* Devuelve la URL de la vista (sin paginar) solo si es utilizable; si no, null. Se admite la
+   dirección del proyecto (https://<ref>.supabase.co) o la URL completa de catalogo_publico.
+   El orden se fija siempre (orden y código interno, que es único) para que las páginas no
+   se solapen ni dejen huecos. */
 function urlCatalogoValida() {
   const valor = String(CONFIG.catalogoUrl || "").trim();
   if (!valor) return null;
   try {
     // Sin base a propósito: una dirección relativa no es una URL de Supabase.
     const url = new URL(valor);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.href : null;
+    if (url.protocol !== "https:" && url.protocol !== "http:") return null;
+    if (url.username || url.password) return null;
+    const ruta = url.pathname.replace(/\/+$/, "");
+    if (ruta === "") {
+      url.pathname = "/rest/v1/catalogo_publico";
+      url.search = "";
+    } else if (ruta !== "/rest/v1/catalogo_publico") {
+      return null;
+    }
+    if (!url.searchParams.has("select")) url.searchParams.set("select", "*");
+    url.searchParams.set("order", "orden.asc,codigoInterno.asc");
+    url.searchParams.delete("limit");
+    url.searchParams.delete("offset");
+    url.hash = "";
+    return url;
   } catch {
     return null;
   }
@@ -663,65 +722,116 @@ async function traerTexto(url, opciones = {}) {
   return respuesta.text();
 }
 
-function guardarCacheCatalogo(texto) {
-  try {
-    localStorage.setItem(CONFIG.claveCache, JSON.stringify({ texto, fecha: Date.now() }));
-  } catch { /* sin espacio o sin permiso: el respaldo siguiente será el JSON */ }
+/* Cabeceras del visitante, según el TIPO admitido. Una clave sb_publishable_ NO es un JWT: va
+   solo en «apikey» (como Bearer, el servidor intentaría leerla como un token). Una clave anon
+   antigua (JWT con role anon) va también como Bearer. Una clave rechazada no va en ninguna.
+   Nunca se envía la sesión del panel: la tienda no la lee. */
+function cabecerasPublicas() {
+  const clave = CONFIG.catalogoClave;
+  if (!clave || CONFIG.claveRechazada) return {};
+  if (CONFIG.tipoClave === "publicable") return { apikey: clave };
+  if (CONFIG.tipoClave === "jwt-anon") return { apikey: clave, Authorization: `Bearer ${clave}` };
+  return {};
 }
 
-function leerCacheCatalogo() {
+// Todas las páginas de la vista. Una página incompleta es la última.
+async function traerCatalogoPublico(base) {
+  const productos = [];
+  for (let pagina = 0; pagina < CONFIG.paginasMaximas; pagina += 1) {
+    const url = new URL(base.href);
+    url.searchParams.set("limit", String(CONFIG.filasPorPagina));
+    url.searchParams.set("offset", String(pagina * CONFIG.filasPorPagina));
+    const datos = JSON.parse(await traerTexto(url.href, { headers: cabecerasPublicas(), credentials: "omit" }));
+    if (!Array.isArray(datos)) throw new Error("La vista del catálogo no devolvió una lista.");
+    productos.push(...datos);
+    if (datos.length < CONFIG.filasPorPagina) return productos;
+  }
+  throw new Error("El catálogo tiene más páginas de las previstas.");
+}
+
+function guardarCacheCatalogo(proyecto, productos) {
+  try {
+    localStorage.setItem(CONFIG.claveCache, JSON.stringify({ formato: CONFIG.formatoCache, proyecto, fecha: Date.now(), productos }));
+  } catch { /* sin espacio o sin permiso: no habrá respaldo en este navegador */ }
+}
+
+// Solo una caché del MISMO proyecto y del formato actual, con datos que vinieron de Supabase.
+function leerCacheCatalogo(proyecto) {
   try {
     const guardado = JSON.parse(localStorage.getItem(CONFIG.claveCache) || "null");
-    return guardado && typeof guardado.texto === "string" ? guardado : null;
+    const valida = guardado && guardado.formato === CONFIG.formatoCache && guardado.proyecto === proyecto
+      && Array.isArray(guardado.productos) && Number.isFinite(guardado.fecha);
+    return valida ? guardado : null;
   } catch { return null; }
+}
+
+// La caché anterior a la etapa 16 no decía de dónde venía (pudo guardar los ejemplos): se retira.
+function descartarCacheAnterior() {
+  try { if (CONFIG.claveCacheAnterior) localStorage.removeItem(CONFIG.claveCacheAnterior); } catch { /* sin almacenamiento */ }
 }
 
 async function leerFuente() {
   // El modo de prueba no toca Supabase: su catálogo ficticio es siempre local y válido.
   if (MODO_PRUEBA) return { texto: await traerTexto(CONFIG.datosPruebaUrl), respaldo: null };
+  descartarCacheAnterior();
+  const base = urlCatalogoValida();
 
   // Una clave secreta en el navegador es un error grave de publicación. No se contacta
   // con Supabase y la tienda queda en modo consulta, también en desarrollo, para que se vea.
   // El aviso nombra el TIPO de clave, jamás su valor.
   if (CONFIG.claveRechazada) {
-    console.warn(`Gama & Talla: la clave de Supabase declarada es SECRETA (${CONFIG.claveRechazada}) y se ha rechazado. Nunca debe estar en el navegador: revócala en Supabase y usa la clave publicable. La tienda queda en modo consulta.`);
-    return leerRespaldo();
+    console.warn(CONFIG.claveSecreta
+      ? `Gama & Talla: la clave de Supabase declarada es SECRETA (${CONFIG.claveRechazada}) y se ha rechazado. Nunca debe estar en el navegador: revócala en Supabase y usa la clave publicable. La tienda queda en modo consulta.`
+      : `Gama & Talla: la clave de Supabase declarada no es una clave publicable admitida (${CONFIG.claveRechazada}) y se ha rechazado. Usa la clave publicable (sb_publishable_…). La tienda queda en modo consulta.`);
+    return leerRespaldo(base?.origin, "clave-rechazada");
   }
 
-  const url = urlCatalogoValida();
-  if (!url) {
-    // Sin configuración o con una URL inválida. En desarrollo el JSON vale; en
-    // producción, NO: se muestra como respaldo y todo queda por revisar.
-    const texto = await traerTexto(CONFIG.datosUrl);
-    if (esEntornoDePruebas()) return { texto, respaldo: null };
+  if (!base) {
+    // Sin configuración o con una URL inválida. En desarrollo se ven los EJEMPLOS del JSON;
+    // en producción no hay catálogo que mostrar.
+    if (esEntornoDePruebas()) return { texto: await traerTexto(CONFIG.datosUrl), respaldo: null };
     const motivo = CONFIG.catalogoUrl ? "configuracion-invalida" : "sin-configuracion";
-    console.warn(`Gama & Talla: ${motivo}. La tienda queda en modo consulta.`);
-    return { texto, respaldo: { motivo, desde: null } };
+    console.warn(`Gama & Talla: ${motivo}. La tienda no puede mostrar el catálogo.`);
+    return { texto: "[]", respaldo: { motivo, desde: null }, sinCatalogo: true };
   }
 
   try {
-    const cabeceras = CONFIG.catalogoClave
-      ? { apikey: CONFIG.catalogoClave, Authorization: `Bearer ${CONFIG.catalogoClave}` }
-      : {};
-    const texto = await traerTexto(url, { headers: cabeceras });
-    JSON.parse(texto);                       // si no es JSON válido, vamos al respaldo
-    guardarCacheCatalogo(texto);
-    return { texto, respaldo: null };
+    const productos = await traerCatalogoPublico(base);
+    guardarCacheCatalogo(base.origin, productos);
+    return { texto: JSON.stringify(productos), respaldo: null, proyecto: base.origin, desde: Date.now() };
   } catch (error) {
-    console.warn("Gama & Talla: no pudimos leer la disponibilidad. Modo consulta.", error);
-    return leerRespaldo();
+    console.warn("Gama & Talla: no pudimos leer el catálogo. Se usa el último guardado, si lo hay, en modo consulta.", error);
+    return leerRespaldo(base.origin, "conexion");
   }
 }
 
-// Modo consulta: el último catálogo bueno de este navegador o, si no hay, el JSON del repositorio.
-async function leerRespaldo() {
-  const cache = leerCacheCatalogo();
-  if (cache) return { texto: cache.texto, respaldo: { motivo: "cache", desde: cache.fecha } };
-  return { texto: await traerTexto(CONFIG.datosUrl), respaldo: { motivo: "json", desde: null } };
+/* Modo consulta: el último catálogo REAL de este proyecto. Puede estar guardado en este
+   navegador (caché) o, si no se pudo guardar (cuota llena, almacenamiento bloqueado), seguir en
+   la memoria de esta página: se usa el más reciente. Sin ninguno de los dos no hay nada que
+   mostrar: los ejemplos del JSON no sustituyen al catálogo real. */
+function leerRespaldo(proyecto, motivo) {
+  const cache = proyecto ? leerCacheCatalogo(proyecto) : null;
+  const memoria = proyecto && estado.catalogoListo && estado.proyectoDatos === proyecto && estado.firmaDatos
+    ? { texto: estado.firmaDatos, desde: estado.datosDesde || null } : null;
+  if (memoria && (!cache || (memoria.desde || 0) >= cache.fecha)) {
+    return { texto: memoria.texto, respaldo: { motivo: "memoria", desde: memoria.desde }, proyecto, desde: memoria.desde };
+  }
+  if (cache) return { texto: JSON.stringify(cache.productos), respaldo: { motivo: "cache", desde: cache.fecha }, proyecto, desde: cache.fecha };
+  return { texto: "[]", respaldo: { motivo, desde: null }, sinCatalogo: true };
 }
 
 async function leerCatalogo() {
   const fuente = await leerFuente();
+  if (fuente.sinCatalogo) {
+    const error = new Error("No hay un catálogo real que mostrar.");
+    error.motivo = fuente.respaldo?.motivo || "conexion";
+    throw error;
+  }
+  return construirCatalogo(fuente);
+}
+
+// Del texto de una fuente al catálogo normalizado. `guias` se reutiliza al degradar.
+async function construirCatalogo(fuente, guias = null) {
   const datos = JSON.parse(fuente.texto);
   const lista = Array.isArray(datos) ? datos : datos?.productos;
   if (!Array.isArray(lista)) throw new Error("El JSON no contiene una lista de productos.");
@@ -733,10 +843,12 @@ async function leerCatalogo() {
   return {
     firma: fuente.texto,
     respaldo: fuente.respaldo,
+    proyecto: fuente.proyecto || null,
+    desde: fuente.desde || null,
     productos,
     conflictos,
     identificadoresV2: identificadoresV2(lista, productos),
-    guias: await leerGuias()
+    guias: guias || await leerGuias()
   };
 }
 
@@ -744,6 +856,8 @@ function aplicarCatalogo(catalogo) {
   const cambio = catalogo.firma !== estado.firmaDatos || Boolean(catalogo.respaldo) !== Boolean(estado.respaldo);
   estado.respaldo = catalogo.respaldo || null;
   estado.firmaDatos = catalogo.firma;
+  estado.proyectoDatos = catalogo.proyecto;
+  estado.datosDesde = catalogo.desde;
   estado.productos = catalogo.productos;
   estado.guias = catalogo.guias;
   estado.identificadoresV2 = catalogo.identificadoresV2;
@@ -774,11 +888,22 @@ async function cargarProductos() {
     validarCarrito(false);
     if (MODO_PRUEBA) mostrarAvisoPrueba();
   } catch (error) {
-    console.error("No se pudo cargar el catálogo:", error);
+    // Ya había un catálogo: no se pierde, pero deja de darse por verificado.
+    if (estado.catalogoListo) { await degradarAConsulta(error); return; }
     actualizarContador("Catálogo no disponible");
+    // El carrito no se toca: sus productos siguen guardados y se validan al volver la conexión.
+    if (error?.motivo === "sin-configuracion" || error?.motivo === "configuracion-invalida" || error?.motivo === "clave-rechazada") {
+      // Un problema de publicación, no del visitante: el detalle técnico ya está en la consola.
+      mostrarEstado({
+        titulo: "El catálogo no está disponible en este momento",
+        mensaje: "Escríbenos por WhatsApp para consultar modelos, precios y tallas mientras lo resolvemos."
+      });
+      return;
+    }
+    if (!error?.motivo) console.error("No se pudo cargar el catálogo:", error);
     mostrarEstado({
       titulo: "No pudimos cargar las zapatillas",
-      mensaje: window.location.protocol === "file:" ? "Abre la página con Live Server en Visual Studio Code. El navegador bloquea la lectura del JSON al abrir el HTML directamente." : "Ocurrió un problema al leer el catálogo. Comprueba tu conexión e inténtalo de nuevo.",
+      mensaje: window.location.protocol === "file:" ? "Abre la página con Live Server en Visual Studio Code. El navegador bloquea la lectura del JSON al abrir el HTML directamente." : "No pudimos conectar con el catálogo. Comprueba tu conexión e inténtalo de nuevo.",
       textoBoton: "Reintentar",
       accion: "reintentar"
     });
@@ -828,9 +953,54 @@ async function refrescarCatalogo() {
     }
     return true;
   } catch (error) {
-    console.warn("No se pudo actualizar el catálogo:", error);
-    return estado.catalogoListo;
+    if (!estado.catalogoListo) { console.warn("No se pudo actualizar el catálogo:", error); return false; }
+    // Un fallo de actualización nunca deja como confirmada la disponibilidad anterior.
+    await degradarAConsulta(error);
+    return true;
   }
+}
+
+/* Un fallo después de haber cargado. El catálogo que está en pantalla es real, pero ya no está
+   verificado: se vuelve a normalizar en MODO CONSULTA (todas las tallas por revisar; se puede
+   consultar, no pedir). Si ni eso fuera posible, se bloquean los pedidos sobre lo que hay.
+   Nunca se cargan los ejemplos del JSON ni se retira nada del carrito. */
+async function degradarAConsulta(motivo) {
+  console.warn("Gama & Talla: no se pudo actualizar el catálogo. Se muestra el último en modo consulta.", motivo);
+  if (!estado.respaldo) {
+    try {
+      aplicarCatalogo(await construirCatalogo({
+        texto: estado.firmaDatos,
+        respaldo: { motivo: "memoria", desde: estado.datosDesde || null },
+        proyecto: estado.proyectoDatos,
+        desde: estado.datosDesde
+      }, estado.guias));
+    } catch {
+      bloquearPedidos();
+    }
+  }
+  estado.firmaVistaCatalogo = "";
+  prepararCarrito();
+  construirFiltros();
+  renderizarCatalogo();
+  validarCarrito(false);
+  refrescarDisponibilidadDetalle();
+  if (carritoDialogo()?.open) renderizarCarrito();
+}
+
+// Último recurso: ninguna talla queda comprable; lo que había se puede consultar.
+function bloquearPedidos() {
+  estado.respaldo = { motivo: "sin-verificar", desde: null };
+  for (const producto of estado.productos) {
+    for (const variante of producto.variantes) {
+      Object.keys(variante.estadosTalla).forEach((talla) => { variante.estadosTalla[talla] = POR_REVISAR; });
+      variante.tallasPorRevisar = [...variante.tallasOfrecidas];
+      variante.tallasDisponibles = [];
+      variante.disponible = false;
+    }
+    producto.tallasPorRevisar = [...(producto.tallasOfrecidas || [])];
+    producto.tallasDisponibles = [];
+  }
+  pintarAvisoRespaldo();
 }
 
 const valoresUnicos = (campo) => [...new Set(estado.productos.map((producto) => producto[campo]).filter(Boolean))]

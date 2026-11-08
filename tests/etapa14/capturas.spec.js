@@ -2,7 +2,7 @@
 // Uso: CAPTURAS_DIR=<carpeta> CAPTURAS_ETIQUETA=despues npx playwright test tests/etapa14/capturas.spec.js
 import { test } from '@playwright/test';
 import { VISTAS, rutaCaptura, abrirDetalle, mostrarTodo } from '../etapa9/ayudas.js';
-import { CATALOGO_MIGRADO, conEstados, tiendaConSupabase, abrirCarritoDesdeCabecera } from './ayudas-etapa14.js';
+import { CATALOGO_MIGRADO, conEstados, tiendaConSupabase, abrirCarritoDesdeCabecera, cacheReal } from './ayudas-etapa14.js';
 
 const SAMBA = 'SAMBA';
 const mixto = conEstados(CATALOGO_MIGRADO, SAMBA, { 40: 'DISPONIBLE', 42: 'AGOTADO' });
@@ -43,6 +43,6 @@ for (const vista of VISTAS) {
     await tiendaConSupabase({ browser, browserName }, vista, async (pagina) => {
       await pagina.waitForTimeout(500);
       await pagina.screenshot({ path: rutaCaptura(`modo-consulta-${vista.nombre}`, browserName) });
-    }, { respuesta: { fallo: 500 }, reducido: true });
+    }, { respuesta: { fallo: 500 }, cache: cacheReal(CATALOGO_MIGRADO), reducido: true });
   });
 }

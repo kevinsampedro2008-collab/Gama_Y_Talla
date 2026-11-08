@@ -59,9 +59,44 @@ por el número comercial real, con indicativo de país y solo números. Para Col
 
 Si el número sigue siendo el de demostración, la web muestra un aviso en vez de intentar enviar el pedido a ese número.
 
-### 2. Reemplaza el catálogo de demostración
+### 2. Conecta el catálogo real (etapa 16)
 
-Edita `data/productos.json`. Cada producto tiene una estructura como esta:
+El catálogo real se administra desde el **panel privado** (`/admin/`): zapatillas, colores, precios,
+tallas y fotos. La tienda lo lee de Supabase (vista `catalogo_publico`) como visitante; ya no hace
+falta editar ningún JSON. Ver `admin/LEEME.md`.
+
+La conexión se declara **fuera del código**, en `config.js` (no se versiona):
+
+1. Copia `config.ejemplo.js` como `config.js`, en la raíz del sitio.
+2. Escribe la URL del proyecto y su clave **publicable** (`sb_publishable_…`). Nunca la secreta: la
+   tienda la rechaza, no la usa y no imprime su valor.
+3. Al publicar, `config.js` debe estar en la carpeta que se sube (por ejemplo, en Netlify Drop).
+
+Cómo carga la tienda:
+
+- Una respuesta válida con el catálogo vacío se muestra vacía («Aún no hay productos»): nunca se
+  rellena con otros datos.
+- Pide todas las páginas de la vista (500 filas por petición), sin truncarse en el límite de la API.
+- Guarda el último catálogo real en este navegador, con el proyecto y la versión de formato. Si
+  Supabase no responde, lo muestra en **modo consulta** (todo por revisar; se puede consultar por
+  WhatsApp, no pedir). Una caché de otro proyecto, de otro formato o anterior a la etapa 16 no se usa.
+- Sin catálogo real guardado, muestra un aviso de conexión con «Reintentar». El carrito nunca se
+  vacía por un fallo de conexión.
+- Claves admitidas, y ninguna más: `sb_publishable_…` con caracteres válidos (viaja solo en
+  `apikey`) y, por compatibilidad, un JWT antiguo legible con `role` `anon` (`apikey` y Bearer). Se
+  rechazan las secretas, los JWT de sesiones de usuario (`authenticated`), de `service_role` o de
+  otro rol, los JWT ilegibles, cualquier otro texto y la falta de clave: no viajan en ninguna
+  cabecera, no se imprime su valor y la tienda queda en modo consulta. Nunca usa la sesión del panel.
+- Si una actualización falla después de haber cargado, la tienda no sigue dando por buena la
+  disponibilidad anterior: pasa a modo consulta con el último catálogo real (guardado o, si no se
+  pudo guardar, el que tenía en memoria), y vuelve sola cuando Supabase responde.
+- Sin `config.js`: en local (`localhost`, `127.0.0.1`, `file://`) se ven los productos de ejemplo; en
+  producción, un aviso de catálogo no disponible.
+
+### 2b. Catálogo de ejemplo (solo desarrollo y pruebas)
+
+Los 28 productos de `data/productos.json` son **ejemplos**: sirven para desarrollar y probar en local
+y nunca se importan al proyecto real ni se muestran como respaldo del catálogo real. Su estructura:
 
 ```json
 {
@@ -87,7 +122,7 @@ Edita `data/productos.json`. Cada producto tiene una estructura como esta:
 - `nuevoIngreso: true` muestra la etiqueta «Nuevo» y habilita el filtro «Nuevos ingresos».
 - No se muestran automáticamente reclamos como «Original», «Exclusivo» o «Edición limitada».
 
-Añadir o eliminar productos no requiere cambiar el HTML. Añade la imagen correspondiente y actualiza el campo `imagen`.
+Este formato se conserva para las pruebas; los productos reales se crean desde el panel.
 
 ### 3. Fotografías
 

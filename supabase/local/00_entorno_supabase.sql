@@ -39,6 +39,31 @@ create schema if not exists extensions;
 grant usage on schema extensions to anon, authenticated, service_role;
 create extension if not exists pgcrypto with schema extensions;
 
+-- Supabase trae el esquema «storage» (lo gestiona el servicio Storage). Se imitan solo las
+-- dos tablas y columnas que usan las migraciones de la etapa 16 (bucket y políticas), con el
+-- RLS activo y los privilegios que Supabase concede, para poder aplicar y probar esas
+-- políticas. Los archivos reales no existen aquí: se prueban con el stack local.
+create schema if not exists storage;
+create table if not exists storage.buckets (
+  id                 text primary key,
+  name               text not null,
+  public             boolean default false,
+  file_size_limit    bigint,
+  allowed_mime_types text[]
+);
+create table if not exists storage.objects (
+  id        uuid primary key default extensions.gen_random_uuid(),
+  bucket_id text references storage.buckets(id),
+  name      text,
+  owner     uuid,
+  metadata  jsonb,
+  unique (bucket_id, name)
+);
+alter table storage.objects enable row level security;
+grant usage on schema storage to anon, authenticated, service_role;
+grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
+grant select on storage.buckets to anon, authenticated, service_role;
+
 -- Supabase da a service_role acceso completo a lo que se cree en public. Se imita para
 -- poder comprobar que los disparadores funcionan aunque no pueda ejecutarlos directamente.
 grant usage on schema public to service_role;

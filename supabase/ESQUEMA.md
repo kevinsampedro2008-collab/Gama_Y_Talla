@@ -1,4 +1,4 @@
-# Esquema de catálogo y disponibilidad · Etapa 13
+# Esquema de catálogo y disponibilidad · Etapas 13 a 16
 
 Validado en **PostgreSQL 17.11** (contenedor local desechable, la misma versión mayor
 que usa Supabase por omisión). Nada de esto está aplicado en producción.
@@ -200,6 +200,7 @@ y esos roles lo heredan.
 | `fn_es_administrador` | no | sí | no | La evalúan 7 políticas `TO authenticated` |
 | `fn_confirmar_por_*`, `fn_marcar_agotada` | no | sí | no | El administrador es `authenticated`; decide su comprobación interna |
 | `fn_admin_tallas` | no | sí | no | Lectura administrativa de las columnas internas; comprueba `fn_es_administrador` |
+| `fn_admin_guardar_producto`, `fn_admin_estado_producto` | no | sí | no | Etapa 16. **Invoker**: escriben con el RLS del administrador y comprueban `fn_es_administrador` al empezar |
 | `fn_asignar_codigo_*`, `fn_registrar_historial` | no | no | no | Solo disparadores: EXECUTE se comprueba al crearlos, no al dispararse |
 | `fn_marcar_actualizado`, `fn_tallas_antes_de_escribir` | no | no | no | Solo disparadores |
 | `fn_lote_actual` | no | no | no | Solo la llama `fn_registrar_historial`, que corre como su propietario |
@@ -239,7 +240,7 @@ y el editor SQL del panel. Lo que crea `supabase_admin` en `public` nace ejecuta
 
 **El riesgo real** es una extensión instalada sin indicar esquema: `create extension pg_trgm;` deja 31
 funciones suyas en `public`, ejecutables por `anon` y publicadas en `/rest/v1/rpc`. Auth, Storage y
-Realtime usan sus propios esquemas. Hoy las 14 funciones de `public` son de `postgres`.
+Realtime usan sus propios esquemas. Hoy las 16 funciones de `public` (14 + 2 de la etapa 16) son de `postgres`.
 
 **La regla:** en las migraciones, una extensión siempre lleva esquema. El panel de extensiones ya usa
 `extensions`.
@@ -386,6 +387,49 @@ aceptadas y `DELETE` del administrador en `tallas`.
 | Volver a ejecutar `20261107020000` **después** de `20261107030000` falla: su comprobación final exige `DELETE` para `authenticated` | Ninguno en el flujo normal: las migraciones no se re-ejecutan. No usarla como validación |
 | `20261105010000` crea `pgcrypto` sin esquema | En Supabase no hace nada (ya está en `extensions`). En PostgreSQL corriente la deja en `public`; el entorno local la crea antes en `extensions` |
 
+## Etapa 16 · Catálogo desde el panel y fotos en Storage
+
+Dos migraciones nuevas, posteriores a las 10 aplicadas (que no se modifican):
+
+| Migración | Qué hace |
+|---|---|
+| `20261108010000_fotos_storage` | Bucket público `fotos-catalogo` (solo `image/webp`, 1 MiB por archivo) y tres políticas sobre `storage.objects` limitadas a ese bucket: **leer/listar**, **subir** y **borrar**, las tres solo para quien cumple `fn_es_administrador()`. Subir exige el nombre del panel (`productos/<uuid>/<uuid>/<13 cifras>-<10 caracteres>.webp`); no hay política UPDATE, así que nada se sobrescribe (tampoco con «upsert»); borrar solo funciona si ninguna fila de `fotos` usa el archivo. No crea funciones |
+| `20261108020000_catalogo_admin` | Columnas `version`, `ultima_operacion` y `retirado_en` en `productos` (anon no las recibe: sus permisos son por columna) y las funciones `fn_admin_guardar_producto(jsonb, integer, uuid)` y `fn_admin_estado_producto(uuid, text, integer, uuid)` |
+
+- **`fn_admin_guardar_producto`**: producto, colores, tallas y galería en una sola transacción. Crea
+  siempre oculto; nunca publica, confirma ni renueva vigencias (una talla nueva nace `REVISAR`, las
+  existentes solo cambian `activa`, y solo si cambia). Exige que el formulario incluya todos los
+  colores y tallas existentes (nada se borra), rechaza equivalentes numéricos en un color, no deja
+  renombrar etiquetas y solo acepta fotos nuevas que ya estén en Storage, en la carpeta del producto.
+  Valida textos, precios (0 = por confirmar; el anterior, mayor que el actual) y pertenencias.
+- **Activación de tallas existentes:** cada talla existente llega con `activa` y `activa_original` (cómo
+  estaba al abrir el formulario; sin ella, `PT422`). Solo se aplica lo que la persona cambió, con
+  `UPDATE … WHERE activa = activa_original` y la fila bloqueada (`FOR UPDATE`). Si la cambió otra acción
+  que no pasa por `productos.version` (las confirmaciones de 15B reactivan tallas), se conserva y se
+  devuelve en `tallas_conservadas`.
+- **`fn_admin_estado_producto`**: `publicar` (exige **un mismo** color visible con al menos una foto y
+  una talla activa; un color oculto no cuenta),
+  `ocultar`, `retirar` (oculta y conserva todo) y `restaurar` (vuelve oculto). No toca tallas.
+- **Versión y operación.** Las dos comparan `version` y la incrementan en la misma transacción, con la
+  fila bloqueada: un formulario desactualizado recibe `PT409` y no cambia nada. Guardan
+  `ultima_operacion`: repetir la misma operación devuelve `ya_aplicada` sin repetir nada, y releerla
+  demuestra si un guardado cuya respuesta se perdió se aplicó.
+- **Errores** (PostgREST convierte `PTnnn` en el estado HTTP): `42501` → 403/401, `PT404` → 404,
+  `PT409` → 409 (con `details` en JSON: motivo y versión actual), `PT422` → 422 con un mensaje para
+  la persona.
+- **Historial:** lo siguen escribiendo los disparadores; las filas de un guardado comparten `lote`
+  (`gamaytalla.lote` = la operación). El navegador no escribe historial.
+- **Retiro:** `retirado_en` exige `activo = false` (restricción `productos_retirado_oculto`). Productos,
+  colores y tallas nunca se borran; las fotos quitadas de la galería pierden su fila, no su archivo.
+
+Pruebas: `supabase/pruebas/70_catalogo_admin.sql` (SQL, en el validador) y
+`supabase/pruebas/80_catalogo_http_local.mjs` (HTTP real con Storage, solo local). Para el validador en
+PostgreSQL corriente, `supabase/local/00_entorno_supabase.sql` imita las dos tablas de `storage` que
+usan las políticas.
+
+**En el proyecto remoto** hay que aplicar estas dos migraciones (no se ha hecho: requiere
+autorización) y después repetir la auditoría y el Security Advisor.
+
 ## Cómo validar
 
 ```bash
@@ -393,7 +437,7 @@ bash scripts/validar-esquema.sh
 ```
 
 Levanta PostgreSQL 17 en Docker, aplica las migraciones, hace la migración en seco de los 28 productos,
-la verifica contra la tienda real, ejecuta las pruebas 10, 20, 30, 40 y 60 y la auditoría. Cada archivo
+la verifica contra la tienda real, ejecuta las pruebas 10, 20, 30, 40, 60 y 70 y la auditoría. Cada archivo
 se ejecuta **una vez** por pasada, se muestra su salida completa y cuenta su código de salida: un error de
 psql, de conexión o de la tubería, una salida con `FALLA` o `ERROR` o una batería sin ninguna comprobación
 `OK` impiden el «Sin fallos» (comprobado provocando cada avería). `CONTENEDOR` y `PUERTO` permiten no tocar
@@ -409,7 +453,8 @@ tienda vaciaba el carrito.
 navegadores) se reproduce con los guiones de `supabase/pruebas/reproducir/`: ver su `README.md`.
 
 **Orden de las migraciones.** Se aplican una vez, en el orden de su nombre: las siete de la etapa 13,
-`20261107010000` (14f), `20261107020000` (14f.1) y `20261107030000` (14f.2). Cada archivo corre en su
+`20261107010000` (14f), `20261107020000` (14f.1), `20261107030000` (14f.2) y las dos de la etapa 16,
+`20261108010000` (Storage) y `20261108020000` (catálogo desde el panel). Cada archivo corre en su
 propia transacción con `supabase db push`: si uno falla, no queda nada de él, pero los anteriores siguen
 aplicados (el conjunto no es atómico). `20261107030000` comprueba antes los datos: si hay tallas con un
 formato no admitido, falla, las enumera y no cambia nada. Se puede repetir sin efecto adicional; las

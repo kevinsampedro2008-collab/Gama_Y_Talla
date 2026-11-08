@@ -30,6 +30,9 @@ with aprobadas(firma, ejecutan, definer, volatilidad) as (
     ('public.fn_confirmar_por_publicacion(pg_catalog.uuid, pg_catalog.timestamptz, pg_catalog.int2)', 'authenticated', true, 'v'),
     ('public.fn_marcar_agotada(pg_catalog.uuid, pg_catalog.text)',                            'authenticated',      true,  'v'),
     ('public.fn_admin_tallas(pg_catalog.uuid)',                                               'authenticated',      true,  's'),
+    -- Etapa 16 (20261108020000): invoker; deciden el RLS del administrador y su comprobación interna.
+    ('public.fn_admin_guardar_producto(pg_catalog.jsonb, pg_catalog.int4, pg_catalog.uuid)',  'authenticated',      false, 'v'),
+    ('public.fn_admin_estado_producto(pg_catalog.uuid, pg_catalog.text, pg_catalog.int4, pg_catalog.uuid)', 'authenticated', false, 'v'),
     ('public.fn_asignar_codigo_interno()',                                                    '',                   true,  'v'),
     ('public.fn_asignar_codigo_variante()',                                                   '',                   true,  'v'),
     ('public.fn_registrar_historial()',                                                       '',                   true,  'v'),

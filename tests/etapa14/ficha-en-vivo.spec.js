@@ -4,7 +4,7 @@ import { test, expect } from '@playwright/test';
 import { VISTAS, CELULAR, ESCRITORIO, abrirDetalle } from '../etapa9/ayudas.js';
 import {
   CATALOGO_MIGRADO, conEstados, sinTalla, tiendaConSupabase, tallaEnFicha,
-  URL_SUPABASE, CLAVE_CARRITO, CLAVE_CACHE, abrirCarritoDesdeCabecera
+  URL_SUPABASE, CLAVE_CARRITO, CLAVE_CACHE, abrirCarritoDesdeCabecera, cacheReal, CLAVE_PUBLICABLE_FICTICIA
 } from './ayudas-etapa14.js';
 
 const SAMBA = 'SAMBA';
@@ -183,21 +183,22 @@ test.describe('Qué pasa sin configuración de Supabase', () => {
     ofrecidos: estado.productos.filter((p) => p.ofrecida).length
   }));
 
-  test('PRODUCCIÓN sin configuración: modo consulta, nunca las 138 del JSON como disponibles', async ({ browser, browserName }) => {
+  // Etapa 16: en producción los 28 productos del JSON (ejemplos) ya no se muestran como respaldo.
+  const sinCatalogo = async (pagina, titulo) => {
+    const r = await leer(pagina);
+    expect(r.productos, 'ningún ejemplo del JSON se presenta como catálogo').toBe(0);
+    expect(r.disponibles).toBe(0);
+    await expect(pagina.locator('.estado-catalogo h3')).toHaveText(titulo);
+    await expect(pagina.locator('.tarjeta')).toHaveCount(0);
+    const pedidos = await pagina.evaluate(() => performance.getEntriesByType('resource').map((e) => e.name));
+    expect(pedidos.filter((n) => n.includes('productos.json')), 'ni siquiera se pide el JSON de ejemplos').toEqual([]);
+  };
+
+  test('PRODUCCIÓN sin configuración: no se muestran los ejemplos del JSON, sino un aviso', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
-      const r = await leer(pagina);
-      expect(r.respaldo?.motivo).toBe('sin-configuracion');
-      expect(r.productos, 'el catálogo respaldado se puede consultar').toBe(28);
-      // 24, no 28: cuatro registros llevan «disponible: false» en el propio JSON.
-      // Eso es una decisión editorial de la tienda, no una disponibilidad caducada,
-      // así que se respeta. Ninguno desaparece del catálogo.
-      expect(r.ofrecidos, 'solo quedan fuera los marcados como no disponibles').toBe(24);
-      expect(r.disponibles, 'ninguna talla del JSON se presenta como disponible').toBe(0);
-      // 164 = las 180 migradas menos las 16 de los cuatro registros no ofrecidos.
-      expect(r.porRevisar).toBe(164);
-      await expect(pagina.locator('#aviso-respaldo')).toBeVisible();
-      await expect(pagina.locator('#aviso-respaldo')).toContainText('Modo consulta');
-    }, { config: PRODUCCION });
+      await sinCatalogo(pagina, 'El catálogo no está disponible en este momento');
+      await expect(pagina.locator('.estado-catalogo')).toContainText('WhatsApp');
+    }, { config: PRODUCCION, tarjetas: false });
   });
 
   for (const [nombre, valor] of [
@@ -206,18 +207,21 @@ test.describe('Qué pasa sin configuración de Supabase', () => {
     ['con protocolo no admitido', 'javascript:alert(1)'],
     ['texto sin sentido', '???']
   ]) {
-    test(`PRODUCCIÓN con configuración inválida (${nombre}): modo consulta`, async ({ browser, browserName }) => {
+    test(`PRODUCCIÓN con configuración inválida (${nombre}): aviso, sin ejemplos`, async ({ browser, browserName }) => {
       await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
-        const r = await leer(pagina);
-        expect(r.respaldo, 'entra en modo consulta').not.toBeNull();
-        expect(r.disponibles).toBe(0);
-        expect(r.productos).toBe(28);
-        await expect(pagina.locator('#aviso-respaldo')).toBeVisible();
-      }, { config: { ...PRODUCCION, catalogoUrl: valor } });
+        await sinCatalogo(pagina, 'El catálogo no está disponible en este momento');
+      }, { config: { ...PRODUCCION, catalogoUrl: valor, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, tarjetas: false });
     });
   }
 
-  test('PRODUCCIÓN sin configuración: no se puede pedir, pero el carrito se conserva', async ({ browser, browserName }) => {
+  test('PRODUCCIÓN sin configuración: el carrito se conserva intacto', async ({ browser, browserName }) => {
+    await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
+      expect(await pagina.evaluate((c) => JSON.parse(localStorage.getItem(c)), CLAVE_CARRITO)).toEqual(carrito);
+      await expect(pagina.locator('#carrito-notificacion')).not.toContainText('Retiramos');
+    }, { config: PRODUCCION, carrito, tarjetas: false });
+  });
+
+  test('PRODUCCIÓN con caché real y Supabase sin respuesta: se puede consultar, no pedir; el carrito se conserva', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       expect(await pagina.evaluate((c) => JSON.parse(localStorage.getItem(c)).lineas.length, CLAVE_CARRITO)).toBe(1);
       await abrirCarritoDesdeCabecera(pagina);
@@ -226,7 +230,7 @@ test.describe('Qué pasa sin configuración de Supabase', () => {
       await expect(pagina.locator('#carrito-copiar')).toBeHidden();
       await expect(pagina.locator('#carrito-nota')).toContainText('por revisar');
       await expect(pagina.locator('#carrito-notificacion')).not.toContainText('Retiramos');
-    }, { config: PRODUCCION, carrito });
+    }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, respuesta: { fallo: 'red' }, cache: cacheReal(CATALOGO_MIGRADO), carrito });
   });
 
   test('DESARROLLO (localhost) sin configuración: el JSON vale, como hasta ahora', async ({ browser, browserName }) => {
@@ -248,22 +252,20 @@ test.describe('Qué pasa sin configuración de Supabase', () => {
   });
 
   test('PRODUCCIÓN con Supabase configurado pero inaccesible: modo consulta por caché', async ({ browser, browserName }) => {
-    const cache = { texto: JSON.stringify(CON_TRES), fecha: Date.now() - 72e5 };
+    const cache = cacheReal(CON_TRES, Date.now() - 72e5);
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       const r = await leer(pagina);
       expect(r.respaldo?.motivo).toBe('cache');
       expect(r.disponibles, 'ni siquiera lo que la caché daba por disponible').toBe(0);
       await expect(pagina.locator('#aviso-respaldo')).toContainText('Última información');
-    }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE }, respuesta: { fallo: 'red' }, cache });
+    }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, respuesta: { fallo: 'red' }, cache });
   });
 
-  test('PRODUCCIÓN con Supabase inaccesible y sin caché: modo consulta por JSON', async ({ browser, browserName }) => {
+  test('PRODUCCIÓN con Supabase inaccesible y sin caché: aviso de conexión, nunca el JSON', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
-      const r = await leer(pagina);
-      expect(r.respaldo?.motivo).toBe('json');
-      expect(r.disponibles).toBe(0);
-      expect(r.productos).toBe(28);
-    }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE }, respuesta: { fallo: 500 } });
+      await sinCatalogo(pagina, 'No pudimos cargar las zapatillas');
+      await expect(pagina.locator('.estado-catalogo').getByRole('button', { name: 'Reintentar' })).toBeVisible();
+    }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, respuesta: { fallo: 500 }, tarjetas: false });
   });
 
   for (const vista of VISTAS) {
@@ -281,7 +283,7 @@ test.describe('Qué pasa sin configuración de Supabase', () => {
         expect(m.ancho).toBeLessThanOrEqual(m.vw + 1);
         expect(m.fijo, 'va en el flujo, no flotando sobre el contenido').toBe(false);
         expect(m.solapa, 'no tapa las tarjetas').toBe(false);
-      }, { config: PRODUCCION });
+      }, { config: { ...PRODUCCION, catalogoUrl: URL_SUPABASE, catalogoClave: CLAVE_PUBLICABLE_FICTICIA }, respuesta: { fallo: 'red' }, cache: cacheReal(CATALOGO_MIGRADO) });
     });
   }
 });

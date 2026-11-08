@@ -1,8 +1,89 @@
-# Panel privado de Gama & Talla · etapas 15A y 15B
+# Panel privado de Gama & Talla · etapas 15A, 15B y 16
 
-Ingreso con correo y contraseña, tablero del catálogo y **gestión de la disponibilidad de las tallas**
-(15B). La creación y edición de productos, colores, precios y fotos llega en la etapa 16; hasta
-entonces el catálogo remoto sigue vacío.
+Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
+(15B) y **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP.
+
+## Administrar el catálogo (16)
+
+- **«Agregar zapatilla»** está siempre arriba del tablero (y en el aviso del catálogo vacío).
+  **«Editar»** abre cada zapatilla. El editor ocupa toda la pantalla en el celular y es un panel
+  centrado en el escritorio; Escape o «Cancelar» piden confirmación si hay cambios sin guardar, y el
+  navegador avisa antes de abandonar la página.
+- **Modelo:** nombre, marca, categoría, referencia del proveedor (puede repetirse: no es el
+  identificador), tabla de la guía de tallas (hombre o mujer), orden, descripción, «Destacada» y
+  «Nuevo ingreso».
+- **Colores:** nombre, referencia del color, precio actual y anterior y «Color visible en la
+  tienda». Precio `0` = «Precio por confirmar»; el precio anterior debe ser mayor que el actual (y no
+  se admite con precio 0). Un color se desactiva, no se borra.
+- **Tallas:** se añaden una a una o separadas por punto y coma (`38; 39; 40`), con la gramática de
+  la base (`40`, `40,5`, `40.5`, `40 1/3`). Se rechazan los equivalentes en el mismo color (`40.5`
+  si ya existe `40,5`): se reactiva la existente. Las etiquetas existentes no se renombran ni se
+  normalizan. Una talla nueva queda **por revisar**; las existentes solo se desactivan o reactivan.
+- **Cambios hechos en otro lugar mientras editas.** El formulario envía, por cada talla, cómo
+  estaba al abrirlo. El servidor solo aplica lo que cambiaste tú: si una talla que no tocaste se
+  reactivó o desactivó entretanto (por ejemplo, «Confirmó el proveedor» desde otra pestaña), ese
+  cambio se conserva y el aviso de guardado lo dice. La comprobación y la escritura van juntas en el
+  servidor, con la fila bloqueada; el estado, la confirmación y la vigencia de la talla no se tocan.
+- **Guardar nunca confirma disponibilidad ni renueva vigencias.** Para confirmar, las acciones de
+  15B del tablero («Confirmó el proveedor», «Nueva publicación»).
+- **Guardar oculta / Guardar y publicar.** Una zapatilla nueva se guarda oculta. Publicar es una
+  acción aparte que exige **un mismo color visible** con al menos una foto y una talla activa (una
+  foto en un color y una talla en otro no bastan, y un color oculto no cuenta); si falta algo, queda
+  guardada y oculta y se dice qué falta. «Ocultar de la tienda», «Retirar del catálogo» (oculta y
+  conserva todo; aparece en el filtro «Retiradas») y «Restaurar» (vuelve oculta).
+- Se conservan UUID, código interno (`GT-…`), códigos de color (`GT-…-A`) y las claves del carrito:
+  cambiar nombres, referencias o fotos no regenera nada.
+
+### Fotografías
+
+| Límite | Valor | Por qué |
+|---|---|---|
+| Archivo original | JPEG, PNG o WebP, hasta 15 MB | Se comprueba la **firma del contenido**, no la extensión, y que el navegador pueda decodificarla |
+| Dimensiones | Lado mayor de 400 px como mínimo; hasta 50 megapíxeles | No se amplían fotos pequeñas (aviso por debajo de 900 px) |
+| Foto publicada | WebP, lado mayor hasta 1600 px, proporciones intactas, sin recortes | Objetivo orientativo 150–250 KB; nunca más de 600 KB |
+| Por color / por vez | 12 / 12 | |
+| Bucket `fotos-catalogo` | Solo `image/webp`, 1 MiB por archivo | Lo impone Storage, además del panel |
+
+- Un WebP que ya es adecuado (hasta 1600 px y 300 KB) se sube **tal cual**. Lo demás se redimensiona
+  sin ampliar y se codifica a WebP probando calidades de 0,86 a 0,68 hasta llegar al objetivo; si
+  recomprimir no mejora un WebP, se conserva el original. La salida se comprueba: si el navegador
+  no genera WebP de verdad, se dice y no se sube otra cosa.
+- Cada foto muestra vista previa, dimensiones, peso original → final y el progreso de subida.
+- Nombres únicos y versionados: `productos/<producto>/<color>/<milisegundos>-<10 aleatorios>.webp`.
+  Nada se sobrescribe (no hay política UPDATE). Reemplazar sube un archivo nuevo.
+- **Quitar de la galería** quita la fila de `fotos`, no el archivo. **Archivos sin usar** (en el
+  editor) lista lo que está en Storage y en ninguna galería guardada; «Borrar definitivamente» pide
+  confirmación, vuelve a comprobar que nadie lo usa y borra con la API de Storage (nunca por SQL).
+  Storage también lo impide en el servidor si alguna galería lo referencia.
+- **Costo de almacenamiento y transferencia (estimación, sin miniaturas):** con ~2.000 fotos de
+  ~200 KB, unos **400 MB**. Una visita típica (12 tarjetas y 2 fichas de 4 fotos) transfiere unos
+  4 MB, es decir ~4 GB al mes por cada 1.000 visitas; los archivos llevan caché de un año y sus
+  nombres no cambian, así que las visitas repetidas descargan mucho menos. Compara estas cifras con
+  los límites vigentes de tu plan de Supabase.
+- **Miniaturas: no se generan.** Duplicarían el trabajo de cada foto. Si se añadieran (unos 400 px y
+  ~30 KB cada una), costarían ~60 MB más para 2.000 fotos y reducirían el peso de las tarjetas del
+  catálogo de ~2,4 MB a ~0,4 MB por visita. Queda como mejora opcional.
+
+### Fallos entre Storage y la base de datos
+
+- Las fotos se suben **antes** de guardar; el guardado solo acepta archivos que ya están en Storage
+  (la función lo comprueba). Una subida fallida nunca deja una referencia publicada.
+- Si se pierde la respuesta de una subida, el panel mira en Storage si el archivo llegó; si no
+  aparece, ofrece reintentar **con el mismo nombre** (no se duplica). No afirma que falló.
+- Un guardado es **una** llamada a `fn_admin_guardar_producto`, en una transacción: o se aplica todo
+  (producto, colores, tallas, galería) o nada.
+- Cada guardado lleva un identificador de operación. Si se pierde la respuesta, el panel relee la
+  zapatilla (solo lectura): si su `ultima_operacion` es la de ese guardado, se aplicó (nadie más
+  conoce ese valor). Si no, dice «Resultado no confirmado» con lo que sabe (sigue sin cambios y
+  podría aplicarse, o cambió por otra edición) y permite **reintentar con la misma operación**: el
+  servidor no la aplica dos veces. Una creación nunca se repite con identificadores nuevos.
+- Formularios desactualizados: el servidor compara la `version` y la actualiza en la misma
+  transacción. Si otra edición se guardó antes, no se sobrescribe nada; el formulario conserva tus
+  datos y ofrece cargar la versión actual.
+- Los archivos antiguos no se borran al reemplazar una foto, y no se ofrece borrar archivos mientras
+  haya una operación sin confirmar.
+- Si la sesión vence con cambios sin guardar, el formulario se conserva en memoria y, al volver a
+  entrar, el tablero ofrece «Volver al formulario».
 
 ## Gestionar la disponibilidad (15B)
 
@@ -77,7 +158,9 @@ python -m http.server 8765 --bind 127.0.0.1
 ```
 
 El panel habla directamente con el proyecto de Supabase configurado: con `admin/config.js` apuntando
-a `gama-talla-dev`, lo que se ve son los datos reales.
+a `gama-talla-dev`, lo que se ve son los datos reales. **Guardar en el panel escribe en ese proyecto.**
+Las fotos (etapa 16) necesitan que las migraciones `20261108010000` y `20261108020000` estén aplicadas
+en él (bucket y funciones).
 
 ## Configuración
 
@@ -122,11 +205,18 @@ Lo que no está publicado (producto, color o talla inactivos) se presenta como �
 Con el stack local de Supabase y la tienda servida:
 
 ```bash
-npx --yes supabase@3.0.0 start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+# Storage activo (la etapa 16 lo necesita): no se excluye storage-api
+npx --yes supabase@3.0.0 start -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 python -m http.server 8765 --bind 127.0.0.1      # en otra terminal
-npx playwright test tests/etapa15 --workers=1
+npx playwright test tests/etapa15 tests/etapa16 --workers=1
+node supabase/pruebas/80_catalogo_http_local.mjs  # PostgREST y Storage por HTTP real
 npx --yes supabase@3.0.0 stop --no-backup
 ```
+
+Las pruebas de la etapa 16 generan fotos ficticias con Chromium en la carpeta temporal
+(`gama-talla-16-fotos`), usan la marca «Marca Dieciséis» y borran al terminar sus productos y sus
+archivos de Storage (también los huérfanos de una ejecución interrumpida). Capturas en
+`gama-talla-16-capturas`.
 
 Las pruebas crean usuarios y productos **ficticios** en el stack local con su clave de servicio
 local, los borran al terminar y se niegan a correr si la API no está en `127.0.0.1`. Necesitan el

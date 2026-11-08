@@ -114,6 +114,7 @@ bateria "7. Pruebas de RLS y privilegios" supabase/pruebas/20_seguridad.sql
 bateria "8. Endurecimiento de funciones" supabase/pruebas/30_endurecimiento.sql
 bateria "9. Acceso a los datos internos" supabase/pruebas/40_acceso_interno.sql
 bateria "10. Integridad de tallas y vigencia (14f.2)" supabase/pruebas/60_integridad_tallas_vigencia.sql
+bateria "10b. Catálogo desde el panel y políticas de fotos (etapa 16)" supabase/pruebas/70_catalogo_admin.sql
 
 titulo "11. Auditoría de funciones (solo lectura; cero filas = sin hallazgos)"
 if psql_ -tA -F ' | ' -v ON_ERROR_STOP=1 < supabase/pruebas/auditar_funciones.sql > "$REGISTRO/auditoria.txt" 2>&1; then

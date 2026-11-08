@@ -20,6 +20,8 @@ supabase/.env.*
 .env.keys
 # Configuración local del panel privado (URL y clave publicable). Se versiona config.ejemplo.js.
 admin/config.js
+# Configuración de la tienda pública (URL y clave publicable). Se versiona config.ejemplo.js.
+/config.js
 *.pem
 *.key
 *.p12

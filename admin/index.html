@@ -7,8 +7,9 @@
   <!-- Panel privado: fuera de buscadores y sin enviar la dirección a otros sitios. -->
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <!-- Solo scripts del propio sitio y conexiones a Supabase (proyecto y stack local de pruebas). -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; connect-src 'self' https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; base-uri 'none'; form-action 'self'; object-src 'none'">
+  <!-- Solo scripts del propio sitio y conexiones a Supabase (proyecto y stack local de pruebas).
+       blob: en img-src es para la vista previa local de las fotos antes de subirlas. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; connect-src 'self' https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; base-uri 'none'; form-action 'self'; object-src 'none'">
   <title>Panel · Gama &amp; Talla</title>
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,6 +20,8 @@
   <!-- Configuración local (no versionada): ver config.ejemplo.js y LEEME.md. -->
   <script src="config.js" defer></script>
   <script src="admin.js" defer></script>
+  <script src="fotos.js" defer></script>
+  <script src="editor.js" defer></script>
 </head>
 <body>
   <!-- Mientras se comprueba la sesión no se muestra nada administrativo. -->
@@ -128,6 +131,7 @@
           <p class="tablero-resumen" id="tablero-resumen"></p>
         </div>
         <div class="tablero-botones">
+          <button class="boton boton-principal boton-compacto" id="boton-nuevo" type="button" data-accion="nuevo-producto">Agregar zapatilla</button>
           <button class="boton boton-secundario boton-compacto" id="boton-historial" type="button" data-accion="historial" aria-controls="historial" aria-expanded="false">Historial</button>
           <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
         </div>
@@ -178,6 +182,40 @@
         </div>
       </div>
     </div>
+
+    <!-- Editor del catálogo (etapa 16): lo construye editor.js. -->
+    <dialog class="editor" id="editor" aria-labelledby="editor-titulo">
+      <form class="editor-formulario" id="editor-formulario" novalidate>
+        <header class="editor-cabecera">
+          <div class="editor-titulos">
+            <p class="editor-codigo" id="editor-codigo"></p>
+            <h2 class="editor-titulo" id="editor-titulo" tabindex="-1">Nueva zapatilla</h2>
+            <p class="editor-estado" id="editor-estado"></p>
+          </div>
+          <div class="editor-cabecera-acciones" id="editor-acciones-estado"></div>
+          <button class="boton boton-secundario boton-compacto editor-cerrar" type="button" data-editor="cerrar" aria-label="Cerrar el editor">Cerrar</button>
+        </header>
+        <div class="editor-cuerpo" id="editor-cuerpo"></div>
+        <footer class="editor-pie">
+          <div class="editor-mensajes">
+            <p class="aviso aviso-error editor-error" id="editor-error" role="alert" tabindex="-1" hidden></p>
+            <div class="editor-resultado" id="editor-resultado" role="status" aria-live="polite"></div>
+          </div>
+          <div class="editor-confirmar-salida" id="editor-salida" role="alertdialog" aria-labelledby="editor-salida-texto" hidden>
+            <p id="editor-salida-texto">Tienes cambios sin guardar. ¿Quieres descartarlos?</p>
+            <div class="editor-botones">
+              <button class="boton boton-secundario boton-compacto" type="button" data-editor="seguir">Seguir editando</button>
+              <button class="boton boton-principal boton-compacto" type="button" data-editor="descartar">Descartar cambios</button>
+            </div>
+          </div>
+          <div class="editor-botones" id="editor-botones">
+            <button class="boton boton-secundario" type="button" data-editor="cancelar">Cancelar</button>
+            <button class="boton boton-secundario" type="submit" data-editor="guardar" id="editor-guardar">Guardar oculta</button>
+            <button class="boton boton-principal" type="button" data-editor="guardar-publicar" id="editor-publicar">Guardar y publicar</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
 
     <dialog class="dialogo" id="dialogo-accion" aria-labelledby="dialogo-titulo">
       <form class="dialogo-formulario" id="formulario-accion" method="dialog" novalidate>

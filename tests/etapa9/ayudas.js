@@ -32,7 +32,17 @@ export async function nuevaPagina(browser, browserName, vista, opciones = {}) {
     locale: 'es-CO',
   });
   const pagina = await contexto.newPage();
+  // Etapa 16: la tienda carga config.js (no versionado). En las pruebas se sirve vacío, que
+  // equivale a no declarar configuración, como antes de existir el archivo; las pruebas que
+  // necesitan una la inyectan con addInitScript (window.GAMA_TALLA_CONFIG).
+  await sinConfiguracionDeTienda(contexto);
   return { contexto, pagina, problemas: vigilar(pagina) };
+}
+
+export async function sinConfiguracionDeTienda(contexto) {
+  await contexto.route(`${BASE}/config.js`, (ruta) => ruta.fulfill({
+    status: 200, contentType: 'text/javascript; charset=utf-8', body: '/* sin configuración declarada en esta prueba */\n'
+  }));
 }
 
 // Abre la tienda en la vista indicada, ejecuta la prueba y exige que no haya errores de consola ni de red.
@@ -94,11 +104,13 @@ export function vigilar(pagina) {
   return problemas;
 }
 
-export async function irATienda(pagina, url = URL_REAL) {
+// `tarjetas: false` (etapa 16): la carga termina en un estado sin catálogo que mostrar.
+export async function irATienda(pagina, url = URL_REAL, { tarjetas = true } = {}) {
   await pagina.goto(url, { waitUntil: 'load' });
   // Con varios navegadores en paralelo el servidor local tarda más: se da margen a la carga del catálogo.
   await expect(pagina.locator('#grilla-productos')).toHaveAttribute('aria-busy', 'false', { timeout: 20000 });
-  await expect(pagina.locator('.tarjeta').first()).toBeVisible();
+  if (tarjetas) await expect(pagina.locator('.tarjeta').first()).toBeVisible();
+  else await expect(pagina.locator('.estado-catalogo')).toBeVisible();
   await pagina.evaluate(() => document.fonts.ready);
 }
 

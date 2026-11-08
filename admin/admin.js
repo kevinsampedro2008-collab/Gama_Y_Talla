@@ -1,4 +1,5 @@
-/* Panel privado de Gama & Talla · etapa 15A: ingreso y tablero de consulta.
+/* Panel privado de Gama & Talla · etapa 15A: ingreso y tablero de consulta; 15B: disponibilidad;
+ * 16: puente para el editor del catálogo (editor.js), que reutiliza la sesión y el acceso de aquí.
  *
  * Seguridad
  *  - El navegador solo usa la URL del proyecto, la clave PUBLICABLE y la sesión del usuario.
@@ -266,12 +267,15 @@
   };
   const GUARDADOS = { CONFIRMADA: "Confirmada", AGOTADA: "Agotada", REVISAR: "Por revisar" };
   const ORIGENES = { publicacion: "publicación del proveedor", proveedor: "confirmación del proveedor", manual: "registro manual", migracion: "catálogo anterior" };
+  // Las retiradas (etapa 16) solo aparecen en su propio filtro: siguen existiendo, con todo.
+  const vigente = (p) => !p.retirado_en;
   const FILTROS = [
-    { id: "todas", texto: "Todas", cumple: () => true },
-    { id: "disponibles", texto: "Con tallas disponibles", cumple: (p) => p.estados.has("DISPONIBLE") },
-    { id: "revisar", texto: "Con tallas por revisar", cumple: (p) => p.estados.has("POR_REVISAR") },
-    { id: "agotadas", texto: "Con tallas agotadas", cumple: (p) => p.estados.has("AGOTADO") },
-    { id: "ocultos", texto: "Con elementos ocultos", cumple: (p) => p.tieneOculto }
+    { id: "todas", texto: "Todas", cumple: vigente },
+    { id: "disponibles", texto: "Con tallas disponibles", cumple: (p) => vigente(p) && p.estados.has("DISPONIBLE") },
+    { id: "revisar", texto: "Con tallas por revisar", cumple: (p) => vigente(p) && p.estados.has("POR_REVISAR") },
+    { id: "agotadas", texto: "Con tallas agotadas", cumple: (p) => vigente(p) && p.estados.has("AGOTADO") },
+    { id: "ocultos", texto: "Con elementos ocultos", cumple: (p) => vigente(p) && p.tieneOculto },
+    { id: "retiradas", texto: "Retiradas", cumple: (p) => !vigente(p) }
   ];
   const PAGINA = 500;           // por debajo del máximo de filas de la API: se pide por páginas
   const COLUMNAS_TALLA = "id,variante_id,talla,estado,activa,vigencia_desde,vence_en,vigencia_horas,origen,publicado_en,confirmado_en,actualizado_en";
@@ -289,6 +293,7 @@
   let historialCursor = null;
   let accionAbierta = null;
   let usuarioActual = null;     // para mostrar «Tú» en el historial
+  let configuracionPanel = null; // { url, clave } ya validadas: el editor sube fotos con ellas
 
   // Valor de una talla solo para ordenar en pantalla (misma gramática que la base).
   function valorTalla(talla) {
@@ -301,6 +306,8 @@
   }
 
   function limpiarTablero() {
+    // El editor guarda en memoria lo que no se llegó a guardar (por ejemplo, si la sesión vence).
+    window.GamaTallaEditor?.alPerderAcceso?.();
     catalogo = [];
     seleccion = { varianteId: null, ids: new Set() };
     accionAbierta = null;
@@ -402,7 +409,7 @@
 
       const respuestas = await Promise.all([
         leerPaginado(() => cliente.from("productos")
-          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,activo,orden," +
+          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,activo,orden,retirado_en," +
                   "variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden,fotos(ruta,orden,alt))")
           .order("orden").order("codigo_interno").order("id")),
         leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).order("variante_id").order("id")),
@@ -515,9 +522,11 @@
       estado.textContent = "";
       seleccion = { varianteId: null, ids: new Set() };
       actualizarBarraAcciones();
+      window.GamaTallaEditor?.ofrecerBorrador?.();
       avisoTablero({
         titulo: "Todavía no hay zapatillas en el catálogo",
-        texto: "Cuando se carguen los productos aparecerán aquí, con sus colores, precios y tallas."
+        texto: "Agrega la primera con sus colores, precios, tallas y fotos. Se guarda oculta hasta que decidas publicarla.",
+        accion: { texto: "Agregar zapatilla", alPulsar: (e) => abrirEditor(null, e?.currentTarget || null) }
       });
       return;
     }
@@ -558,6 +567,7 @@
     estado.textContent = (nota + (consulta || filtro !== "todas"
       ? `${visibles.length} de ${catalogo.length} ${catalogo.length === 1 ? "zapatilla" : "zapatillas"} a la vista.`
       : "")).trim();
+    window.GamaTallaEditor?.ofrecerBorrador?.();
   }
 
   function nodo(etiqueta, clase, texto) {
@@ -595,8 +605,15 @@
     const titulo = nodo("h2", "producto-nombre", p.nombre);
     titulo.id = idTitulo;
     const meta = nodo("p", "producto-meta", [p.marca, p.categoria].filter(Boolean).join(" · "));
-    const publicado = nodo("p", `producto-estado ${p.activo ? "es-publicado" : "es-oculto"}`, p.activo ? "Publicado en la tienda" : "Oculto en la tienda");
-    cuerpo.append(codigos, titulo, meta, publicado);
+    const publicado = nodo("p", `producto-estado ${p.retirado_en ? "es-retirado" : p.activo ? "es-publicado" : "es-oculto"}`,
+      p.retirado_en ? "Retirado del catálogo" : p.activo ? "Publicado en la tienda" : "Oculto en la tienda");
+    const editar = nodo("button", "boton boton-secundario boton-compacto producto-editar", "Editar");
+    editar.type = "button";
+    editar.dataset.accion = "editar-producto";
+    editar.dataset.productoId = p.id;
+    editar.setAttribute("aria-label", `Editar ${p.nombre} (${p.codigo_interno})`);
+    editar.disabled = ocupado;
+    cuerpo.append(codigos, titulo, meta, publicado, editar);
 
     const variantes = nodo("ul", "variantes");
     variantes.setAttribute("aria-label", `Colores de ${p.nombre}`);
@@ -745,7 +762,7 @@
 
   function marcarOcupado(si) {
     ocupado = si;
-    document.querySelectorAll("#lista-productos .talla[data-talla-id], #filtros button, #barra-acciones button, #boton-actualizar, #boton-historial, [data-accion='salir'], #historial button")
+    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #boton-actualizar, #boton-historial, [data-accion='salir'], #historial button")
       .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, #barra-acciones button")); });
     $("#barra-acciones")?.setAttribute("aria-busy", String(si));
     document.querySelectorAll("#dialogo-accion button").forEach((b) => { b.disabled = si; });
@@ -1300,10 +1317,37 @@
     estado.textContent = lista.children.length ? `${lista.children.length} ${lista.children.length === 1 ? "cambio" : "cambios"}, del más reciente al más antiguo. Hora de Colombia.` : "Todavía no hay cambios de disponibilidad registrados.";
   }
 
+  // ------------------------------------------------------- puente con el editor
+  function abrirEditor(productoId, disparador = null) {
+    if (!window.GamaTallaEditor) {
+      anunciarResultado({ titulo: "El editor no se pudo cargar", texto: "Recarga la página.", tipo: "aviso" });
+      return;
+    }
+    quitarSeleccion();
+    window.GamaTallaEditor.abrir(productoId, disparador);
+  }
+
+  // Lo mínimo que necesita editor.js; la sesión, el acceso y la recarga siguen siendo de aquí.
+  window.GamaTallaPanel = Object.freeze({
+    cliente: () => cliente,
+    configuracion: () => configuracionPanel,
+    comprobarAcceso,
+    aplicarAcceso,
+    generacion: () => generacion,
+    ocupado: () => ocupado,
+    recargar: () => cargarCatalogo({ conservarPosicion: true }),
+    anunciar: anunciarResultado,
+    productos: () => catalogo,
+    vigenciaPredeterminada: () => vigenciaPredeterminada,
+    fecha,
+    valorTalla
+  });
+
   // ------------------------------------------------------------------- arranque
   async function arrancar() {
     const configuracion = leerConfiguracion();
     if (!configuracion || !window.supabase?.createClient) { mostrar("configuracion"); return; }
+    configuracionPanel = configuracion;
     cliente = window.supabase.createClient(configuracion.url, configuracion.clave, {
       auth: { storageKey: CLAVE_SESION, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
@@ -1343,6 +1387,8 @@
       else if (accion === "deseleccionar") { if (!ocupado) quitarSeleccion(); }
       else if (accion === "cancelar-dialogo") cerrarDialogo();
       else if (accion === "cerrar-resultado") { const caja = $("#resultado-accion"); caja.hidden = true; caja.replaceChildren(); }
+      else if (accion === "nuevo-producto") { if (!ocupado) abrirEditor(null, e.target.closest("[data-accion]")); }
+      else if (accion === "editar-producto") { const b = e.target.closest("[data-producto-id]"); if (!ocupado) abrirEditor(b.dataset.productoId, b); }
     });
     document.addEventListener("visibilitychange", revisarAlVolver);
     window.addEventListener("focus", revisarAlVolver);

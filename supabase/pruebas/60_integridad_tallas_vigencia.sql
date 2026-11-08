@@ -542,8 +542,10 @@ begin
     not has_function_privilege('anon', 'public.fn_tallas_antes_de_escribir()', 'EXECUTE')
     and not has_function_privilege('authenticated', 'public.fn_tallas_antes_de_escribir()', 'EXECUTE')
     and not has_function_privilege('service_role', 'public.fn_tallas_antes_de_escribir()', 'EXECUTE'));
-  perform pg_temp.exigir('R en public siguen exactamente 14 funciones propias',
-    (select count(*) = 14 from pg_proc p where p.pronamespace = 'public'::regnamespace
+  -- 14 hasta 14f.2; la etapa 16 añade fn_admin_guardar_producto y fn_admin_estado_producto,
+  -- clasificadas en 40_acceso_interno.sql y aprobadas en auditar_funciones.sql.
+  perform pg_temp.exigir('R en public siguen exactamente 16 funciones propias',
+    (select count(*) = 16 from pg_proc p where p.pronamespace = 'public'::regnamespace
        and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
 end;
 $$;
