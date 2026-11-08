@@ -993,9 +993,10 @@
     return "el servidor no aplicó el cambio";
   }
 
+  // Solo lectura, con las columnas internas (fn_admin_tallas): nunca escribe ni renueva nada.
   async function leerTallasVariante(varianteId) {
     try {
-      const r = await cliente.rpc("fn_admin_tallas", { p_variante_id: varianteId }).select("id,talla,estado,activa,actualizado_en");
+      const r = await cliente.rpc("fn_admin_tallas", { p_variante_id: varianteId }).select(COLUMNAS_TALLA);
       if (r.error) return { error: r.error, status: r.status };
       return { data: r.data || [] };
     } catch {
@@ -1065,9 +1066,9 @@
         if (respuesta.error) {
           const tipo = clasificarEscritura(respuesta);
           for (const r of resultados) {
-            r.resultado = tipo === "red" ? "incierta" : "fallida";
+            r.resultado = tipo === "red" ? "no-confirmada" : "fallida";
             r.motivo = tipo;
-            r.detalle = tipo === "red" ? "se perdió la conexión" : textoError(tipo, respuesta);
+            r.detalle = tipo === "red" ? "se perdió la respuesta del servidor" : textoError(tipo, respuesta);
           }
         } else {
           const hechas = new Map((respuesta.data || []).map((f) => [f.id, f]));
@@ -1087,8 +1088,8 @@
           if (respuesta.error) {
             const tipo = clasificarEscritura(respuesta);
             r.motivo = tipo;
-            r.resultado = tipo === "red" ? "incierta" : "fallida";
-            r.detalle = tipo === "red" ? "se perdió la conexión" : textoError(tipo, respuesta);
+            r.resultado = tipo === "red" ? "no-confirmada" : "fallida";
+            r.detalle = tipo === "red" ? "se perdió la respuesta del servidor" : textoError(tipo, respuesta);
             // Sin reintentos automáticos: tras un error de red, de sesión, de permiso o de
             // validación no se sigue con las demás (darían el mismo error o un resultado dudoso).
             if (tipo !== "otro") {
@@ -1099,25 +1100,27 @@
           }
           const fila = Array.isArray(respuesta.data) ? respuesta.data[0] : respuesta.data;
           if (fila && fila.id === r.id && fila.estado === def.estadoEsperado) r.resultado = "aplicada";
-          else { r.resultado = "incierta"; r.detalle = "la respuesta no confirma el cambio"; }
+          else { r.resultado = "no-confirmada"; r.detalle = "la respuesta no confirma el cambio"; }
         }
       }
 
-      // Resultado incierto: se vuelve a consultar antes de permitir repetir nada.
-      if (resultados.some((r) => r.resultado === "incierta")) {
-        progreso.textContent = "Comprobando qué se aplicó…";
+      // Resultado no confirmado. Solo una respuesta válida de la escritura confirma qué hizo esa
+      // petición. Releer la talla dice cómo está AHORA, pero no qué operación la dejó así: una
+      // marca de actualización distinta puede venir de otra acción u otra cuenta, y una fila sin
+      // cambios no prueba que la petición fallara (puede seguir en camino). Por eso la relectura
+      // solo se muestra como «estado actual», sin convertirla en éxito ni en fracaso. No se
+      // reintenta ni se escribe nada para comprobarlo.
+      const sinConfirmar = resultados.filter((r) => r.resultado === "no-confirmada");
+      if (sinConfirmar.length) {
+        progreso.textContent = "Consultando el estado actual…";
         const despues = await leerTallasVariante(accion.variante.id);
+        if (mia !== generacion) return;
         if (despues.error) {
           verificacionPendiente = true;
-          for (const r of resultados.filter((x) => x.resultado === "incierta")) r.detalle = "no pudimos comprobarlo: sin conexión";
+          for (const r of sinConfirmar) r.actual = { leido: false };
         } else {
           const ahora = new Map(despues.data.map((t) => [t.id, t]));
-          for (const r of resultados.filter((x) => x.resultado === "incierta")) {
-            const fila = ahora.get(r.id);
-            const cambio = fila && fila.actualizado_en !== r.actualizado_en && (accion.tipo === "revisar" || fila.estado === def.estadoEsperado);
-            r.resultado = cambio ? "aplicada" : "no-aplicada";
-            r.detalle = cambio ? "comprobado después de perder la conexión" : "se perdió la conexión antes de aplicarse";
-          }
+          for (const r of sinConfirmar) r.actual = { leido: true, fila: ahora.get(r.id) || null };
         }
       }
 
@@ -1136,6 +1139,9 @@
         if (!(await aplicarAcceso(otraVez))) return;
       }
       anunciarResultado(resumenResultados(accion, resultados));
+      // Tras un resultado no confirmado no queda nada preparado para repetir: cualquier acción
+      // posterior pide elegir las tallas y confirmar otra vez, ya con los datos recargados.
+      if (sinConfirmar.length) seleccion = { varianteId: null, ids: new Set() };
       marcarOcupado(false);
       if (!verificacionPendiente) {
         await cargarCatalogo({ conservarPosicion: true });
@@ -1160,21 +1166,44 @@
     const def = ACCIONES[accion.tipo];
     const total = resultados.length;
     const aplicadas = resultados.filter((r) => r.resultado === "aplicada").length;
-    const inciertas = resultados.filter((r) => r.resultado === "incierta").length;
+    const sinConfirmar = resultados.filter((r) => r.resultado === "no-confirmada");
+    const sinLeer = sinConfirmar.some((r) => !r.actual?.leido);
     const quien = `${accion.producto.nombre} · ${accion.variante.color}`;
     let titulo;
-    if (inciertas) titulo = "Resultado sin comprobar";
+    if (sinConfirmar.length) titulo = "Resultado no confirmado";
     else if (aplicadas === total) titulo = total === 1 ? `Talla ${resultados[0].talla} ${def.hecho}` : `${total} tallas ${def.hechas}`;
     else if (aplicadas) titulo = `Se aplicó a ${aplicadas} de ${total} tallas`;
     else titulo = "No se aplicó ningún cambio";
     const lineas = resultados.map((r) => {
-      const estado = { aplicada: def.hecho, fallida: "no se aplicó", "no-aplicada": "no se aplicó", "no-intentada": "no se aplicó", incierta: "sin comprobar" }[r.resultado];
+      if (r.resultado === "no-confirmada") return `${r.talla}: resultado no confirmado (${r.detalle}). ${textoEstadoActual(r)}`;
+      const estado = { aplicada: def.hecho, fallida: "no se aplicó", "no-intentada": "no se aplicó" }[r.resultado];
       return `${r.talla}: ${estado}${r.detalle ? ` (${r.detalle})` : ""}`;
     });
     let texto = quien;
-    if (inciertas) texto += ". Se perdió la conexión y no pudimos comprobar el resultado. No repitas la acción: pulsa «Actualizar» cuando vuelva la conexión para ver el estado real.";
-    else if (aplicadas !== total && total > 1 && accion.tipo !== "revisar") texto += ". Cada talla se guardó por separado; no fue una operación única.";
-    return { titulo, texto, lineas, tipo: inciertas || aplicadas !== total ? "aviso" : "ok" };
+    if (sinConfirmar.length) {
+      texto += `. No sabemos si la petición de ${sinConfirmar.length === 1 ? `la talla ${sinConfirmar[0].talla}` : `las tallas ${sinConfirmar.map((r) => r.talla).join(", ")}`} se aplicó.`;
+      texto += sinLeer
+        ? " Tampoco pudimos leer el estado actual: no repitas la acción y pulsa «Actualizar» cuando vuelva la conexión."
+        : " El estado actual es el que tiene ahora en el servidor, pero no indica qué operación lo produjo. No repitas la acción sin revisarlo; si hace falta, vuelve a elegir las tallas y confirma de nuevo.";
+    }
+    if (aplicadas !== total && total > 1 && accion.tipo !== "revisar") texto += `${sinConfirmar.length ? "" : "."} Cada talla se guardó por separado; no fue una operación única.`;
+    return { titulo, texto, lineas, tipo: sinConfirmar.length || aplicadas !== total ? "aviso" : "ok" };
+  }
+
+  // Describe la fila releída tal como está, sin atribuirla a la petición sin confirmar.
+  function textoEstadoActual(r) {
+    if (!r.actual?.leido) return "No pudimos leer su estado actual.";
+    const fila = r.actual.fila;
+    if (!fila) return "Estado actual: la talla ya no aparece en este color.";
+    const datos = [`guardada como ${(GUARDADOS[fila.estado] || fila.estado).toLowerCase()}`];
+    if (fila.origen) datos.push(`procedencia: ${ORIGENES[fila.origen] || fila.origen}`);
+    if (fila.publicado_en) datos.push(`publicación original: ${fecha(fila.publicado_en)}`);
+    if (fila.vigencia_desde) datos.push(`vigencia: ${fecha(fila.vigencia_desde)} → ${fecha(fila.vence_en)}`);
+    if (!fila.activa) datos.push("desactivada");
+    const cambio = fila.actualizado_en !== r.actualizado_en
+      ? "Cambió después de la comprobación previa, pero no sabemos por qué operación."
+      : "Sin cambios por ahora; la petición todavía podría aplicarse.";
+    return `Estado actual: ${datos.join(" · ")}. ${cambio}`;
   }
 
   function anunciarResultado({ titulo, texto = "", lineas = [], tipo = "ok" }) {

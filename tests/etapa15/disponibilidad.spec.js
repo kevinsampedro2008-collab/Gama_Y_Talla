@@ -305,44 +305,220 @@ test('fallo parcial: se informa qué se aplicó y qué no', async ({ page }) => 
   expect(filas[cat.talla('negro', '40')].estado).toBe('CONFIRMADA');
 });
 
-test('conexión perdida: el resultado incierto se comprueba antes de permitir repetir', async ({ page }) => {
-  // 1) La petición llega a Supabase, pero la respuesta se pierde: se comprueba y sí se aplicó.
-  await page.route('**/rpc/fn_marcar_agotada*', async (r) => { await r.fetch(); await r.abort('internetdisconnected'); });
+// Las líneas del resultado, una por talla.
+const lineas = (page) => resultado(page).locator('.resultado-lineas li');
+const SIN_CAMBIOS = 'Sin cambios por ahora; la petición todavía podría aplicarse.';
+const CAMBIO_SIN_ORIGEN = 'Cambió después de la comprobación previa, pero no sabemos por qué operación.';
+
+// Las cabeceras con las que el panel envió una petición, para reenviarla más tarde desde Node.
+async function cabecerasDe(peticion) {
+  const todas = await peticion.allHeaders();
+  const utiles = ['authorization', 'apikey', 'content-type', 'accept', 'prefer', 'content-profile', 'accept-profile', 'x-client-info'];
+  return Object.fromEntries(Object.entries(todas).filter(([k]) => utiles.includes(k.toLowerCase())));
+}
+
+test('conexión perdida: resultado no confirmado, estado actual y sin repetir nada', async ({ page }) => {
+  // 1) La petición llega a Supabase y se aplica, pero la respuesta se pierde. La relectura
+  //    muestra el estado actual sin atribuírselo a la petición, y nada se repite.
+  let agotadas = 0;
+  await page.route('**/rpc/fn_marcar_agotada*', async (r) => { agotadas += 1; await r.fetch(); await r.abort('internetdisconnected'); });
   await talla(page, 'negro', '38').click();
   await talla(page, 'negro', '39').click();
   await accion(page, 'Marcar agotada').click();
   await confirmar(page, 'Marcar agotada').click();
-  await expect(resultado(page)).toContainText('38: marcada agotada (comprobado después de perder la conexión)');
-  await expect(resultado(page)).toContainText('39: no se aplicó (no se intentó)');
-  await page.unroute('**/rpc/fn_marcar_agotada*');
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveCount(2);
+  await expect(lineas(page).nth(0)).toContainText('38: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como agotada');
+  await expect(lineas(page).nth(0)).toContainText(CAMBIO_SIN_ORIGEN);
+  await expect(lineas(page).nth(1)).toHaveText('39: no se aplicó (no se intentó)');
+  await expect(resultado(page)).toContainText('No sabemos si la petición de la talla 38 se aplicó.');
+  await expect(resultado(page)).not.toContainText('marcada agotada');
+  expect(agotadas, 'sin reintentos automáticos').toBe(1);
+  const filas = await leerTallas([cat.talla('negro', '38'), cat.talla('negro', '39')]);
+  expect(filas[cat.talla('negro', '38')].estado).toBe('AGOTADA');
+  expect(filas[cat.talla('negro', '39')].estado).toBe('REVISAR');
+  // Los datos se recargan y la selección se vacía: cualquier acción posterior exige elegir y confirmar.
   await expect(talla(page, 'negro', '38')).toHaveText('38, agotada');
+  await expect(talla(page, 'negro', '38')).toHaveAttribute('aria-pressed', 'false');
+  await expect(barra(page)).toBeHidden();
+  await talla(page, 'negro', '39').click();
+  await accion(page, 'Marcar agotada').click();
+  await expect(dialogo(page)).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialogo(page)).toBeHidden();
+  expect(agotadas, 'abrir el diálogo no envía nada').toBe(1);
+  await talla(page, 'negro', '39').click(); // se quita la selección de prueba
+  await expect(barra(page)).toBeHidden();
+  await page.unroute('**/rpc/fn_marcar_agotada*');
 
-  // 2) La petición no sale: se comprueba y no se aplicó.
+  // 2) La petición no sale y la relectura encuentra la talla igual: tampoco se afirma que fallara.
   await page.route('**/rpc/fn_confirmar_por_proveedor*', (r) => r.abort('internetdisconnected'));
   await talla(page, 'negro', '40').click();
   await accion(page, 'Confirmó el proveedor').click();
   await confirmar(page, 'Confirmar disponibilidad').click();
-  await expect(resultado(page)).toContainText('40: no se aplicó (se perdió la conexión antes de aplicarse)');
+  await expect(lineas(page)).toHaveCount(1);
+  await expect(lineas(page).first()).toContainText('40: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como por revisar');
+  await expect(lineas(page).first()).toContainText(SIN_CAMBIOS);
+  await expect(resultado(page)).not.toContainText('no se aplicó');
   expect((await leerTallas([cat.talla('negro', '40')]))[cat.talla('negro', '40')].estado).toBe('REVISAR');
 
-  // 3) Tampoco se puede comprobar: nada se repite, la lista se vacía y se pide actualizar.
+  // 3) Tampoco se puede leer el estado actual: nada se repite, la lista se vacía y se pide actualizar.
+  let lecturas = 0;
   await page.route('**/rpc/fn_admin_tallas**', async (r) => {
     const cuerpo = r.request().postData() || '';
-    if (cuerpo.includes('p_variante_id') && (globalThis.__comprobaciones = (globalThis.__comprobaciones || 0) + 1) > 1) await r.abort('internetdisconnected');
+    if (cuerpo.includes('p_variante_id') && (lecturas += 1) > 1) await r.abort('internetdisconnected');
     else await r.continue();
   });
   await talla(page, 'negro', '41').click();
   await accion(page, 'Confirmó el proveedor').click();
   await confirmar(page, 'Confirmar disponibilidad').click();
-  await expect(resultado(page)).toContainText('Resultado sin comprobar');
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveText(['41: resultado no confirmado (se perdió la respuesta del servidor). No pudimos leer su estado actual.']);
+  await expect(resultado(page)).not.toContainText('Estado actual:');
+  await expect(resultado(page)).toContainText('Tampoco pudimos leer el estado actual');
   await expect(page.getByRole('heading', { name: 'Comprueba el resultado antes de seguir' })).toBeVisible();
   await expect(page.locator('#lista-productos > li')).toHaveCount(0);
-  globalThis.__comprobaciones = 0;
   await page.unroute('**/rpc/fn_admin_tallas**');
   await page.unroute('**/rpc/fn_confirmar_por_proveedor*');
   await page.locator('#tablero-aviso').getByRole('button', { name: 'Actualizar' }).click();
   await expect(page.locator('#lista-productos > li')).toHaveCount(2);
   await expect(talla(page, 'negro', '41')).toBeEnabled();
+  await expect(talla(page, 'negro', '41')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('respuesta perdida de «Dejar por revisar»: una fila AGOTADA no se anuncia como revisada', async ({ page }) => {
+  // La escritura llega, otra cuenta marca la talla agotada y la respuesta se pierde.
+  let escrituras = 0;
+  await page.route('**/rest/v1/tallas*', async (r) => {
+    if (r.request().method() !== 'PATCH') return r.continue();
+    escrituras += 1;
+    await r.fetch();
+    await ajustarTalla(cat.talla('negro', '38'), { estado: 'AGOTADA' });
+    await r.abort('internetdisconnected');
+  });
+  const antes = (await leerTallas([cat.talla('negro', '38')]))[cat.talla('negro', '38')];
+  await talla(page, 'negro', '38').click();
+  await accion(page, 'Dejar por revisar').click();
+  await confirmar(page, 'Dejar por revisar').click();
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveCount(1);
+  await expect(lineas(page).first()).toContainText('38: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como agotada');
+  await expect(lineas(page).first()).toContainText(CAMBIO_SIN_ORIGEN);
+  await expect(resultado(page)).not.toContainText('dejada por revisar');
+  await expect(resultado(page)).not.toContainText('guardada como por revisar');
+  const despues = (await leerTallas([cat.talla('negro', '38')]))[cat.talla('negro', '38')];
+  expect(despues.estado).toBe('AGOTADA');
+  expect(despues.actualizado_en).not.toBe(antes.actualizado_en);
+  expect(escrituras).toBe(1);
+  await expect(talla(page, 'negro', '38')).toHaveText('38, agotada');
+});
+
+test('respuesta perdida de «Nueva publicación»: no se le atribuye una confirmación ajena', async ({ page }) => {
+  // La petición no llega, pero antes de releer la talla queda CONFIRMADA por otra vía.
+  let ajena = null;
+  let publicaciones = 0;
+  await page.route('**/rpc/fn_confirmar_por_publicacion*', async (r) => {
+    publicaciones += 1;
+    await ajustarTalla(ajena.id, ajena.campos);
+    await r.abort('internetdisconnected');
+  });
+  const pedida = enColombia(Math.floor((Date.now() - 5 * 3600e3) / 60000) * 60000);
+  const publicar = async (t) => {
+    await talla(page, 'negro', t).click();
+    await accion(page, 'Nueva publicación').click();
+    await dialogo(page).getByLabel('Fecha de la publicación').fill(pedida.dia);
+    await dialogo(page).getByLabel('Hora (Colombia, UTC−5)').fill(pedida.hora);
+    await confirmar(page, 'Registrar publicación').click();
+  };
+
+  // a) Otra acción: una confirmación directa del proveedor.
+  const hace = new Date(Date.now() - 60e3).toISOString();
+  ajena = { id: cat.talla('negro', '40'), campos: { estado: 'CONFIRMADA', origen: 'proveedor', confirmado_en: hace, vigencia_desde: hace, vigencia_horas: 48 } };
+  await publicar('40');
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveCount(1);
+  await expect(lineas(page).first()).toContainText('40: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como confirmada · procedencia: confirmación del proveedor');
+  await expect(lineas(page).first()).toContainText(CAMBIO_SIN_ORIGEN);
+  await expect(resultado(page)).not.toContainText('confirmada por publicación');
+  const a = (await leerTallas([cat.talla('negro', '40')]))[cat.talla('negro', '40')];
+  expect(a).toMatchObject({ estado: 'CONFIRMADA', origen: 'proveedor', publicado_en: null });
+
+  // b) La misma acción con parámetros distintos: otra fecha de publicación.
+  const otra = new Date(Date.now() - 10 * 3600e3).toISOString();
+  ajena = { id: cat.talla('negro', '41'), campos: { estado: 'CONFIRMADA', origen: 'publicacion', publicado_en: otra, vigencia_desde: otra, vigencia_horas: 24 } };
+  await publicar('41');
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page).first()).toContainText('41: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como confirmada · procedencia: publicación del proveedor');
+  await expect(lineas(page).first()).toContainText(CAMBIO_SIN_ORIGEN);
+  await expect(resultado(page)).not.toContainText('confirmada por publicación');
+  const b = (await leerTallas([cat.talla('negro', '41')]))[cat.talla('negro', '41')];
+  expect(Date.parse(b.publicado_en)).toBe(Date.parse(otra));
+  expect(Date.parse(b.publicado_en)).not.toBe(Date.parse(pedida.iso));
+  expect(publicaciones, 'una sola petición por intento, sin reintentos').toBe(2);
+});
+
+test('relectura sin cambios mientras la escritura sigue en camino: no se afirma que no se aplicó', async ({ page }) => {
+  // El navegador pierde la petición, pero esta llega a Supabase DESPUÉS de la relectura.
+  let enCamino = null;
+  let escrituras = 0;
+  await page.route('**/rpc/fn_marcar_agotada*', async (r) => {
+    escrituras += 1;
+    const p = r.request();
+    enCamino = { url: p.url(), headers: await cabecerasDe(p), body: p.postData() };
+    await r.abort('internetdisconnected');
+  });
+  let tardia = null;
+  await page.route('**/rpc/fn_admin_tallas**', async (r) => {
+    if (!enCamino || !(r.request().postData() || '').includes('p_variante_id')) return r.continue();
+    const leida = await r.fetch();                     // la relectura ve la talla todavía sin cambios
+    const { url, headers, body } = enCamino;
+    enCamino = null;
+    tardia = await fetch(url, { method: 'POST', headers, body }); // y entonces llega la escritura original
+    await r.fulfill({ response: leida });
+  });
+  await talla(page, 'negro', '38').click();
+  await accion(page, 'Marcar agotada').click();
+  await confirmar(page, 'Marcar agotada').click();
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveCount(1);
+  await expect(lineas(page).first()).toContainText('38: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como por revisar');
+  await expect(lineas(page).first()).toContainText(SIN_CAMBIOS);
+  await expect(resultado(page)).not.toContainText('no se aplicó');
+  await expect(resultado(page)).not.toContainText('antes de aplicarse');
+  // La petición sí terminó aplicándose: decir que no se aplicó habría sido falso.
+  expect(tardia && tardia.status).toBe(200);
+  expect((await leerTallas([cat.talla('negro', '38')]))[cat.talla('negro', '38')].estado).toBe('AGOTADA');
+  expect(escrituras, 'el panel no la repitió').toBe(1);
+  await page.getByRole('button', { name: 'Actualizar' }).click();
+  await expect(talla(page, 'negro', '38')).toHaveText('38, agotada');
+});
+
+test('lote con conexión perdida: conserva lo confirmado, los fallos conocidos y lo no intentado', async ({ page }) => {
+  let n = 0;
+  await page.route('**/rpc/fn_confirmar_por_proveedor*', async (r) => {
+    n += 1;
+    if (n === 2) await r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'P0001', message: 'No existe la talla x', details: null, hint: null }) });
+    else if (n === 3) { await r.fetch(); await r.abort('internetdisconnected'); }
+    else await r.continue();
+  });
+  for (const t of ['38', '39', '40', '41']) await talla(page, 'negro', t).click();
+  await accion(page, 'Confirmó el proveedor').click();
+  await confirmar(page, 'Confirmar disponibilidad').click();
+  await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
+  await expect(lineas(page)).toHaveCount(4);
+  await expect(lineas(page).nth(0)).toHaveText('38: confirmada por el proveedor');
+  await expect(lineas(page).nth(1)).toHaveText('39: no se aplicó (la talla ya no existe)');
+  await expect(lineas(page).nth(2)).toContainText('40: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como confirmada · procedencia: confirmación del proveedor');
+  await expect(lineas(page).nth(2)).toContainText(CAMBIO_SIN_ORIGEN);
+  await expect(lineas(page).nth(3)).toHaveText('41: no se aplicó (no se intentó)');
+  await expect(resultado(page)).toContainText('No sabemos si la petición de la talla 40 se aplicó.');
+  await expect(resultado(page)).toContainText('Cada talla se guardó por separado; no fue una operación única.');
+  expect(n, 'se detiene tras perder la respuesta y no reintenta').toBe(3);
+  const filas = await leerTallas(['38', '39', '40', '41'].map((t) => cat.talla('negro', t)));
+  expect(filas[cat.talla('negro', '38')].estado).toBe('CONFIRMADA');
+  expect(filas[cat.talla('negro', '39')].estado).toBe('REVISAR');
+  expect(filas[cat.talla('negro', '40')].estado).toBe('CONFIRMADA');
+  expect(filas[cat.talla('negro', '41')].estado).toBe('REVISAR');
 });
 
 test('selección desactualizada: si la talla cambió en otro lugar, no se aplica nada', async ({ page }) => {

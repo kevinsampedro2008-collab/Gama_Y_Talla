@@ -31,13 +31,30 @@ entonces el catálogo remoto sigue vacío.
 
 - Antes de escribir se comprueban la sesión, el permiso (`fn_es_administrador()`) y que la selección
   siga vigente: si alguna talla cambió desde que se cargó (`actualizado_en`), no se aplica nada.
+  Esta consulta previa **detecta los cambios hechos antes de ella, pero no es un bloqueo atómico**:
+  entre la consulta y la escritura, otra pestaña u otra cuenta todavía puede cambiar la misma talla,
+  y la escritura se aplicará igualmente.
 - Mientras se aplica, todo lo demás queda bloqueado: no hay envíos dobles ni acciones cruzadas.
 - Las tres funciones trabajan **talla a talla**: con varias tallas son varias solicitudes, no una
   operación única, y el resultado dice cuáles se aplicaron y cuáles no. «Dejar por revisar» es una
   sola escritura para toda la selección.
-- Sin reintentos automáticos. Si se pierde la conexión, el panel vuelve a consultar la talla antes de
-  permitir repetir: informa si se aplicó o no. Si tampoco puede comprobarlo, vacía la lista y bloquea
-  las acciones hasta que «Actualizar» traiga el estado real.
+- Sin reintentos automáticos. Solo una **respuesta válida de la escritura** confirma qué hizo esa
+  petición. Si la respuesta se pierde (o no confirma el cambio), la talla queda como **«Resultado no
+  confirmado»**:
+  - El panel no repite la petición ni escribe nada para comprobarla, y no renueva vigencias.
+  - Relee la talla con `fn_admin_tallas()` (solo lectura) y muestra su **estado actual**: estado
+    guardado, procedencia, publicación original, vigencia y si está desactivada. Ese estado **no se
+    atribuye a la petición**: una fecha de actualización distinta puede venir de otra acción, otra
+    cuenta u otros parámetros, y una talla sin cambios tampoco prueba que la petición fallara, porque
+    puede seguir en camino y aplicarse después. El aviso lo dice así («cambió…, pero no sabemos por
+    qué operación» o «sin cambios por ahora; la petición todavía podría aplicarse»). Nunca anuncia,
+    por ejemplo, que una talla quedó por revisar si la relectura la muestra en otro estado.
+  - Si la relectura funciona, los datos se recargan y la selección se vacía: cualquier acción
+    posterior exige elegir las tallas y confirmar de nuevo.
+  - Si tampoco puede leerla, vacía la lista y bloquea las acciones hasta que «Actualizar» traiga el
+    estado real.
+  - En un lote, las tallas con respuesta válida conservan su resultado («confirmada…», «no se
+    aplicó» con el motivo) y las que quedaron después de la pérdida aparecen como «no se intentó».
 - Después de cada acción los datos se recargan desde el servidor, conservando búsqueda, filtro y
   posición. Las lecturas se piden por páginas ordenadas, sin truncarse en el límite de la API.
 - Las columnas internas de las tallas se leen con `fn_admin_tallas()`; las escrituras solo devuelven
