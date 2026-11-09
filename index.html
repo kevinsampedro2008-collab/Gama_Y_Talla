@@ -135,11 +135,38 @@
       </div>
     </section>
 
+    <!-- Cómo comprar (17.1): va justo después del inicio. Recorrido: Inicio → Cómo comprar → Catálogo → Pagos → Contacto. -->
+    <section class="seccion seccion-pasos zona-oscura" id="como-comprar" aria-labelledby="titulo-como-comprar">
+      <div class="contenedor">
+        <div class="seccion-encabezado">
+          <div>
+            <p class="etiqueta-mono seccion-numero"><span>01</span>Cómo comprar</p>
+            <h2 id="titulo-como-comprar">Tu pedido en cinco pasos</h2>
+          </div>
+          <p class="seccion-nota">Arma tu pedido con uno o varios pares y te atendemos por WhatsApp.</p>
+        </div>
+        <ol class="pasos">
+          <li class="paso"><span class="paso-numero" aria-hidden="true">01</span><div class="paso-tarjeta"><svg class="icono paso-icono" aria-hidden="true"><use href="#icono-buscar"></use></svg><div class="paso-texto"><h3>Explora las zapatillas</h3><p>Busca por modelo, marca o color y usa los filtros.</p></div></div></li>
+          <li class="paso"><span class="paso-numero" aria-hidden="true">02</span><div class="paso-tarjeta"><svg class="icono paso-icono" aria-hidden="true"><use href="#icono-regla"></use></svg><div class="paso-texto"><h3>Elige modelo y talla</h3><p>Abre los detalles y selecciona tu talla EU.</p></div></div></li>
+          <li class="paso"><span class="paso-numero" aria-hidden="true">03</span><div class="paso-tarjeta"><svg class="icono paso-icono" aria-hidden="true"><use href="#icono-bolsa"></use></svg><div class="paso-texto"><h3>Añade al carrito</h3><p>Combina modelos, tallas y cantidades en un solo pedido.</p></div></div></li>
+          <li class="paso"><span class="paso-numero" aria-hidden="true">04</span><div class="paso-tarjeta"><svg class="icono paso-icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg><div class="paso-texto"><h3>Envía tu pedido</h3><p>Todo tu carrito llega en un solo mensaje de WhatsApp.</p></div></div></li>
+          <li class="paso"><span class="paso-numero" aria-hidden="true">05</span><div class="paso-tarjeta"><svg class="icono paso-icono" aria-hidden="true"><use href="#icono-caja"></use></svg><div class="paso-texto"><h3>Confirma y recibe</h3><p>Coordina con nosotros el pago y la entrega.</p></div></div></li>
+        </ol>
+        <div class="pasos-cierre">
+          <p><strong>¿Te gustó más de un par?</strong> Añádelos al carrito y envíalos juntos para confirmar disponibilidad y precio final.</p>
+          <div class="acciones">
+            <a class="boton boton-claro boton-destacado" href="#catalogo">Explorar catálogo <svg class="icono" aria-hidden="true"><use href="#icono-flecha"></use></svg></a>
+            <button class="boton boton-contorno-claro" type="button" data-abrir-carrito><svg class="icono" aria-hidden="true"><use href="#icono-bolsa"></use></svg>Ver mi carrito</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="seccion seccion-catalogo" id="catalogo" aria-labelledby="titulo-catalogo">
       <div class="contenedor">
         <div class="seccion-encabezado">
           <div>
-            <p class="etiqueta-mono seccion-numero"><span>01</span>Catálogo</p>
+            <p class="etiqueta-mono seccion-numero"><span>02</span>Catálogo</p>
             <h2 id="titulo-catalogo" tabindex="-1">Elige tu par</h2>
           </div>
           <p class="seccion-nota">Abre cada modelo para ver sus tallas y añadirlo al carrito.</p>
@@ -242,65 +269,41 @@
       </div>
     </section>
 
-    <section class="seccion seccion-pasos zona-oscura" id="como-comprar" aria-labelledby="titulo-como-comprar">
-      <div class="contenedor">
-        <div class="seccion-encabezado">
-          <div>
-            <p class="etiqueta-mono seccion-numero"><span>02</span>Cómo comprar</p>
-            <h2 id="titulo-como-comprar">Tu pedido en cinco pasos</h2>
-          </div>
-          <p class="seccion-nota">Arma tu pedido con uno o varios pares y te atendemos por WhatsApp.</p>
-        </div>
-        <ol class="pasos">
-          <li class="paso"><span class="paso-numero" aria-hidden="true">01</span><h3>Explora las zapatillas</h3><p>Busca por modelo, marca o color y usa los filtros.</p></li>
-          <li class="paso"><span class="paso-numero" aria-hidden="true">02</span><h3>Elige modelo y talla</h3><p>Abre los detalles y selecciona tu talla EU.</p></li>
-          <li class="paso"><span class="paso-numero" aria-hidden="true">03</span><h3>Añade al carrito</h3><p>Combina modelos, tallas y cantidades en un solo pedido.</p></li>
-          <li class="paso"><span class="paso-numero" aria-hidden="true">04</span><h3>Envía tu pedido</h3><p>Todo tu carrito llega en un solo mensaje de WhatsApp.</p></li>
-          <li class="paso"><span class="paso-numero" aria-hidden="true">05</span><h3>Confirma y recibe</h3><p>Coordina con nosotros el pago y la entrega.</p></li>
-        </ol>
-        <div class="pasos-cierre">
-          <p><strong>¿Te gustó más de un par?</strong> Añádelos al carrito y envíalos juntos para confirmar disponibilidad y precio final.</p>
-          <div class="acciones">
-            <button class="boton boton-claro" type="button" data-abrir-carrito><svg class="icono" aria-hidden="true"><use href="#icono-bolsa"></use></svg>Ver mi carrito</button>
-            <a class="boton boton-contorno-claro" href="#catalogo">Explorar catálogo</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section class="seccion seccion-pagos" id="pagos" aria-labelledby="titulo-pagos">
-      <div class="contenedor">
-        <div class="seccion-encabezado">
-          <div>
+    <!-- Cierre oscuro (17.3): Pagos y Contacto forman un solo bloque negro de ancho completo. Siguen siendo
+         dos secciones con sus anclas #pagos y #contacto: en escritorio van en dos columnas, en celular una bajo la otra. -->
+    <div class="cierre-oscuro zona-oscura">
+      <div class="contenedor cierre-grid">
+        <section class="cierre-pagos" id="pagos" aria-labelledby="titulo-pagos">
+          <div class="pagos-encabezado">
             <p class="etiqueta-mono seccion-numero"><span>03</span>Pagos</p>
             <h2 id="titulo-pagos">Medios de pago</h2>
+            <p class="seccion-nota">Coordinamos el pago contigo cuando confirmemos la disponibilidad de tu pedido.</p>
           </div>
-          <p class="seccion-nota">El pago se coordina una vez confirmada la disponibilidad de tu pedido.</p>
-        </div>
-        <ul class="pagos">
-          <li class="pago"><span class="pago-icono"><img class="pago-icono-nequi" src="assets/images/pagos/nequi-icono.png" width="256" height="256" alt="" loading="lazy"></span><span class="pago-texto"><strong>Nequi</strong><small>Billetera digital</small></span></li>
-          <li class="pago"><span class="pago-icono"><img class="pago-icono-bancolombia" src="assets/images/pagos/bancolombia-icono.svg" width="512" height="512" alt="" loading="lazy"></span><span class="pago-texto"><strong>Bancolombia</strong><small>Cuenta bancaria</small></span></li>
-          <li class="pago"><span class="pago-icono"><svg class="icono" aria-hidden="true"><use href="#icono-transferencia"></use></svg></span><span class="pago-texto"><strong>Transferencia bancaria</strong><small>Desde tu banco</small></span></li>
-        </ul>
-        <p class="aviso"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg><span>Confirma los datos oficiales de pago directamente con nosotros antes de realizar cualquier transferencia.</span></p>
-      </div>
-    </section>
+          <ul class="pagos">
+            <li class="pago"><span class="pago-icono"><img class="pago-icono-nequi" src="assets/images/pagos/nequi-icono.png" width="256" height="256" alt="" loading="lazy"></span><span class="pago-texto"><strong>Nequi</strong><small>Billetera digital</small></span></li>
+            <li class="pago"><span class="pago-icono"><img class="pago-icono-bancolombia" src="assets/images/pagos/bancolombia-icono.svg" width="512" height="512" alt="" loading="lazy"></span><span class="pago-texto"><strong>Bancolombia</strong><small>Cuenta bancaria</small></span></li>
+            <li class="pago"><span class="pago-icono"><svg class="icono" aria-hidden="true"><use href="#icono-transferencia"></use></svg></span><span class="pago-texto"><strong>Transferencia bancaria</strong><small>Desde tu banco</small></span></li>
+          </ul>
+          <p class="aviso"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg><span>Confirma con nosotros los datos de pago antes de transferir.</span></p>
+        </section>
 
-    <section class="seccion seccion-contacto zona-oscura" id="contacto" aria-labelledby="titulo-contacto">
-      <div class="contenedor contacto">
-        <div class="contacto-principal">
-          <p class="etiqueta-mono seccion-numero"><span>04</span>Contacto</p>
-          <h2 id="titulo-contacto">¿Dudas con tu talla o tu pedido?</h2>
-          <p>Escríbenos por WhatsApp para consultar modelos, tallas, precios y detalles del envío.</p>
-          <a class="boton boton-whatsapp" data-wa href="#contacto"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Escribir por WhatsApp</a>
-        </div>
-        <ul class="contacto-lista">
-          <li><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg><span><strong>Atención por WhatsApp</strong><span>Te ayudamos con modelos, tallas y pedidos.</span></span></li>
-          <li><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg><span><strong>Envíos</strong><span>Enviamos a toda Colombia. El costo y el tiempo se confirman con cada pedido.</span></span></li>
-          <li><svg class="icono" aria-hidden="true"><use href="#icono-reloj"></use></svg><span><strong>Horario de atención</strong><span data-horario>Consulta nuestro horario de atención por WhatsApp.</span></span></li>
-        </ul>
+        <section class="cierre-contacto" id="contacto" aria-labelledby="titulo-contacto">
+          <div class="contacto">
+            <div class="contacto-principal">
+              <p class="etiqueta-mono seccion-numero"><span>04</span>Contacto</p>
+              <h2 id="titulo-contacto">¿Dudas con tu talla o tu pedido?</h2>
+              <p>Escríbenos por WhatsApp para consultar modelos, tallas, precios y detalles del envío.</p>
+              <a class="boton boton-whatsapp" data-wa href="#contacto"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Escribir por WhatsApp</a>
+            </div>
+            <ul class="contacto-lista">
+              <li><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp"></use></svg><span><strong>Atención por WhatsApp</strong><span>Te ayudamos con modelos, tallas y pedidos.</span></span></li>
+              <li><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg><span><strong>Envíos</strong><span>Enviamos a toda Colombia. El costo y el tiempo se confirman con cada pedido.</span></span></li>
+              <li><svg class="icono" aria-hidden="true"><use href="#icono-reloj"></use></svg><span><strong>Horario de atención</strong><span data-horario>Consulta nuestro horario de atención por WhatsApp.</span></span></li>
+            </ul>
+          </div>
+        </section>
       </div>
-    </section>
+    </div>
   </main>
 
   <footer class="pie zona-oscura">
@@ -315,8 +318,8 @@
       <nav class="pie-columna" aria-labelledby="pie-titulo-tienda">
         <h2 class="pie-titulo" id="pie-titulo-tienda">Tienda</h2>
         <ul>
-          <li><a href="#catalogo">Catálogo</a></li>
           <li><a href="#como-comprar">Cómo comprar</a></li>
+          <li><a href="#catalogo">Catálogo</a></li>
           <li><a href="#pagos">Medios de pago</a></li>
           <li><button class="boton-texto" type="button" data-abrir-guia aria-haspopup="dialog" aria-controls="guia-tallas">Guía de tallas</button></li>
         </ul>
@@ -342,7 +345,49 @@
 
   <dialog class="modal modal-producto" id="modal-producto" aria-label="Detalles del producto"><div class="modal-caja"><button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar detalles"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button><div class="detalle" id="detalle-contenido"></div></div></dialog>
 
-  <dialog class="modal modal-lateral" id="carrito" aria-labelledby="carrito-titulo"><div class="carrito"><header class="carrito-cabecera"><div><p class="etiqueta-mono">Tu selección</p><h2 id="carrito-titulo" tabindex="-1">Mi carrito</h2></div><button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar carrito"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button></header><p class="carrito-notificacion" id="carrito-notificacion" role="status" hidden></p><div class="carrito-cuerpo" id="carrito-cuerpo"></div><footer class="carrito-pie" id="carrito-pie" hidden><dl class="carrito-resumen"><div><dt>Unidades</dt><dd id="carrito-unidades">0</dd></div><div><dt>Subtotal estimado</dt><dd id="carrito-subtotal">$0</dd></div><div><dt>Envío</dt><dd>Por confirmar</dd></div></dl><p class="carrito-nota" id="carrito-nota">El subtotal es estimado y no incluye el envío.</p><section class="carrito-envio" id="carrito-envio" aria-labelledby="carrito-envio-titulo" hidden><h3 id="carrito-envio-titulo">Datos de envío</h3><dl class="carrito-envio-datos" id="carrito-envio-datos"></dl></section><p class="carrito-envio-aviso" id="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg>Completa tus datos de envío para continuar.</p><button class="boton boton-secundario boton-ancho" id="carrito-datos" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg><span class="carrito-datos-texto">Agregar datos de envío</span></button><button class="boton boton-whatsapp boton-ancho" id="carrito-enviar" type="button" aria-describedby="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar pedido por WhatsApp</button><div class="carrito-respaldo" id="carrito-respaldo" hidden><p>El pedido es largo: WhatsApp se abre con un resumen y el mensaje completo se pega en el chat.</p><button class="boton boton-claro boton-ancho" id="carrito-copiar-completo" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-copiar"></use></svg>Copiar mensaje completo</button><textarea class="carrito-mensaje-completo" id="carrito-mensaje-completo" readonly rows="8" aria-label="Mensaje completo del pedido" hidden></textarea></div></footer></div></dialog>
+  <!-- Carrito (etapa 17.1): tres zonas. Cabecera compacta, UNA zona con desplazamiento (productos, nota,
+       entrega y mensaje completo) y pie fijo con el subtotal y la acción principal. -->
+  <dialog class="modal modal-lateral" id="carrito" aria-labelledby="carrito-titulo">
+    <div class="carrito">
+      <header class="carrito-cabecera">
+        <h2 id="carrito-titulo" tabindex="-1">Mi carrito</h2>
+        <button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar carrito"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button>
+      </header>
+      <p class="carrito-notificacion" id="carrito-notificacion" role="status" hidden></p>
+      <div class="carrito-zona" id="carrito-zona">
+        <div class="carrito-cuerpo" id="carrito-cuerpo"></div>
+        <div class="carrito-complemento" id="carrito-complemento" hidden>
+          <p class="carrito-nota" id="carrito-nota">El subtotal es estimado y no incluye el envío.</p>
+          <section class="carrito-entrega" id="carrito-entrega" aria-labelledby="carrito-entrega-titulo" hidden>
+            <h3 class="carrito-entrega-titulo" id="carrito-entrega-titulo">Dirección de envío</h3>
+            <div class="carrito-entrega-fila">
+              <p class="carrito-entrega-resumen" id="carrito-entrega-resumen"><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg><span id="carrito-entrega-ciudad">Sin dirección</span></p>
+              <button class="boton-texto carrito-entrega-boton" id="carrito-envio-ver" type="button" aria-expanded="false" aria-controls="carrito-envio" hidden>Ver datos</button>
+              <button class="boton boton-secundario carrito-entrega-boton" id="carrito-datos" type="button"><span class="carrito-datos-texto">Agregar dirección</span></button>
+            </div>
+            <p class="carrito-envio-confirmacion" id="carrito-envio-confirmacion" role="status" hidden></p>
+            <section class="carrito-envio" id="carrito-envio" aria-label="Datos de envío" hidden>
+              <dl class="carrito-envio-datos" id="carrito-envio-datos"></dl>
+            </section>
+          </section>
+          <div class="carrito-respaldo" id="carrito-respaldo" hidden>
+            <p>El pedido es largo: WhatsApp se abre con un resumen y el mensaje completo se pega en el chat.</p>
+            <button class="boton boton-claro boton-ancho" id="carrito-copiar-completo" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-copiar"></use></svg>Copiar mensaje completo</button>
+            <textarea class="carrito-mensaje-completo" id="carrito-mensaje-completo" readonly rows="8" aria-label="Mensaje completo del pedido" hidden></textarea>
+          </div>
+        </div>
+      </div>
+      <footer class="carrito-pie" id="carrito-pie" hidden>
+        <dl class="carrito-resumen">
+          <div class="carrito-resumen-subtotal"><dt>Subtotal estimado</dt><dd id="carrito-subtotal">$0</dd></div>
+          <div><dt>Unidades</dt><dd id="carrito-unidades">0</dd></div>
+          <div><dt>Envío</dt><dd>Por confirmar</dd></div>
+        </dl>
+        <p class="carrito-envio-aviso" id="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg>Completa tus datos de envío para continuar.</p>
+        <button class="boton boton-whatsapp boton-ancho" id="carrito-enviar" type="button" aria-describedby="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar pedido por WhatsApp</button>
+      </footer>
+    </div>
+  </dialog>
 
   <!-- Datos de envío (etapa 16.2): libreta de direcciones guardada solo en este navegador (LocalStorage), nunca en el servidor. -->
   <dialog class="modal modal-envio" id="datos-envio" aria-labelledby="envio-titulo">

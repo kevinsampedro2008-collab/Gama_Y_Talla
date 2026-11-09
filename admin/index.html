@@ -134,6 +134,8 @@
           <button class="boton boton-principal boton-compacto" id="boton-nuevo" type="button" data-accion="nuevo-producto">Agregar zapatilla</button>
           <button class="boton boton-secundario boton-compacto" id="boton-historial" type="button" data-accion="historial" aria-controls="historial" aria-expanded="false">Historial</button>
           <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
+          <!-- Etapa 17: CSV del inventario completo (también lo oculto y lo retirado). -->
+          <button class="boton boton-secundario boton-compacto" id="boton-exportar" type="button" data-accion="exportar">Exportar catálogo</button>
         </div>
       </div>
 
@@ -142,8 +144,15 @@
 
       <section class="historial" id="historial" aria-labelledby="historial-titulo" hidden>
         <div class="historial-cabecera">
-          <h2 id="historial-titulo">Historial reciente de disponibilidad</h2>
+          <h2 id="historial-titulo">Historial de cambios</h2>
           <button class="boton boton-secundario boton-compacto" type="button" data-accion="historial">Cerrar</button>
+        </div>
+        <!-- Etapa 17: zapatillas, colores y tallas. Cambiar el filtro reinicia la lista. -->
+        <div class="historial-filtros" role="group" aria-label="Mostrar cambios de">
+          <button class="filtro" type="button" data-accion="historial-filtro" data-historial-filtro="todos" aria-pressed="true">Todos</button>
+          <button class="filtro" type="button" data-accion="historial-filtro" data-historial-filtro="productos" aria-pressed="false">Zapatillas</button>
+          <button class="filtro" type="button" data-accion="historial-filtro" data-historial-filtro="variantes" aria-pressed="false">Colores</button>
+          <button class="filtro" type="button" data-accion="historial-filtro" data-historial-filtro="tallas" aria-pressed="false">Tallas</button>
         </div>
         <p class="historial-estado" id="historial-estado" role="status" aria-live="polite"></p>
         <ol class="historial-lista" id="historial-lista"></ol>

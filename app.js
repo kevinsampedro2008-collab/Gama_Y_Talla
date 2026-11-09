@@ -113,6 +113,11 @@ Object.assign(CONFIG, (() => {
   // fuenteLocal fuerza (true) o descarta (false) fiarse del JSON del repositorio.
   // Sin indicarlo, se deduce del entorno: ver esEntornoDePruebas().
   if (typeof fuera.fuenteLocal === "boolean") salida.fuenteLocal = fuera.fuenteLocal;
+  // Publicación (config.js generado al compilar): el número comercial viene del entorno y el catálogo
+  // de demostración («?datos-prueba») queda desactivado. En desarrollo no se declaran y todo sigue igual.
+  const whatsapp = leer("whatsapp");
+  if (whatsapp !== undefined && /^\d{10,15}$/.test(whatsapp)) salida.whatsapp = whatsapp;
+  if (fuera.produccion === true) salida.produccion = true;
   // Una clave no admitida se descarta aquí mismo: ningún otro punto del código llega a verla.
   if (salida.catalogoUrl || salida.catalogoClave) {
     const { tipo, rechazo, secreta } = clasificarClave(salida.catalogoClave);
@@ -135,14 +140,24 @@ const formatoNumero = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 
 const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const normalizarTexto = (valor) => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
-/* ---------- Público y muestras de color (etapa 16.3) ----------
-   «publico» clasifica el producto para la tienda (hombre → «Caballero», dama → «Dama»); vacío =
-   sin clasificar: no lleva etiqueta y solo aparece en «Todos». Es independiente de «segmento», que
-   elige la tabla de la guía de tallas. La muestra de un color es un hexadecimal validado; sin ella,
-   un nombre INEQUÍVOCO se resuelve con esta paleta y uno compuesto o desconocido usa un círculo
-   neutro identificable, siempre con el nombre real del color. */
-const PUBLICOS = Object.freeze({ hombre: "Caballero", dama: "Dama" });
+/* ---------- Público y muestras de color (etapas 16.3 y 17) ----------
+   «publico» clasifica el producto para la tienda (hombre → «Caballero», dama → «Dama», unisex →
+   «Unisex»); vacío = heredado sin clasificar: no lleva etiqueta y solo aparece en «Todos». Es
+   independiente de «segmento», que elige la tabla de la guía de tallas. La muestra de un color es
+   un hexadecimal validado; sin ella, un nombre INEQUÍVOCO se resuelve con esta paleta y uno
+   compuesto o desconocido usa un círculo neutro identificable, siempre con el nombre real del color. */
+const PUBLICOS = Object.freeze({ hombre: "Caballero", dama: "Dama", unisex: "Unisex" });
 const etiquetaPublico = (publico) => (Object.hasOwn(PUBLICOS, publico) ? PUBLICOS[publico] : "");
+// 17: en los filtros, Marca, Categoría y Público se leen con la primera letra en mayúscula y el resto
+// en minúscula («ADIDAS» → «Adidas», «BOTAS CASUALES» → «Botas casuales»). Solo cambia el texto
+// visible: los valores guardados, las claves de selección y los recuentos siguen siendo los mismos.
+function textoFiltro(valor) {
+  const [primera = "", ...resto] = [...String(valor ?? "").toLocaleLowerCase("es-CO")];
+  return primera.toLocaleUpperCase("es-CO") + resto.join("");
+}
+// 17.4: la marca se muestra con la misma regla («ADIDAS» → «Adidas», «NEW BALANCE» → «New balance»,
+// «ÉCLAT» → «Éclat»). Es solo presentación: el dato, los filtros y la búsqueda no cambian.
+const textoMarca = (marca) => textoFiltro(marca);
 const MUESTRA_VALIDA = /^#[0-9a-f]{6}$/i;
 const PALETA_COLORES = new Map(Object.entries({
   negro: "#141414", blanco: "#ffffff", gris: "#8c8c88", "gris claro": "#c9c9c4", "gris oscuro": "#4a4a47",
@@ -180,7 +195,8 @@ const precioMensaje = (valor) => Number(valor) > 0 ? `$${formatoNumero.format(Nu
 const formatearPrecio = (valor) => Number(valor) > 0 ? pesos(valor) : "Precio por confirmar";
 const animacionReducida = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const grilla = () => $("#grilla-productos");
-const MODO_PRUEBA = new URLSearchParams(window.location.search).has("datos-prueba");
+// En producción (config.js generado con produccion: true) «?datos-prueba» no activa los ejemplos.
+const MODO_PRUEBA = !CONFIG.produccion && new URLSearchParams(window.location.search).has("datos-prueba");
 // El modo de prueba usa su propio carrito: nunca toca el carrito real ni migra el V2.
 if (MODO_PRUEBA) {
   CONFIG.claveCarrito += "-prueba";
@@ -246,7 +262,7 @@ const enlaceWhatsApp = (mensaje) => `https://api.whatsapp.com/send?phone=${Strin
    Los asteriscos del encabezado son la negrita de WhatsApp; los de cada campo («* Marca: …») son
    parte literal del formato pedido: WhatsApp los muestra como viñetas. */
 const ENCABEZADO_PEDIDO = `*${CONFIG.tienda.toUpperCase()} — NUEVO PEDIDO*`;
-const SEPARADOR_PEDIDO = "─".repeat(17);
+const SEPARADOR_PEDIDO = "─".repeat(16);
 const textoUnidades = (cantidad) => `${cantidad} ${cantidad === 1 ? "artículo" : "artículos"}`;
 
 function totalPedido(resumen) {
@@ -260,7 +276,7 @@ const cierreTotales = (resumen) => [SEPARADOR_PEDIDO, `💰TOTAL: ${totalPedido(
 function bloqueDatosEnvio(envio) {
   if (!envio) return [];
   return [
-    SEPARADOR_PEDIDO, "Mis datos:",
+    SEPARADOR_PEDIDO, "*Mis datos:*",
     `Nombre: ${envio.nombre}`, `Teléfono: ${envio.telefono}`, `Ciudad: ${envio.ciudad}`, `Dirección: ${envio.direccion}`,
     ...(envio.nota ? [`Nota: ${envio.nota}`] : [])
   ];
@@ -531,7 +547,7 @@ function crearConsultaAlternativa(lineas) {
 function nombreCompleto(producto) {
   const nombre = normalizarTexto(producto.nombre);
   const marca = normalizarTexto(producto.marca);
-  return nombre.includes(marca) ? producto.nombre : `${producto.marca} ${producto.nombre}`;
+  return nombre.includes(marca) ? producto.nombre : `${textoMarca(producto.marca)} ${producto.nombre}`;
 }
 
 const estado = {
@@ -876,7 +892,7 @@ function aplicarConfiguracion() {
     enlace.rel = "noopener noreferrer";
   });
   $$('[data-horario]').forEach((nodo) => {
-    nodo.textContent = CONFIG.horario || "Consulta nuestro horario de atención por WhatsApp.";
+    nodo.textContent = CONFIG.horario || "Lunes a viernes: 8:00 a. m. - 6:00 p. m. / Sábados y domingos: 8:00 a. m. - 1:00 p. m.";
   });
   $$('[data-anio]').forEach((nodo) => { nodo.textContent = String(new Date().getFullYear()); });
   if (String(CONFIG.whatsapp).replace(/\D/g, "") === NUMERO_PROVISIONAL) {
@@ -1283,8 +1299,8 @@ function construirFiltros() {
 
   // Las mismas opciones viven en los paneles de escritorio y en la hoja de celular;
   // sincronizarFiltros() mantiene ambas copias al día.
-  const opcionesMarca = () => [TODOS, ...marcas].map((marca) => crearOpcion("marca", marca, marca === TODOS ? "Todas las marcas" : marca));
-  const opcionesCategoria = () => [TODOS, ...categorias].map((categoria) => crearOpcion("categoria", categoria, categoria === TODOS ? "Todas las categorías" : categoria));
+  const opcionesMarca = () => [TODOS, ...marcas].map((marca) => crearOpcion("marca", marca, marca === TODOS ? "Todas las marcas" : textoFiltro(marca)));
+  const opcionesCategoria = () => [TODOS, ...categorias].map((categoria) => crearOpcion("categoria", categoria, categoria === TODOS ? "Todas las categorías" : textoFiltro(categoria)));
   const opcionesTalla = () => [TODOS, ...tallas].map(crearOpcionTalla);
   $("#filtro-marca")?.replaceChildren(...opcionesMarca());
   $("#hoja-marca")?.replaceChildren(...opcionesMarca());
@@ -1292,8 +1308,9 @@ function construirFiltros() {
   $("#hoja-categoria")?.replaceChildren(...opcionesCategoria());
   $("#filtro-talla")?.replaceChildren(...opcionesTalla());
   $("#hoja-talla")?.replaceChildren(...opcionesTalla());
-  // Público (16.3): solo aparece cuando al menos un producto está clasificado.
-  const opcionesPublico = () => [[TODOS, "Todos"], ["hombre", PUBLICOS.hombre], ["dama", PUBLICOS.dama]].map(([valor, texto]) => crearOpcion("publico", valor, texto));
+  // Público (16.3, 17 con Unisex): solo aparece cuando al menos un producto está clasificado.
+  // «Todos» incluye los heredados sin clasificar; cada opción filtra por su clasificación exacta.
+  const opcionesPublico = () => [[TODOS, "Todos"], ...Object.entries(PUBLICOS)].map(([valor, texto]) => crearOpcion("publico", valor, textoFiltro(texto)));
   $("#filtro-publico")?.replaceChildren(...opcionesPublico());
   $("#hoja-publico")?.replaceChildren(...opcionesPublico());
   const hayPublico = estado.productos.some((producto) => producto.publico);
@@ -1340,7 +1357,7 @@ function actualizarPortada(tallas) {
   estado.productos.forEach((producto) => conteo.set(producto.marca, (conteo.get(producto.marca) || 0) + 1));
   const marcas = [...conteo.entries()]
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
-    .map(([marca]) => marca);
+    .map(([marca]) => textoMarca(marca));
   const textoMarcas = $("[data-marcas-portada]");
   if (textoMarcas && marcas.length) {
     textoMarcas.textContent = marcas.length > 4 ? `${marcas.slice(0, 4).join(", ")} y más` : unirConY(marcas);
@@ -1380,10 +1397,10 @@ function sincronizarFiltros() {
 
   // Valor visible de cada campo de escritorio y marca de campo activo.
   const valores = {
-    marca: estado.marca === TODOS ? "Todas" : estado.marca,
-    categoria: estado.categoria === TODOS ? "Todas" : estado.categoria,
+    marca: estado.marca === TODOS ? "Todas" : textoFiltro(estado.marca),
+    categoria: estado.categoria === TODOS ? "Todas" : textoFiltro(estado.categoria),
     talla: estado.talla === TODOS ? "Todas" : `EU ${estado.talla}`,
-    publico: estado.publico === TODOS ? "Todos" : etiquetaPublico(estado.publico)
+    publico: estado.publico === TODOS ? "Todos" : textoFiltro(etiquetaPublico(estado.publico))
   };
   $$("[data-valor-campo]").forEach((nodo) => { nodo.textContent = valores[nodo.dataset.valorCampo]; });
   $$(".campo[data-campo]").forEach((campo) => campo.toggleAttribute("data-activo", estado[campo.dataset.campo] !== TODOS));
@@ -1417,10 +1434,10 @@ function renderizarFiltrosActivos() {
   const busqueda = estado.busqueda.trim();
   const activos = [
     busqueda && ["busqueda", "Búsqueda", `“${busqueda}”`],
-    estado.marca !== TODOS && ["marca", "Marca", estado.marca],
-    estado.categoria !== TODOS && ["categoria", "Categoría", estado.categoria],
+    estado.marca !== TODOS && ["marca", "Marca", textoFiltro(estado.marca)],
+    estado.categoria !== TODOS && ["categoria", "Categoría", textoFiltro(estado.categoria)],
     estado.talla !== TODOS && ["talla", "Talla", `EU ${estado.talla}`],
-    estado.publico !== TODOS && ["publico", "Público", etiquetaPublico(estado.publico)],
+    estado.publico !== TODOS && ["publico", "Público", textoFiltro(etiquetaPublico(estado.publico))],
     estado.soloNuevos && ["nuevos", "Novedades", "Solo nuevos"]
   ].filter(Boolean);
   lista.replaceChildren(...activos.map(([tipo, etiqueta, valor]) => {
@@ -1666,14 +1683,14 @@ function crearTarjeta(producto, indiceVisible = 12) {
   const detalles = crearBoton("tarjeta-enlace", caja, { accion: "detalles" });
   detalles.setAttribute("aria-label", `Ver detalles de ${nombreCompleto(producto)}`);
   acciones.append(detalles);
-  // 16.3: «Caballero» / «Dama» va justo después de la marca y nunca se recorta. Si la línea no
-  // cabe, se recorta primero la categoría (y los colores) y, solo si hace falta, la marca.
+  // 17: marca · público (si está asignado) · recuento de colores (si hay más de uno), p. ej.
+  // «NIKE · CABALLERO · 2 COLORES». La categoría ya no va en esta línea (sigue en la ficha y en el
+  // filtro). Público y recuento nunca se recortan: si no caben, en celular pasan a una segunda
+  // línea; solo la marca puede recortarse en una línea muy estrecha.
   const meta = crearElemento("p", "tarjeta-meta");
-  const resto = crearElemento("span", "tarjeta-meta-resto", ` · ${producto.categoria}`);
-  if (producto.variantes.length > 1) resto.append(crearElemento("span", "tarjeta-colores", ` · ${producto.variantes.length} colores`));
-  meta.append(crearElemento("span", "tarjeta-meta-marca", producto.marca));
+  meta.append(crearElemento("span", "tarjeta-meta-marca", textoMarca(producto.marca)));
   if (producto.publico) meta.append(crearElemento("span", "tarjeta-publico", ` · ${etiquetaPublico(producto.publico)}`));
-  meta.append(resto);
+  if (producto.variantes.length > 1) meta.append(crearElemento("span", "tarjeta-colores", ` · ${producto.variantes.length} colores`));
   cuerpo.append(meta, nombre, precio, crearTiraTallas(producto), acciones);
   if (producto.prueba) cuerpo.prepend(crearElemento("p", "sello sello-prueba", "Dato de prueba"));
 
@@ -1919,7 +1936,7 @@ function construirDetalle(producto) {
   const cabecera = crearElemento("header", "detalle-cabecera");
   // Primer nivel: marca y categoría. Segundo nivel: el modelo, con todo el protagonismo.
   const identidad = crearElemento("p", "detalle-marca");
-  identidad.append(crearElemento("span", "detalle-marca-nombre", producto.marca));
+  identidad.append(crearElemento("span", "detalle-marca-nombre", textoMarca(producto.marca)));
   if (producto.categoria) identidad.append(` · ${producto.categoria}`);
   if (producto.publico) identidad.append(crearElemento("span", "detalle-publico", ` · ${etiquetaPublico(producto.publico)}`));
   const titulo = crearElemento("h2", "detalle-nombre", producto.nombre);
@@ -3065,7 +3082,7 @@ function pintarProductoConfirmacion(anadido) {
   foto.append(crearImagenRuta(ruta, descripcionFoto, { perezosa: false }));
 
   const marca = crearElemento("p", "detalle-marca");
-  marca.append(crearElemento("span", "detalle-marca-nombre", nombreMarca), document.createTextNode(` · ${categoria}`));
+  marca.append(crearElemento("span", "detalle-marca-nombre", textoMarca(nombreMarca)), document.createTextNode(` · ${categoria}`));
   const precio = crearElemento("p", "detalle-precio confirmacion-precio");
   pintarPrecio(precio, anadido);
   const identidad = crearElemento("div", "confirmacion-identidad");
@@ -3184,14 +3201,13 @@ function crearLineaCarrito(linea) {
     marca.setAttribute("role", "note");
     info.append(marca);
   }
+  // Etapa 17.1: una sola fila bajo el texto, con espacio para tocar: cantidad · subtotal · quitar.
   const controles = crearElemento("div", "linea-controles");
-  controles.append(crearSelectorCantidad(cantidad, `Cantidad de ${nombreCompleto(producto)}, ${variante.color}, talla EU ${talla}`, { linea: clave }));
+  const subtotal = crearElemento("p", "linea-subtotal", variante.precio > 0 ? pesos(variante.precio * cantidad) : "Por confirmar");
   const eliminar = crearBoton("boton-icono", crearIcono("icono-papelera"), { eliminar: clave });
   eliminar.setAttribute("aria-label", `Eliminar ${nombreCompleto(producto)}, ${variante.color}, EU ${talla} del carrito`);
-  controles.append(eliminar);
-  info.append(controles);
-  const subtotal = crearElemento("p", "linea-subtotal", variante.precio > 0 ? pesos(variante.precio * cantidad) : "Por confirmar");
-  item.append(media, info, subtotal);
+  controles.append(crearSelectorCantidad(cantidad, `Cantidad de ${nombreCompleto(producto)}, ${variante.color}, talla EU ${talla}`, { linea: clave }), subtotal, eliminar);
+  item.append(media, info, controles);
   return item;
 }
 
@@ -3223,12 +3239,14 @@ function crearPendientes() {
 function renderizarCarrito({ selectorFoco = "" } = {}) {
   const cuerpo = $("#carrito-cuerpo");
   const pie = $("#carrito-pie");
-  if (!cuerpo || !pie) return;
+  const complemento = $("#carrito-complemento");
+  if (!cuerpo || !pie || !complemento) return;
   if (!estado.catalogoListo && (estado.carrito.length || estado.unidadesPrevias)) {
     const vacio = crearElemento("div", "carrito-vacio");
     vacio.append(crearElemento("h3", "", "No pudimos verificar el carrito"), crearElemento("p", "", "Necesitamos cargar el catálogo para comprobar los colores, las tallas y los precios."), crearBoton("boton boton-claro", "Reintentar", { reintentarCarrito: "" }));
     cuerpo.replaceChildren(vacio);
     pie.hidden = true;
+    complemento.hidden = true;
     return;
   }
   const lineas = lineasCarrito();
@@ -3240,12 +3258,14 @@ function renderizarCarrito({ selectorFoco = "" } = {}) {
     vacio.append(dibujo, crearElemento("h3", "", "Tu carrito está vacío"), crearElemento("p", "", "Abre los detalles de una zapatilla, elige el color y la talla EU y añádela aquí. Puedes combinar varios pares."), explorar);
     cuerpo.replaceChildren(...bloques, vacio);
     pie.hidden = true;
+    complemento.hidden = true;
     return;
   }
   const lista = crearElemento("ul", "lineas");
   lineas.forEach((linea) => lista.append(crearLineaCarrito(linea)));
   cuerpo.replaceChildren(...bloques, lista);
   pie.hidden = false;
+  complemento.hidden = false;
   // El resumen y el pedido cuentan solo lo que se puede pedir ahora.
   const comprables = lineasComprables(lineas);
   const porRevisar = lineasPorRevisar(lineas);
@@ -3312,20 +3332,55 @@ function botonConsultar() {
   return boton;
 }
 
-// Resumen, aviso y botón de los datos de envío en el pie del carrito.
+/* Dirección del carrito (etapa 17.1). Una fila breve con la ciudad y las acciones «Ver datos» y
+   «Cambiar» (o «Agregar dirección» si falta); el nombre, el teléfono, la dirección completa y la
+   nota van en el detalle desplegable (#carrito-envio). El aviso de «falta la dirección» queda junto
+   al botón de enviar, en el pie, porque es lo que explica por qué está bloqueado. */
+function fijarDetalleEnvio(abierto) {
+  const ver = $("#carrito-envio-ver");
+  const detalle = $("#carrito-envio");
+  if (!ver || !detalle) return;
+  ver.setAttribute("aria-expanded", String(abierto));
+  const texto = abierto ? "Ocultar datos" : "Ver datos";
+  if (ver.textContent !== texto) ver.textContent = texto;
+  detalle.hidden = !abierto;
+}
+
+// Confirmación breve junto a la fila de la dirección (antes era el aviso azul de arriba).
+function notificarEnvioCarrito(mensaje) {
+  const nodo = $("#carrito-envio-confirmacion");
+  if (!nodo) return;
+  nodo.textContent = mensaje;
+  nodo.hidden = !mensaje || !datosEnvioValidos();
+  // La fila de la dirección y su confirmación se llevan a la vista (el pie fijo no las tapa).
+  if (!nodo.hidden && carritoDialogo()?.open) nodo.scrollIntoView({ block: "nearest" });
+}
+
 function pintarEnvioCarrito(envio, sinPedido) {
-  const bloque = $("#carrito-envio");
+  const entrega = $("#carrito-entrega");
   const aviso = $("#carrito-envio-aviso");
   const boton = $("#carrito-datos");
-  if (!bloque || !aviso || !boton) return;
-  bloque.hidden = sinPedido || !envio;
+  const ver = $("#carrito-envio-ver");
+  const confirmacion = $("#carrito-envio-confirmacion");
+  if (!entrega || !aviso || !boton || !ver) return;
+  entrega.hidden = sinPedido;
   aviso.hidden = sinPedido || Boolean(envio);
-  boton.hidden = sinPedido;
-  $(".carrito-datos-texto", boton).textContent = libreta.direcciones.length ? "Cambiar dirección de envío" : "Agregar datos de envío";
   // Con direcciones guardadas pero ninguna elegida (por ejemplo, se eliminó la elegida) se pide
   // elegir una: nunca se usa otra en su lugar.
-  aviso.lastChild.textContent = libreta.direcciones.length ? "Elige una dirección de envío para continuar." : "Completa tus datos de envío para continuar.";
-  if (envio) $("#carrito-envio-datos").replaceChildren(...filasDatosEnvio(envio));
+  const hayGuardadas = libreta.direcciones.length > 0;
+  const accion = envio ? "Cambiar" : hayGuardadas ? "Elegir dirección" : "Agregar dirección";
+  $(".carrito-datos-texto", boton).textContent = accion;
+  boton.setAttribute("aria-label", `${envio ? "Cambiar" : hayGuardadas ? "Elegir" : "Agregar"} dirección de envío`);
+  $("#carrito-entrega-ciudad").textContent = envio ? envio.ciudad : hayGuardadas ? "Sin dirección elegida" : "Sin dirección";
+  aviso.lastChild.textContent = hayGuardadas ? "Elige una dirección de envío para continuar." : "Completa tus datos de envío para continuar.";
+  ver.hidden = !envio;
+  if (envio) {
+    $("#carrito-envio-datos").replaceChildren(...filasDatosEnvio(envio));
+    fijarDetalleEnvio(ver.getAttribute("aria-expanded") === "true");
+  } else {
+    fijarDetalleEnvio(false);
+    if (confirmacion) { confirmacion.textContent = ""; confirmacion.hidden = true; }
+  }
 }
 
 function filasDatosEnvio(envio) {
@@ -3413,6 +3468,8 @@ async function enviarPedidoCarrito() {
     return;
   }
   $("#carrito-respaldo").hidden = false;
+  // El mensaje completo vive en la zona con desplazamiento (ya no en el pie): se lleva a la vista.
+  $("#carrito-respaldo").scrollIntoView({ block: "nearest" });
   if (copiado) {
     notificarCarrito("El pedido es largo: copiamos el mensaje completo. Pégalo en el chat de WhatsApp que se abrió.");
   } else {
@@ -3423,6 +3480,8 @@ async function enviarPedidoCarrito() {
 
 async function abrirCarrito(origen) {
   notificarCarrito(estado.avisoCarrito || "");
+  notificarEnvioCarrito("");
+  fijarDetalleEnvio(false);
   estado.avisoCarrito = "";
   renderizarCarrito();
   abrirDialogo(carritoDialogo(), origen);
@@ -3586,7 +3645,7 @@ async function guardarEnvio(evento) {
     return;
   }
   cerrarDialogo(ventanaEnvio());
-  notificarCarrito(`Dirección guardada y elegida para el pedido. Revísala antes de enviarlo.${previa}${nota}`);
+  notificarEnvioCarrito(`Dirección elegida para este pedido.${previa}${nota}`);
 }
 
 function cancelarFormularioEnvio() {
@@ -3737,7 +3796,7 @@ function usarDireccionElegida() {
     return;
   }
   cerrarDialogo(ventanaEnvio());
-  notificarCarrito("Usaremos esta dirección para el pedido. Revísala antes de enviarlo.");
+  notificarEnvioCarrito("Dirección elegida para este pedido.");
 }
 
 // Otra pestaña cambió la libreta: se vuelve a leer y se actualizan selección, resumen, envío,
@@ -3792,7 +3851,7 @@ function actualizarRevisionEnvio() {
   const par = $("#envio-revision-par");
   if (linea) {
     const { producto, variante, talla, cantidad } = linea;
-    const filas = [["Modelo", producto.nombre], ["Marca", producto.marca], ["Color", variante.color], ["Referencia", variante.referencia],
+    const filas = [["Modelo", producto.nombre], ["Marca", textoMarca(producto.marca)], ["Color", variante.color], ["Referencia", variante.referencia],
       ["Talla EU", talla], ["Cantidad", String(cantidad)],
       ["Precio unit.", formatearPrecio(variante.precio)], ["Subtotal", variante.precio > 0 ? pesos(variante.precio * cantidad) : "Precio por confirmar"]];
     par.replaceChildren(...filas.map(([rotulo, valor]) => { const fila = crearElemento("div"); fila.append(crearElemento("dt", "", rotulo), crearElemento("dd", "", valor)); return fila; }));
@@ -3938,6 +3997,7 @@ function iniciarCarrito() {
 
   $("#carrito-enviar")?.addEventListener("click", () => enviarPedidoCarrito());
   $("#carrito-datos")?.addEventListener("click", (evento) => abrirEnvio("carrito", evento.currentTarget));
+  $("#carrito-envio-ver")?.addEventListener("click", (evento) => fijarDetalleEnvio(evento.currentTarget.getAttribute("aria-expanded") !== "true"));
   $("#carrito-copiar-completo")?.addEventListener("click", async () => {
     const lineas = lineasComprables();
     const envio = datosEnvioValidos();
@@ -4074,7 +4134,7 @@ function iniciarCatalogo() {
     if (filtro === "categoria") estado.categoria = valor;
     if (filtro === "talla") estado.talla = desdePortada && estado.talla === valor ? TODOS : valor;
     if (filtro === "nuevos") estado.soloNuevos = !estado.soloNuevos;
-    if (filtro === "publico") estado.publico = valor === "hombre" || valor === "dama" ? valor : TODOS;
+    if (filtro === "publico") estado.publico = Object.hasOwn(PUBLICOS, valor) ? valor : TODOS;
     renderizarCatalogo();
     // En escritorio cada panel es de selección única: se cierra y el foco vuelve a su campo.
     const desplegable = boton.closest("[data-desplegable]");
@@ -4280,6 +4340,10 @@ function iniciarNavegacionActiva() {
   const cabecera = $("#cabecera");
   let fijada = "";
   let temporizador = 0;
+  // Secciones que empiezan a la misma altura (Pagos y Contacto en escritorio): el desempate es la
+  // última que se pidió con un enlace, mientras no se desplace la página a mano.
+  let elegida = "";
+  let yElegida = 0;
 
   function marcar(id) {
     enlaces.forEach((enlace) => {
@@ -4292,21 +4356,29 @@ function iniciarNavegacionActiva() {
   function detectar() {
     // Margen bajo la cabecera; mayor que el scroll-padding para absorber redondeos.
     const linea = (cabecera ? cabecera.getBoundingClientRect().bottom : 0) + 32;
-    let actual = "";
-    secciones.forEach((seccion) => { if (seccion.getBoundingClientRect().top <= linea) actual = seccion.id; });
+    let actual = null;
+    secciones.forEach((seccion) => { if (seccion.getBoundingClientRect().top <= linea) actual = seccion; });
     // Al final de la página, la última sección queda activa aunque no alcance la línea.
     const alFinal = window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 24;
-    return alFinal ? secciones[secciones.length - 1].id : actual;
+    const referencia = alFinal ? secciones[secciones.length - 1] : actual;
+    if (!referencia) return "";
+    const arriba = referencia.getBoundingClientRect().top;
+    const grupo = secciones.filter((seccion) => Math.abs(seccion.getBoundingClientRect().top - arriba) < 2);
+    if (grupo.length < 2) return referencia.id;
+    if (grupo.some((seccion) => seccion.id === elegida)) return elegida;
+    return alFinal ? grupo[grupo.length - 1].id : grupo[0].id;
   }
 
   // Libera la selección fijada cuando el desplazamiento se detiene.
   function esperarFinDeDesplazamiento() {
     window.clearTimeout(temporizador);
-    temporizador = window.setTimeout(() => { fijada = ""; marcar(detectar()); }, 140);
+    temporizador = window.setTimeout(() => { fijada = ""; yElegida = window.scrollY; marcar(detectar()); }, 140);
   }
 
   function actualizar() {
     if (fijada) { esperarFinDeDesplazamiento(); return; }
+    // Un desplazamiento a mano suelta el desempate de la última elección.
+    if (elegida && Math.abs(window.scrollY - yElegida) > 48) elegida = "";
     marcar(detectar());
   }
 
@@ -4324,6 +4396,7 @@ function iniciarNavegacionActiva() {
     const destino = secciones.find((seccion) => seccion.id === enlace.hash.slice(1));
     if (!destino) return;
     fijada = destino.id;
+    elegida = destino.id;
     marcar(fijada);
     esperarFinDeDesplazamiento();
   });

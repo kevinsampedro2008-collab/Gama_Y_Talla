@@ -1,7 +1,141 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B y 16
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16 y 17
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
-(15B) y **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP.
+(15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
+y (17) **público obligatorio con Unisex, historial de cambios, exportación a CSV y respaldo
+restaurable**.
+
+## Público en la tienda (17)
+
+- El editor tiene el grupo **«Público en la tienda (obligatorio)»**: Hombre, Dama o Unisex. Al crear
+  no hay ninguna opción marcada y ya no existe «Dejar sin asignar». Sin elegirlo no se guarda (tampoco
+  con «Guardar oculta») ni se publica: el error aparece junto al grupo y el foco va a «Hombre».
+- En la tienda se ve como «Caballero», «Dama» o «Unisex» en la tarjeta y en «Ver detalles», y el
+  filtro «Público» ofrece Todos, Caballero, Dama y Unisex (cada opción filtra por su valor exacto).
+  Es independiente de la tabla de la guía de tallas.
+- Los productos **anteriores** sin clasificar siguen visibles en «Todos», sin etiqueta. Al editarlos,
+  el editor avisa «todavía no tiene público» y pide elegirlo para guardarlos o publicarlos (el
+  servidor también lo exige: `fn_admin_guardar_producto` y la acción «publicar» de
+  `fn_admin_estado_producto`). Ocultarlos, retirarlos o restaurarlos no lo exige.
+- Lo aplica la migración `20261109010000_publico_unisex.sql`. Un servidor sin ella rechaza Unisex:
+  el panel conserva el formulario y dice que falta aplicar esa migración.
+
+## Historial de cambios (17)
+
+El botón **«Historial»** abre los cambios de **zapatillas, colores y tallas** que registra
+`public.historial` (por disparador, en cada alta, cambio o baja), del más reciente al más antiguo.
+
+- Filtros **Todos, Zapatillas, Colores y Tallas**. Cambiar de filtro empieza la lista desde el
+  principio; «Ver cambios anteriores» pide la página siguiente (25 por página, por `id`
+  descendente, sin repetir).
+- Cada cambio muestra: tipo, **fecha y hora de Colombia**, **quién** («Tú», el nombre de otra cuenta
+  administradora o «Sistema o mantenimiento» si no hubo sesión), **qué** zapatilla, color o talla y,
+  cuando corresponde, el valor **anterior → nuevo** (precio, código, público, categoría, visibilidad,
+  estado y vigencia de una talla…). Si el registro ya no está en el tablero, se describe con los
+  datos guardados en el propio evento.
+- Los cambios de una misma operación (mismo `lote`, por ejemplo un guardado del editor) se marcan
+  como «misma operación» y quedan unidos visualmente.
+- Solo lectura y solo para administradores (RLS); el acceso se comprueba antes de cada página. Las
+  respuestas que llegan tarde —de un filtro anterior, de un historial ya cerrado o de una sesión
+  cerrada— se descartan sin pintarse.
+
+## Exportar el catálogo a CSV (17)
+
+**«Exportar catálogo»** descarga `gama-talla-catalogo-AAAA-MM-DD.csv` (fecha de Colombia) con el
+inventario **completo**, también lo oculto y lo retirado:
+
+- Una fila por **color y talla**; un modelo sin colores o un color sin tallas tienen su fila con
+  esas columnas vacías.
+- Columnas: códigos actuales (zapatilla y color), modelo, marca, categoría, público («Hombre»,
+  «Dama», «Unisex» o «Sin clasificar»), referencias del proveedor, estado en la tienda (Publicada,
+  Oculta o Retirada), color visible, precio y precio anterior en COP (números enteros), talla, talla
+  activa, disponibilidad guardada y en la tienda, procedencia y vigencia (desde, vence y horas, en
+  hora de Colombia).
+- UTF-8 con BOM y separador **punto y coma**, como lo espera Excel en español. Se escapan comillas,
+  saltos de línea y punto y coma, y un texto que empiece por `=`, `+`, `-`, `@`, tabulador o retorno
+  se antepone con `'` para que la hoja de cálculo no lo ejecute como fórmula.
+- Antes de exportar se comprueba el permiso. Usa las mismas lecturas paginadas del tablero: si una
+  página falla, se avisa y **no se descarga nada** (nunca un archivo incompleto).
+- Limitación conocida: Excel puede interpretar por su cuenta tallas como `41 1/3` o `40,5` como
+  números o fracciones al abrir el archivo; el texto del CSV es el exacto.
+
+## Respaldo y recuperación (17)
+
+Comandos en `scripts/respaldo/`. El paquete se guarda **fuera del repositorio** y nunca contiene
+claves, sesiones, cuentas de Auth, `public.administradores` ni datos de envío de clientes (esos solo
+existen en el navegador de cada cliente). Los autores del historial quedan como UUID.
+
+```bash
+# 1. Respaldar (el stack local de este proyecto; o el proyecto enlazado, solo lectura)
+node scripts/respaldo/respaldar.mjs --origen local  --salida "C:\Users\kevin\Documents\Revisiones_Gama_Talla\respaldos"
+node scripts/respaldo/respaldar.mjs --origen remoto --confirmar-remoto --salida "C:\Users\kevin\Documents\Revisiones_Gama_Talla\respaldos"
+
+# 2. Verificar (no escribe nada; código 0 = válido)
+node scripts/respaldo/verificar.mjs "<carpeta del paquete>"
+
+# 3. Preparar y arrancar OTRO stack local, vacío y desechable (otros puertos: API 127.0.0.1:56321)
+node scripts/respaldo/preparar-destino.mjs --carpeta "C:\Users\kevin\Documents\Revisiones_Gama_Talla\destino_restauracion" --id gt_restauracion
+npx --yes supabase@3.0.0 start --workdir "C:\Users\kevin\Documents\Revisiones_Gama_Talla\destino_restauracion" -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+# 4. Restaurar en él
+node scripts/respaldo/restaurar.mjs "<carpeta del paquete>" --destino-workdir "C:\Users\kevin\Documents\Revisiones_Gama_Talla\destino_restauracion" --informe informe.json
+
+# Desechar el destino
+npx --yes supabase@3.0.0 stop --no-backup --workdir "C:\Users\kevin\Documents\Revisiones_Gama_Talla\destino_restauracion"
+```
+
+**Qué guarda el paquete** (`gama-talla-respaldo-<fecha>-<origen>/`):
+
+| Archivo | Contenido |
+|---|---|
+| `manifiesto.json` | Versión del formato (1), fecha, origen, commit (y si había cambios sin commit), migraciones, recuentos, secuencias y **SHA-256 y tamaño** de cada archivo |
+| `datos/catalogo.json` | `productos`, `variantes`, `tallas`, `fotos`, `historial` y `configuracion`, leídos en **una sola sentencia** (una instantánea coherente), más migraciones y secuencias |
+| `fotos/productos/…webp` | Cada archivo de `fotos-catalogo` referenciado por `fotos`, descargado con la API de Storage, en su misma ruta de objeto |
+
+Las fotos que son archivos del repositorio (`assets/…`) no se copian: se registran con su ruta, el
+commit que las contiene y su SHA-256 (se exige que estén versionadas y sin cambios). El paquete se
+escribe como `….incompleto`, se verifica y solo entonces se renombra.
+
+**Restaurar** se niega si el paquete no pasa la verificación, si el destino no es local, si es el
+mismo proyecto de origen, si ya tiene catálogo, historial u objetos en `fotos-catalogo`, o si su
+esquema no es el de esta entrega (todas las migraciones del repositorio, incluida la de Unisex).
+Después:
+
+1. **Storage:** sube cada foto con la API de Storage del destino (misma ruta, sin sobrescribir) y
+   comprueba los bytes servidos.
+2. **Base, en una transacción:** suspende los disparadores de usuario de `productos`, `variantes`,
+   `tallas` y `fotos` **solo dentro de ella** —si no, al insertar recalcularían `clave_catalogo` (el
+   UUID en lugar de la clave original, por ejemplo un código GT anterior a un renombrado), los
+   códigos, `actualizado_en` y las vigencias, y duplicarían el historial—, inserta las filas tal
+   cual (UUID, códigos, claves, relaciones, estados, vigencias, fechas e historial con sus `id`),
+   la configuración y las secuencias, y los reactiva. Si algo falla, se deshace todo. De las rutas
+   de las fotos de Storage solo cambia el origen (al Storage local del destino).
+3. **Verificación:** filas idénticas al paquete, `clave_catalogo` byte a byte, disparadores
+   activos, secuencias, ids de `catalogo_publico`, bytes de cada foto servida, generación de
+   **códigos nuevos** (en una transacción que se deshace) y auditoría de funciones con **0 filas**.
+   `catalogo_publico` se lee **por páginas ordenadas por `id`** (`scripts/respaldo/vista.mjs`): la API
+   local limita cada respuesta a 1.000 filas, así que una sola petición dejaría fuera lo que pase de
+   ahí. Cada página valida su estado HTTP y su contenido (JSON, arreglo, `id` de texto, `variantes`,
+   sin ids repetidos entre páginas); un 503 con cuerpo de texto, un 200 que no es JSON o un servidor
+   caído son un fallo de verificación con la página y lo recibido, nunca una lectura parcial.
+
+Si una comprobación falla **después de confirmar la base**, el informe (`--informe`) queda en
+`verificacion-fallida` y el mensaje dice qué quedó restaurado y que **no se deshizo**: las filas de
+la base (zapatillas, colores, tallas, fotos, historial, ajustes, con los disparadores reactivados) y
+las fotos subidas a Storage; el informe lo guarda en `restaurado`. Los resultados posibles del informe
+son `paquete-no-valido`, `rechazado`, `parcial-storage`, `parcial-base`, `verificacion-fallida` y `ok`.
+
+Si una fase falla, el mensaje dice qué quedó parcial (por ejemplo, «las 2 fotos ya están en el
+Storage del destino; la base sigue vacía») y cómo repetir en un destino limpio:
+`npx --yes supabase@3.0.0 db reset --workdir "<destino>"` (borra el destino) o `stop --no-backup` y
+`start`.
+
+El ciclo completo con datos ficticios (respaldo, paquetes alterados, fallo simulado, restauración y
+comparación origen ↔ destino, incluida una línea de carrito V3 en la tienda real) se reproduce con:
+
+```bash
+node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<destino vacío>" --salida "<carpeta fuera del repo>"
+```
 
 ## Administrar el catálogo (16)
 
@@ -105,8 +239,8 @@ Ingreso con correo y contraseña, tablero del catálogo, **gestión de la dispon
 - Las confirmaciones **reactivan** una talla desactivada (`activa = true`); el diálogo lo avisa antes.
   Ninguna acción publica un producto o un color ocultos.
 - El estado que ve el cliente lo sigue calculando Supabase; el panel no usa el reloj del navegador.
-- **Historial:** el botón «Historial» muestra los cambios recientes de las tallas (fecha en hora de
-  Colombia, qué cambió y quién: «Tú», otra cuenta o «Sistema o mantenimiento»). Es solo lectura.
+- **Historial:** desde la etapa 17 cubre zapatillas, colores y tallas, con filtros (ver «Historial
+  de cambios» arriba). Es solo lectura.
 
 ### Cómo se protege cada operación
 
@@ -208,10 +342,16 @@ Con el stack local de Supabase y la tienda servida:
 # Storage activo (la etapa 16 lo necesita): no se excluye storage-api
 npx --yes supabase@3.0.0 start -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 python -m http.server 8765 --bind 127.0.0.1      # en otra terminal
-npx playwright test tests/etapa15 tests/etapa16 --workers=1
+npx playwright test tests/etapa15 tests/etapa16 tests/etapa17 --workers=1
 node supabase/pruebas/80_catalogo_http_local.mjs  # PostgREST y Storage por HTTP real
 npx --yes supabase@3.0.0 stop --no-backup
 ```
+
+Etapa 17: `tests/etapa17/panel.spec.js` (Unisex, público obligatorio, heredados, servidor sin la
+migración, historial, CSV y acceso; marca «MARCA DIECISIETE») y `tests/etapa17/tienda.spec.js`
+(tarjeta, Unisex y filtros con Supabase simulado). La migración se prueba desde las 14 anteriores
+con `supabase/pruebas/reproducir/datos_previos_17.sql` y `verificar_migracion_17.sql` (ver su
+README), y sus reglas con `supabase/pruebas/92_publico_obligatorio.sql`.
 
 Las pruebas de la etapa 16 generan fotos ficticias con Chromium en la carpeta temporal
 (`gama-talla-16-fotos`), usan la marca «Marca Dieciséis» y borran al terminar sus productos y sus

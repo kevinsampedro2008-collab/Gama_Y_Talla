@@ -62,11 +62,16 @@ async function abrirPanel(page) {
   return problemas;
 }
 
-async function rellenarModelo(page, { nombre, marca = MARCA, categoria = 'Running', referencia = '' }) {
+async function rellenarModelo(page, { nombre, marca = MARCA, categoria = 'Running', referencia = '', publico = 'Hombre' }) {
   await editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true }).fill(nombre);
   await editor(page).getByRole('combobox', { name: 'Marca (obligatorio)', exact: true }).fill(marca);
   await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill(categoria);
   if (referencia) await editor(page).getByLabel('Referencia del proveedor', { exact: true }).fill(referencia);
+  // Etapa 17: el público es obligatorio. Con un esquema anterior a 16.3 la opción está bloqueada.
+  if (publico) {
+    const radio = radioPublico(page, publico);
+    if (await radio.isEnabled()) await radio.check();
+  }
 }
 
 async function rellenarColor(page, n, { nombre, precio = '', anterior = '', tallas = [] }) {
@@ -1120,24 +1125,24 @@ test('ingreso oscuro: legible, con foco visible, solo en el ingreso; el flujo no
 const radioPublico = (page, texto) => editor(page).getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: texto, exact: true });
 const campoMuestra = (page, n) => color(page, n).getByRole('textbox', { name: 'Muestra del color (opcional)' });
 
-test('público y muestra: se guardan, se ven en la tienda y lo existente queda sin clasificar', async ({ page, browser, browserName }) => {
+test('público y muestra: se guardan y se ven en la tienda', async ({ page, browser, browserName }) => {
   await abrirPanel(page);
+  // Etapa 17: el público es obligatorio (crearCompleta elige «Hombre»); ya no hay «sin asignar».
   const p = await crearCompleta(page, `Público ${sufijo}`);
   const NOMBRE = `Público ${sufijo}`.toUpperCase();
   let [fila] = await servicio('GET', `/rest/v1/productos?select=publico,segmento,variantes(muestra_color)&id=eq.${p.id}`);
-  expect(fila, 'sin elegir nada: sin clasificar y sin muestra').toEqual({ publico: null, segmento: null, variantes: [{ muestra_color: null }] });
+  expect(fila, 'Hombre elegido y sin muestra').toEqual({ publico: 'hombre', segmento: null, variantes: [{ muestra_color: null }] });
   await editor(page).getByRole('button', { name: 'Publicar' }).click();
   await expect(resultado(page)).toContainText('Publicada');
-  // Sin clasificar: la tienda no pone etiqueta.
   let tienda = await abrirTienda(browser);
   await tienda.pagina.locator('article', { hasText: NOMBRE }).waitFor();
-  await expect(tienda.pagina.locator('article', { hasText: NOMBRE }).locator('.tarjeta-publico')).toHaveCount(0);
+  await expect(tienda.pagina.locator('article', { hasText: NOMBRE }).locator('.tarjeta-publico')).toHaveText(' · Caballero');
   await tienda.contexto.close();
 
   // Dama + muestra (escrita y con el selector de color).
   await expect(editor(page).getByRole('group', { name: 'Público en la tienda' })).toContainText('No cambia la tabla de la guía de tallas');
   await radioPublico(page, 'Dama').check();
-  await expect(editor(page).getByRole('button', { name: 'Dejar sin asignar' })).toBeVisible();
+  await expect(editor(page).getByRole('button', { name: 'Dejar sin asignar' })).toHaveCount(0);
   await campoMuestra(page, 0).fill('#12');
   await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(page.locator('#editor-error')).toContainText('debe ser un color hexadecimal');
@@ -1168,19 +1173,18 @@ test('público y muestra: se guardan, se ven en la tienda y lo existente queda s
   await tienda.pagina.screenshot({ path: path.join(CAPTURAS, `tienda-publico-dama-${browserName}.png`) });
   await tienda.contexto.close();
 
-  // Hombre → «Caballero»; luego, sin asignar.
+  // Hombre → «Caballero»; luego Unisex (etapa 17), que sustituye a «sin asignar».
   await radioPublico(page, 'Hombre').check();
   await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
   tienda = await abrirTienda(browser);
   await expect(tienda.pagina.locator('article', { hasText: NOMBRE }).locator('.tarjeta-publico')).toHaveText(' · Caballero');
   await tienda.contexto.close();
-  await editor(page).getByRole('button', { name: 'Dejar sin asignar' }).click();
-  await expect(radioPublico(page, 'Hombre')).not.toBeChecked();
+  await radioPublico(page, 'Unisex').check();
   await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
   [fila] = await servicio('GET', `/rest/v1/productos?select=publico&id=eq.${p.id}`);
-  expect(fila.publico).toBeNull();
+  expect(fila.publico).toBe('unisex');
 });
 
 test('esquema anterior a 16.3: opciones bloqueadas con aviso, y nada se presenta como guardado', async ({ page, browser, browserName }) => {
@@ -1189,7 +1193,11 @@ test('esquema anterior a 16.3: opciones bloqueadas con aviso, y nada se presenta
   await page.route(sinColumna, (r) => r.fulfill({ status: 400, contentType: 'application/json',
     body: JSON.stringify({ code: '42703', message: 'column productos.publico does not exist', details: null, hint: null }) }));
   await page.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
-    const respuesta = await r.fetch();
+    // Etapa 17: el servidor local ya exige el público; aquí se simula un servidor anterior a 16.3,
+    // que no lo pide. La petición del panel (registrada abajo) sigue sin «publico».
+    const cuerpo = JSON.parse(r.request().postData());
+    if (!('publico' in cuerpo.p_datos)) cuerpo.p_datos.publico = 'hombre';
+    const respuesta = await r.fetch({ postData: JSON.stringify(cuerpo) });
     const json = await respuesta.json();
     if (json && typeof json === 'object') delete json.publico_y_muestras;
     await r.fulfill({ response: respuesta, json });
@@ -1231,7 +1239,7 @@ test('esquema anterior a 16.3: opciones bloqueadas con aviso, y nada se presenta
   await expect(otra.locator('#ed-publico-aviso')).toBeVisible();
   await expect(radioPublico(otra, 'Dama')).toBeDisabled();
   const [fila] = await servicio('GET', `/rest/v1/productos?select=publico&id=eq.${p.id}`);
-  expect(fila.publico).toBeNull();
+  expect(fila.publico, 'la función antigua no aplicó «Dama»: conserva el valor anterior').toBe('hombre');
   await contexto.close();
 });
 

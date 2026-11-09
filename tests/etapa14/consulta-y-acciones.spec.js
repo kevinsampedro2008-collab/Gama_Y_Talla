@@ -9,7 +9,7 @@ import {
 
 const SAMBA = 'SAMBA';
 const LCS = 'LCS Retro Classic';
-const SEPARADOR = '─'.repeat(17);
+const SEPARADOR = '─'.repeat(16);
 const NL = String.fromCharCode(10);
 
 const producto = (catalogo, nombre) => catalogo.find((p) => p.nombre === nombre);
@@ -179,7 +179,7 @@ test.describe('Carrito: las tres distribuciones', () => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await abrirCarritoDesdeCabecera(pagina);
       await expect(pagina.locator('#carrito-enviar')).toBeVisible();
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       await expect(pagina.locator('#carrito-consultar')).toBeHidden();
       await expect(pagina.locator('#carrito-unidades')).toBeVisible();
       await expect(pagina.locator('#carrito-subtotal')).toBeVisible();

@@ -59,11 +59,13 @@ select set_config('request.jwt.claim.sub', 'aaaaaaaa-9191-0000-0000-000000000001
 do $$
 declare r jsonb; v_ver integer;
 begin
-  -- B1 crear sin los campos nuevos (cliente anterior): sin clasificar y sin muestra.
-  r := public.fn_admin_guardar_producto(pg_temp.datos(), null, gen_random_uuid());
+  -- B1 (etapa 17) crear sin público se rechaza; con público y sin muestras: colores sin muestra.
+  perform pg_temp.exigir_rechazo('B1 crear sin público se rechaza (etapa 17: obligatorio)',
+    $q$select public.fn_admin_guardar_producto(pg_temp.datos(), null, gen_random_uuid())$q$, 'PT422', 'Hombre, Dama o Unisex');
+  r := public.fn_admin_guardar_producto(pg_temp.datos('{"publico": "dama"}'), null, gen_random_uuid());
   perform pg_temp.exigir('B1 crear responde «aplicada» y anuncia público y muestras', r ->> 'estado' = 'aplicada' and (r ->> 'publico_y_muestras')::boolean, r::text);
-  perform pg_temp.exigir('B1 sin clasificar y sin muestras',
-    (select publico is null from public.productos where id = '10000000-9191-0000-0000-00000000000a')
+  perform pg_temp.exigir('B1 clasificada y sin muestras',
+    (select publico = 'dama' from public.productos where id = '10000000-9191-0000-0000-00000000000a')
     and (select bool_and(muestra_color is null) from public.variantes where producto_id = '10000000-9191-0000-0000-00000000000a'));
 
   -- B2 «Hombre» (con mayúsculas y espacios) y una muestra en mayúsculas se normalizan.
@@ -83,9 +85,9 @@ begin
 
   -- B4 valores no válidos: se rechaza todo el guardado.
   perform pg_temp.exigir_rechazo('B4 público desconocido',
-    $q$select public.fn_admin_guardar_producto(pg_temp.datos('{"publico": "unisex"}'), 3, gen_random_uuid())$q$, 'PT422', 'Hombre o Dama');
+    $q$select public.fn_admin_guardar_producto(pg_temp.datos('{"publico": "niños"}'), 3, gen_random_uuid())$q$, 'PT422', 'Hombre, Dama o Unisex');
   perform pg_temp.exigir_rechazo('B4 público que no es texto',
-    $q$select public.fn_admin_guardar_producto(pg_temp.datos('{"publico": {"x": 1}}'), 3, gen_random_uuid())$q$, 'PT422', 'Hombre o Dama');
+    $q$select public.fn_admin_guardar_producto(pg_temp.datos('{"publico": {"x": 1}}'), 3, gen_random_uuid())$q$, 'PT422', 'Hombre, Dama o Unisex');
   perform pg_temp.exigir_rechazo('B4 muestra que no es hexadecimal',
     $q$select public.fn_admin_guardar_producto(pg_temp.datos('{}', '{"muestra_color": "red"}'), 3, gen_random_uuid())$q$, 'PT422', 'hexadecimal');
   perform pg_temp.exigir_rechazo('B4 muestra con CSS inyectado',
@@ -95,15 +97,16 @@ begin
   perform pg_temp.exigir('B4 nada cambió tras los rechazos',
     (select version = 3 and publico = 'hombre' from public.productos where id = '10000000-9191-0000-0000-00000000000a'));
 
-  -- B5 «Dama», y null / vacío vuelven a «sin clasificar» y «sin muestra».
+  -- B5 «Dama»; la muestra se quita con null o vacío. (Etapa 17: el público ya no vuelve a «sin
+  -- clasificar»: null o vacío se rechazan; lo comprueba 92_publico_obligatorio.sql.)
   r := public.fn_admin_guardar_producto(pg_temp.datos('{"publico": "dama"}', '{"muestra_color": null}', '{"muestra_color": "#111111"}'), 3, gen_random_uuid());
   perform pg_temp.exigir('B5 «dama»; la muestra se quita con null y se pone en el otro color',
     (select publico = 'dama' from public.productos where id = '10000000-9191-0000-0000-00000000000a')
     and (select muestra_color is null from public.variantes where id = '20000000-9191-0000-0000-00000000000a')
     and (select muestra_color = '#111111' from public.variantes where id = '20000000-9191-0000-0000-00000000000b'), r::text);
-  r := public.fn_admin_guardar_producto(pg_temp.datos('{"publico": ""}', '{}', '{"muestra_color": ""}'), 4, gen_random_uuid());
-  perform pg_temp.exigir('B5 vacío = sin clasificar y sin muestra',
-    (select publico is null from public.productos where id = '10000000-9191-0000-0000-00000000000a')
+  r := public.fn_admin_guardar_producto(pg_temp.datos('{"publico": "dama"}', '{}', '{"muestra_color": ""}'), 4, gen_random_uuid());
+  perform pg_temp.exigir('B5 muestra vacía = sin muestra; el público se conserva',
+    (select publico = 'dama' from public.productos where id = '10000000-9191-0000-0000-00000000000a')
     and (select muestra_color is null from public.variantes where id = '20000000-9191-0000-0000-00000000000b'), r::text);
 
   -- B6 conflicto de versión y operación repetida siguen funcionando con los campos nuevos.

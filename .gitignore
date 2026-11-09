@@ -32,3 +32,6 @@ pgpass.conf
 secrets.json
 credentials.json
 service-account*.json
+
+# Paquete de publicación (npm run / node scripts/preparar-publicacion.mjs)
+/dist/

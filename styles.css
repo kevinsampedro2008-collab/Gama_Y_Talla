@@ -1496,67 +1496,119 @@
   .boton-mostrar-mas--menos .icono { transform: rotate(180deg); }
 
   /* ---------- Cómo comprar ---------- */
-  .pasos { border-top: 1px solid var(--oscuro-linea); }
-  .paso {
-    display: grid;
-    grid-template-columns: 3.5rem minmax(0, 1fr);
-    column-gap: var(--e-4);
-    row-gap: var(--e-1);
-    padding-block: var(--e-5);
-    border-bottom: 1px solid var(--oscuro-linea);
-  }
+  /* Etapa 17.1: la sección va justo después del inicio. En celular, cinco filas cortas en una
+     columna (número, título y una línea) para que el catálogo quede cerca; desde 1024 px, una
+     fila con separadores discretos. */
+  .seccion-pasos { padding-block: clamp(2rem, 1.25rem + 4vw, 6rem); }
+  .seccion-pasos .seccion-encabezado { margin-bottom: var(--e-4); }
+  /* 17.4 · Recorrido visual. Celular: círculos numerados a la izquierda unidos por una línea vertical y,
+     a la derecha, paneles compactos algo más claros que el fondo con icono, título y descripción.
+     Desde 1100 px: cinco pasos de ancho similar, con los números alineados y unidos por una línea
+     horizontal; por debajo de eso se usa la versión vertical. */
+  .pasos { display: grid; gap: 0.625rem; margin: 0; padding: 0; list-style: none; }
+  .paso { position: relative; display: grid; grid-template-columns: 2.25rem minmax(0, 1fr); column-gap: var(--e-3); align-items: start; }
   .paso-numero {
-    grid-row: 1 / 3;
-    font-size: 2.5rem;
-    font-stretch: var(--condensada);
-    font-weight: 800;
-    line-height: 0.9;
+    display: grid;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin-top: 0.5rem;
+    border: 1px solid var(--oscuro-linea);
+    border-radius: 50%;
+    background: var(--oscuro);
+    font-family: var(--fuente-mono);
+    font-size: var(--t-xs);
+    font-weight: 500;
+    letter-spacing: 0.02em;
     color: var(--cobalto-claro);
     font-variant-numeric: tabular-nums;
   }
-  .paso h3 { color: var(--oscuro-texto); }
-  .paso p { font-size: var(--t-sm); color: var(--oscuro-texto-2); }
+  /* Conector vertical entre un círculo y el siguiente. */
+  .paso:not(:last-child)::after {
+    content: "";
+    position: absolute;
+    left: calc(1.125rem - 0.5px);
+    top: 2.75rem;
+    bottom: -1.125rem;
+    width: 1px;
+    background: var(--oscuro-linea);
+  }
+  .paso-tarjeta {
+    display: flex;
+    gap: var(--e-3);
+    min-width: 0;
+    padding: var(--e-3) var(--e-4);
+    border: 1px solid var(--oscuro-linea);
+    border-radius: var(--r-superficie);
+    background: rgb(255 255 255 / 0.05);
+  }
+  .paso-icono { flex: none; width: 1.375rem; height: 1.375rem; margin-top: 0.125rem; color: var(--cobalto-claro); }
+  .paso-texto { display: grid; gap: 0.125rem; min-width: 0; }
+  .paso h3 { font-size: var(--t-base); line-height: 1.25; color: var(--oscuro-texto); overflow-wrap: anywhere; }
+  .paso p { font-size: var(--t-sm); line-height: 1.4; color: var(--oscuro-texto-2); overflow-wrap: anywhere; }
+  @media (min-width: 1100px) {
+    .pasos { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--e-4); }
+    .paso { display: flex; flex-direction: column; align-items: stretch; }
+    .paso-numero { margin: 0 0 var(--e-3); }
+    .paso:not(:last-child)::after { left: 2.75rem; right: -0.5rem; top: 1.125rem; bottom: auto; width: auto; height: 1px; }
+    .paso-tarjeta { flex: 1 1 auto; flex-direction: column; gap: var(--e-3); padding: var(--e-4); }
+  }
 
   .pasos-cierre {
     display: grid;
     gap: var(--e-4);
-    margin-top: var(--e-7);
-    padding: var(--e-5);
-    border: 1px solid var(--oscuro-linea);
-    border-radius: var(--r-superficie);
+    margin-top: var(--e-4);
   }
   .pasos-cierre p { max-width: 36rem; color: var(--oscuro-texto-2); }
   .pasos-cierre strong { color: var(--oscuro-texto); font-weight: 600; }
   .acciones { display: flex; flex-wrap: wrap; gap: var(--e-3); }
+  /* «Explorar catálogo» es la acción principal; «Ver mi carrito», la secundaria. */
+  .pasos-cierre .acciones { flex-direction: column; }
+  .pasos-cierre .acciones .boton { width: 100%; min-height: 3rem; }
+  .pasos-cierre .boton-destacado { min-height: 3.25rem; font-weight: 700; }
+  /* El botón flotante de WhatsApp ocupa la esquina inferior derecha: al llevar un botón a la vista, queda por encima. */
+  .pasos-cierre .acciones .boton { scroll-margin-bottom: 6rem; }
+  @media (max-width: 767px) { .seccion-pasos { padding-bottom: 5rem; } }
+  /* En celular la nota del encabezado repite el cierre de la sección: se omite para acercar el catálogo. */
+  @media (max-width: 767px) {
+    .seccion-pasos .seccion-nota { display: none; }
+  }
+  @media (min-width: 520px) {
+    .pasos-cierre .acciones { flex-direction: row; }
+    .pasos-cierre .acciones .boton { width: auto; }
+  }
 
-  /* ---------- Medios de pago ----------
-     Disposición original: un recuadro pequeño con solo el icono de la entidad
-     y, a su lado, el nombre con una línea descriptiva. Medidas del original
-     (60 × 48 px en celular, 64 × 52 px desde tableta, 7 px de aire). */
-  .pagos { display: grid; gap: var(--e-3); }
+  /* ---------- Cierre oscuro: Medios de pago + Contacto (17.3) ----------
+     Un solo bloque negro de ancho completo después del catálogo, con el contenedor del catálogo.
+     Escritorio: Pagos a la izquierda y Contacto a la derecha, rótulos alineados arriba y un divisor
+     vertical tenue. Celular: Pagos y, debajo, Contacto, con una línea horizontal entre ambos; el negro
+     continúa hasta el pie. */
+  .cierre-oscuro { padding-block: clamp(2.5rem, 1.5rem + 4vw, 5rem) var(--e-7); }
+  .cierre-grid { display: grid; align-items: start; gap: var(--e-6); }
+  .cierre-contacto { padding-top: var(--e-6); border-top: 1px solid var(--oscuro-linea); }
+  .pagos-encabezado { display: grid; justify-items: start; gap: var(--e-2); margin-bottom: var(--e-4); }
+  .pagos-encabezado h2 { margin-top: 0; }
+  .pagos-encabezado .seccion-nota { max-width: 30rem; justify-self: start; }
+  .pagos { display: grid; margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--oscuro-linea); }
   .pago {
     display: flex;
     align-items: center;
     gap: var(--e-4);
-    min-height: 5.5rem;
-    padding: var(--e-4) var(--e-5);
-    border: 1px solid var(--linea);
-    border-radius: var(--r-superficie);
-    background: var(--superficie);
+    padding: var(--e-3) 0;
+    border-bottom: 1px solid var(--oscuro-linea);
   }
   .pago-icono {
     position: relative;
     display: grid;
     flex: none;
     place-items: center;
-    width: 3.75rem;
-    height: 3rem;
-    padding: 7px;
-    border: 1px solid var(--linea);
+    width: 3.5rem;
+    height: 2.75rem;
     border-radius: var(--r-control);
     background: var(--superficie);
+    color: var(--tinta);
   }
-  /* El icono ocupa exactamente el interior del recuadro, respetando los 7 px de aire. */
+  /* El icono ocupa el interior del marco claro, respetando 7 px de aire. */
   .pago-icono img {
     position: absolute;
     inset: 7px;
@@ -1566,21 +1618,19 @@
   }
   .pago-icono .icono { width: 1.5rem; height: 1.5rem; }
   .pago-texto { display: grid; gap: 0.125rem; min-width: 0; }
-  .pago-texto strong { font-size: var(--t-md); font-weight: 600; line-height: 1.25; }
+  .pago-texto strong { font-size: var(--t-md); font-weight: 600; line-height: 1.25; color: var(--oscuro-texto); }
   .pago-texto small {
     font-family: var(--fuente-mono);
     font-size: var(--t-2xs);
     letter-spacing: 0.06em;
     text-transform: uppercase;
-    color: var(--tinta-2);
+    color: var(--oscuro-texto-2);
   }
-  @media (min-width: 640px) {
-    .pago-icono { width: 4rem; height: 3.25rem; }
-  }
-  .seccion-pagos .aviso { max-width: 42rem; margin-top: var(--e-5); }
+  .cierre-pagos .aviso { margin-top: var(--e-4); font-size: var(--t-xs); color: var(--oscuro-texto-2); }
+  .cierre-pagos .aviso .icono { color: var(--cobalto-claro); margin-top: 0.0625rem; flex: none; }
 
   /* ---------- Contacto ---------- */
-  .contacto { display: grid; gap: var(--e-7); }
+  .contacto { display: grid; gap: var(--e-6); }
   .contacto-principal h2 { margin-block: var(--e-3) var(--e-4); }
   .contacto-principal p { max-width: 30rem; margin-bottom: var(--e-5); color: var(--oscuro-texto-2); }
   .contacto-lista { border-top: 1px solid var(--oscuro-linea); }
@@ -1597,7 +1647,6 @@
   .contacto-lista li > span > span { font-size: var(--t-sm); color: var(--oscuro-texto-2); }
 
   /* ---------- Pie de página ---------- */
-  .seccion-contacto { padding-bottom: var(--e-7); }
   .pie { padding-bottom: calc(var(--e-8) + env(safe-area-inset-bottom)); }
   /* Divisores alineados con el contenido, no con el borde del contenedor. */
   .pie-columnas,
@@ -1722,8 +1771,6 @@
 
     .grilla { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-7) var(--e-4); }
 
-    .pasos { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--e-6); }
-    .pagos { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .pie-columnas { grid-template-columns: 2fr 1fr 1fr; }
 
     .aviso-flotante {
@@ -1819,20 +1866,18 @@
     .talla-mini { min-width: 1.75rem; padding-inline: 0.25rem; }
 
 
-    .pasos { grid-template-columns: repeat(5, minmax(0, 1fr)); column-gap: 0; border-top: 0; }
-    .paso {
-      grid-template-columns: 1fr;
-      align-content: start;
-      row-gap: var(--e-2);
-      padding: 0 var(--e-5);
-      border-bottom: 0;
-      border-left: 1px solid var(--oscuro-linea);
+    .seccion-pasos .seccion-encabezado { margin-bottom: var(--e-6); }
+    .pasos-cierre {
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      margin-top: var(--e-7);
+      padding-top: var(--e-5);
+      border-top: 1px solid var(--oscuro-linea);
     }
-    .paso:first-child { padding-left: 0; border-left: 0; }
-    .paso-numero { grid-row: auto; margin-bottom: var(--e-5); font-size: 4rem; }
-    .pasos-cierre { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: var(--e-5) var(--e-6); }
 
-    .contacto { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: end; }
+    .cierre-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); column-gap: 0; }
+    .cierre-pagos { padding-right: var(--e-7); }
+    .cierre-contacto { padding: 0 0 0 var(--e-7); border-top: 0; border-left: 1px solid var(--oscuro-linea); }
   }
 
   @media (min-width: 1280px) {
@@ -2048,7 +2093,7 @@
     overflow-wrap: anywhere;
     color: var(--tinta-2);
   }
-  .detalle-marca-nombre { color: var(--tinta); }
+  .detalle-marca-nombre { color: var(--tinta); text-transform: none; }
   /* Segundo nivel: el modelo, en el titular condensado de la portada, con el mismo tamaño para
      todos los productos (--t-modelo). Un nombre largo ocupa dos líneas, sin encogerse. */
   .detalle-nombre {
@@ -2199,12 +2244,16 @@
   }
   .muestra-unica { width: 1.25rem; height: 1.25rem; align-self: center; }
 
-  /* 16.3: «Caballero» o «Dama» junto a marca y categoría: pequeño, sin competir con modelo ni precio. */
-  .tarjeta-meta { display: flex; }
-  .tarjeta-meta > span { white-space: pre; }
-  .tarjeta-meta-marca { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .tarjeta-publico { flex: none; color: var(--tinta); }
-  .tarjeta-meta-resto { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  /* 16.3 y 17: «MARCA · PÚBLICO · N COLORES», pequeño, sin competir con modelo ni precio. Público y
+     recuento nunca se recortan: si no caben (celular), pasan a una segunda línea. Solo la marca,
+     sola en su línea, puede recortarse con puntos suspensivos. */
+  /* El espacio entre fragmentos lo pone column-gap (no el texto): así una segunda línea empieza
+     alineada, sin sangría. Cada fragmento es una caja: su espacio inicial no se pinta. */
+  .tarjeta-meta { display: flex; flex-wrap: wrap; column-gap: 1ch; }
+  .tarjeta-meta > span { white-space: nowrap; }
+  .tarjeta-meta-marca { text-transform: none; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .tarjeta-publico, .tarjeta-colores { flex: none; }
+  .tarjeta-publico { color: var(--tinta); }
   .detalle-publico { color: var(--tinta-2); }
 
   /* Tallas EU: una tabla de numeración impresa, con las casillas unidas (no botones sueltos) y
@@ -2757,33 +2806,49 @@
     height: 100dvh;
     margin: 0 0 0 auto;
   }
-  .carrito { display: flex; flex-direction: column; height: 100%; background: var(--superficie); }
+  /* Etapa 17.1 · Carrito en tres zonas: cabecera compacta, UNA zona con desplazamiento (productos,
+     nota, dirección y mensaje completo) y pie fijo con el subtotal y la acción principal. El pie
+     es hermano de la zona, no se superpone: la última línea siempre se alcanza. */
+  .carrito { display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--superficie); }
   .carrito-cabecera {
+    flex: none;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: var(--e-4);
-    padding: var(--e-5) var(--e-5) var(--e-4);
+    gap: var(--e-3);
+    min-height: 3.5rem;
+    padding: var(--e-1) var(--e-2) var(--e-1) var(--e-4);
     border-bottom: 1px solid var(--linea);
   }
-  .carrito-cabecera h2 { margin-top: var(--e-2); font-size: var(--t-xl); }
+  .carrito-cabecera h2 { font-size: var(--t-lg); line-height: 1.1; }
   .carrito-cabecera h2:focus { outline: none; }
   .carrito-cabecera .boton-cerrar { position: static; box-shadow: none; background: var(--papel); }
   .carrito-notificacion {
-    margin: var(--e-4) var(--e-5) 0;
-    padding: var(--e-3) var(--e-4);
+    flex: none;
+    margin: var(--e-2) var(--e-4);
+    padding: var(--e-2) var(--e-3);
     border-radius: var(--r-control);
     background: var(--cobalto-suave);
     color: var(--cobalto-oscuro);
-    font-size: var(--t-sm);
+    font-size: var(--t-xs);
+    line-height: 1.4;
   }
-  .carrito-cuerpo { flex: 1; overflow-y: auto; overscroll-behavior: contain; padding-inline: var(--e-5); }
+  .carrito-zona {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-inline: var(--e-4);
+    scroll-padding-bottom: var(--e-5);
+  }
+  .carrito-complemento { display: grid; gap: var(--e-3); padding-block: var(--e-3) var(--e-5); }
   .linea {
     display: grid;
-    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
-    gap: var(--e-3);
+    grid-template-columns: 4rem minmax(0, 1fr);
+    grid-template-areas: "media info" "fila fila";
+    gap: var(--e-2) var(--e-3);
     align-items: start;
-    padding-block: var(--e-4);
+    padding-block: var(--e-3);
     border-bottom: 1px solid var(--linea);
   }
   /* Se conserva en el carrito, marcada: no entra en el pedido hasta confirmarla. */
@@ -2804,9 +2869,11 @@
     color: var(--tinta-2);
     cursor: not-allowed;
   }
-  .linea-media { overflow: hidden; aspect-ratio: 1; border-radius: 8px; background: var(--papel); }
+  .linea-media { grid-area: media; overflow: hidden; aspect-ratio: 1; border-radius: 8px; background: var(--papel); }
   .linea-media img { width: 100%; height: 100%; object-fit: contain; }
-  .linea-nombre { font-size: var(--t-sm); font-weight: 600; line-height: 1.3; }
+  .linea-info { grid-area: info; min-width: 0; }
+  /* Jerarquía: modelo (puede ocupar varias líneas) → talla y color → precio. */
+  .linea-nombre { font-size: var(--t-sm); font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
   .linea-meta {
     margin-top: var(--e-1);
     font-family: var(--fuente-mono);
@@ -2814,8 +2881,9 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
     color: var(--tinta-2);
+    overflow-wrap: anywhere;
   }
-  .linea-unitario { margin-top: 0.125rem; font-size: var(--t-xs); color: var(--tinta-2); }
+  .linea-unitario { margin-top: 0.125rem; font-size: var(--t-xs); color: var(--tinta-2); overflow-wrap: anywhere; }
   .carrito-pendientes {
     display: grid;
     gap: var(--e-2);
@@ -2833,10 +2901,11 @@
   .carrito-pendientes li { display: grid; }
   .carrito-pendiente-motivo { font-size: var(--t-xs); color: var(--tinta-2); }
   .carrito-pendientes .boton-texto { justify-self: start; }
-  .linea-controles { display: flex; align-items: center; gap: var(--e-2); margin-top: 0.625rem; }
-  .linea-controles .cantidad { height: 2.75rem; }
+  .linea-controles { grid-area: fila; display: flex; align-items: center; justify-content: space-between; gap: var(--e-3); }
+  .linea-controles .cantidad { height: 3rem; }
   .linea-controles .cantidad-boton { width: 2.75rem; }
-  .linea-subtotal { font-size: var(--t-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .linea-controles .boton-icono { flex: none; width: 2.75rem; height: 2.75rem; }
+  .linea-subtotal { flex: 1 1 auto; min-width: 0; text-align: right; font-size: var(--t-md); font-weight: 700; font-variant-numeric: tabular-nums; }
 
   .carrito-vacio {
     display: grid;
@@ -2864,18 +2933,27 @@
   .carrito-vacio p { max-width: 20rem; margin-bottom: var(--e-2); font-size: var(--t-sm); color: var(--tinta-2); }
 
   .carrito-pie {
+    flex: none;
     display: grid;
-    gap: var(--e-3);
-    padding: var(--e-4) var(--e-5) calc(var(--e-5) + env(safe-area-inset-bottom));
+    gap: var(--e-2);
+    padding: var(--e-3) var(--e-4) calc(var(--e-3) + env(safe-area-inset-bottom));
     border-top: 1px solid var(--linea);
+    background: var(--superficie);
+    box-shadow: 0 -10px 18px -14px rgb(20 20 20 / 0.35);
+    /* Red de seguridad en pantallas muy bajas: el pie nunca se come toda la altura. */
+    max-height: 60dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
-  .carrito-resumen { display: grid; gap: 0.375rem; }
-  .carrito-resumen div { display: flex; justify-content: space-between; gap: var(--e-4); font-size: var(--t-sm); }
+  .carrito-pie .boton { min-height: 2.75rem; }
+  .carrito-resumen { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--e-4); margin: 0; }
+  .carrito-resumen div { display: flex; align-items: baseline; gap: var(--e-2); font-size: var(--t-xs); }
   .carrito-resumen dt { color: var(--tinta-2); }
-  .carrito-resumen dd { font-weight: 600; font-variant-numeric: tabular-nums; }
-  .carrito-resumen div:nth-child(2) dd { font-size: var(--t-md); }
+  .carrito-resumen dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .carrito-resumen .carrito-resumen-subtotal { order: -1; flex: 1 0 100%; justify-content: space-between; font-size: var(--t-sm); }
+  .carrito-resumen .carrito-resumen-subtotal dd { font-size: var(--t-md); font-weight: 700; }
   .carrito-nota,
-  .carrito-respaldo p { font-size: var(--t-xs); color: var(--tinta-2); }
+  .carrito-respaldo p { font-size: var(--t-xs); line-height: 1.4; color: var(--tinta-2); }
 
   /* ---------- Hoja de filtros (celular y tableta) ----------
      Tarea modal: velo detrás, entra desde abajo y sale por el mismo camino.
@@ -3321,14 +3399,48 @@
      anchas, con las acciones fijas abajo y los campos con desplazamiento propio. */
   #carrito-enviar[aria-disabled="true"] { background: var(--linea); color: var(--tinta-2); cursor: not-allowed; }
   #carrito-enviar[aria-disabled="true"] .icono { color: var(--tinta-2); }
-  .carrito-envio {
+  .carrito-entrega {
     display: grid;
     gap: var(--e-2);
-    padding: var(--e-3) var(--e-4);
+    padding: var(--e-3);
     border: 1px solid var(--linea);
     border-radius: var(--r-control);
     background: var(--papel);
   }
+  .carrito-entrega-titulo {
+    font-family: var(--fuente-mono);
+    font-size: var(--t-2xs);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--tinta-2);
+  }
+  .carrito-entrega-fila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); }
+  .carrito-entrega-resumen {
+    display: flex;
+    align-items: center;
+    flex: 1 1 7rem;
+    gap: var(--e-2);
+    min-width: 0;
+    font-size: var(--t-sm);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+  }
+  .carrito-entrega-resumen .icono { flex: none; width: 1.125rem; height: 1.125rem; }
+  .carrito-entrega-boton { flex: none; min-height: 2.75rem; }
+  .carrito-entrega .boton-texto.carrito-entrega-boton { padding-inline: var(--e-2); }
+  #carrito-datos { padding-inline: var(--e-4); }
+  /* Confirmación breve de la dirección elegida, junto a su fila (antes era el aviso azul de arriba). */
+  .carrito-envio-confirmacion {
+    margin: 0;
+    padding: var(--e-2) var(--e-3);
+    border-radius: var(--r-control);
+    background: var(--cobalto-suave);
+    color: var(--cobalto-oscuro);
+    font-size: var(--t-xs);
+    line-height: 1.4;
+  }
+  .carrito-envio { padding-top: var(--e-2); border-top: 1px solid var(--linea); }
   .carrito-envio h3, .envio-revision h3 { font-size: var(--t-sm); font-weight: 700; }
   .carrito-envio-datos, .envio-lista { display: grid; gap: 0.25rem; margin: 0; }
   .carrito-envio-datos div, .envio-lista div { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--e-2); font-size: var(--t-sm); line-height: 1.35; }
@@ -3350,11 +3462,8 @@
     line-height: 1.45;
     resize: vertical;
   }
-  /* Con los datos de envío y el mensaje completo a la vista el pie crece mucho: tiene su
-     propio desplazamiento y las líneas conservan un alto mínimo, así las cantidades se pueden
-     seguir cambiando (y el respaldo se actualiza) en cualquier pantalla. */
-  .carrito-cuerpo { min-height: 7rem; }
-  .carrito-pie { max-height: 62vh; max-height: 62dvh; overflow-y: auto; overscroll-behavior: contain; }
+  /* El mensaje completo vive en la zona con desplazamiento (no en el pie): las cantidades se
+     pueden seguir cambiando y el respaldo se actualiza en cualquier pantalla. */
   .confirmacion-referencia { margin-top: var(--e-1); font-family: var(--fuente-mono); font-size: var(--t-xs); color: var(--tinta-2); overflow-wrap: anywhere; }
 
   dialog.modal-envio { width: 100%; margin: auto 0 0; }

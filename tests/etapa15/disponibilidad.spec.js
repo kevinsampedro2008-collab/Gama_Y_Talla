@@ -564,7 +564,8 @@ test('historial reciente: autor y cambios comprensibles', async ({ page }) => {
   const primero = page.locator('.historial-item').first();
   await expect(primero).toContainText(`${`Disponibilidad ${sufijo}`.toUpperCase()} · NEGRO · talla 38`);
   await expect(primero).toContainText('Por revisar → Agotada');
-  await expect(primero).toContainText('nota: «Confirmado por teléfono»');
+  // Etapa 17: cada cambio del historial es una línea propia que empieza con mayúscula.
+  await expect(primero).toContainText('Nota: «Confirmado por teléfono»');
   await expect(primero.locator('.historial-quien')).toHaveText('Tú');
   const registros = await historialDe(cat.talla('negro', '38'));
   const ultimo = registros[registros.length - 1];

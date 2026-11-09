@@ -74,6 +74,7 @@ const subidos = [];
 const creadas = [];
 const datos = (extra = {}) => ({
   id: P, nombre: 'SONDA 80', marca: 'Marca Ochenta', categoria: 'Running',
+  publico: 'hombre', // etapa 17: el público es obligatorio al guardar
   variantes: [{ id: V, color: 'Negro', precio: 100000, precio_anterior: 0, activa: true, orden: 0,
     tallas: [{ id: T, talla: '40', activa: true, activa_original: true }], fotos: [] }],
   ...extra

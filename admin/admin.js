@@ -328,6 +328,13 @@
       if (n) n.hidden = true;
     }
     $("#boton-historial")?.setAttribute("aria-expanded", "false");
+    // 17: lo que llegue tarde del historial se descarta, y al volver empieza en «Todos».
+    historialPeticion += 1;
+    historialCursor = null;
+    historialFiltro = "todos";
+    nombresAdmin = new Map();
+    pintarFiltrosHistorial();
+    $("#historial-mas")?.setAttribute("hidden", "");
     document.body.classList.remove("con-seleccion");
   }
 
@@ -774,7 +781,7 @@
 
   function marcarOcupado(si) {
     ocupado = si;
-    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #boton-actualizar, #boton-historial, [data-accion='salir'], #historial button")
+    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
       .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, #barra-acciones button")); });
     $("#barra-acciones")?.setAttribute("aria-busy", String(si));
     document.querySelectorAll("#dialogo-accion button").forEach((b) => { b.disabled = si; });
@@ -1254,37 +1261,147 @@
   }
 
   // ------------------------------------------------------------------ historial
+  /* Etapa 17: zapatillas, colores y tallas (lo que ya registra public.historial por disparador).
+   * Solo lectura y solo para administradores (RLS historial_lectura_admin; además se comprueba
+   * el acceso antes de cada página). Paginación por id descendente con cursor; cambiar el filtro
+   * reinicia la paginación. Cada petición lleva un número: la respuesta de un filtro anterior, de
+   * una sesión cerrada o de un historial ya cerrado se descarta sin pintarse. */
+  const HISTORIAL_PAGINA = 25;
+  const HISTORIAL_FILTROS = {
+    todos: { texto: "Todos", vacio: "Todavía no hay cambios registrados.", tablas: ["productos", "variantes", "tallas"] },
+    productos: { texto: "Zapatillas", vacio: "Todavía no hay cambios de zapatillas registrados.", tablas: ["productos"] },
+    variantes: { texto: "Colores", vacio: "Todavía no hay cambios de colores registrados.", tablas: ["variantes"] },
+    tallas: { texto: "Tallas", vacio: "Todavía no hay cambios de tallas registrados.", tablas: ["tallas"] }
+  };
+  const TIPO_FILA = { productos: "Zapatilla", variantes: "Color", tallas: "Talla" };
+  const PUBLICO_TEXTO = { hombre: "Hombre", dama: "Dama", unisex: "Unisex" };
+  const SEGMENTO_TEXTO = { hombre: "hombre", mujer: "mujer" };
+  let historialFiltro = "todos";
+  let historialPeticion = 0;        // sube con cada petición: solo se pinta la respuesta de la última
+  let nombresAdmin = new Map();     // user_id → nombre de la administración (si se puede leer)
+
+  const siNo = (v) => (v ? "sí" : "no");
+  const textoPublico = (v) => (v ? PUBLICO_TEXTO[v] || String(v) : "sin clasificar");
+  const textoPrecio = (v) => (Number(v) > 0 ? pesos.format(Number(v)) : "por confirmar");
+  const textoAnterior = (v) => (Number(v) > 0 ? pesos.format(Number(v)) : "sin precio anterior");
+  const textoVacio = (v) => (v === null || v === undefined || v === "" ? "—" : String(v));
+  const recortar = (texto, max = 80) => (String(texto).length > max ? `${String(texto).slice(0, max - 1)}…` : String(texto));
+
+  // Campos que se describen con su valor anterior y el nuevo. Los internos (versión, operación,
+  // marcas de tiempo, claves inmutables) no se muestran: no son decisiones de la persona.
+  const CAMPOS = {
+    productos: {
+      nombre: ["Modelo", textoVacio], marca: ["Marca", textoVacio], categoria: ["Categoría", textoVacio],
+      codigo_interno: ["Código", textoVacio], referencia_proveedor: ["Referencia del proveedor", textoVacio],
+      segmento: ["Tabla de la guía de tallas", (v) => SEGMENTO_TEXTO[v] || (v ? String(v) : "sin indicar")],
+      publico: ["Público", textoPublico], destacado: ["Destacada", siNo], nuevo_ingreso: ["Nuevo ingreso", siNo],
+      orden: ["Orden", textoVacio]
+    },
+    variantes: {
+      color: ["Color", textoVacio], codigo_variante: ["Código del color", textoVacio],
+      referencia_variante: ["Referencia del proveedor", textoVacio], precio: ["Precio", textoPrecio],
+      precio_anterior: ["Precio anterior", textoAnterior], muestra_color: ["Muestra", (v) => (v ? String(v).toUpperCase() : "sin muestra")],
+      orden: ["Orden", textoVacio]
+    },
+    tallas: {}
+  };
+  const INTERNOS = new Set(["id", "version", "ultima_operacion", "actualizado_en", "creado_en", "clave_catalogo", "clave_legado", "id_legado",
+    "producto_id", "variante_id", "registrado_en", "vence_en", "estado_migrado"]);
+
+  function describirTalla(h, antes, ahora, cambios) {
+    if (h.operacion === "INSERT") return [`Talla ${ahora.talla} registrada como ${(GUARDADOS[ahora.estado] || ahora.estado || "").toLowerCase()}${ahora.activa === false ? " (desactivada)" : ""}`];
+    const partes = [];
+    if (cambios.has("estado")) partes.push(`Estado: ${GUARDADOS[antes.estado] || antes.estado} → ${GUARDADOS[ahora.estado] || ahora.estado}`);
+    if (ahora.estado === "CONFIRMADA" && (cambios.has("vigencia_desde") || cambios.has("vigencia_horas"))) {
+      partes.push(`Vigencia: desde ${fecha(ahora.vigencia_desde)} por ${ahora.vigencia_horas} h (${ORIGENES[ahora.origen] || ahora.origen})`);
+    } else if (cambios.has("vigencia_horas")) partes.push(`Horas de vigencia: ${antes.vigencia_horas} → ${ahora.vigencia_horas}`);
+    if (cambios.has("activa")) partes.push(ahora.activa ? "Reactivada" : "Desactivada");
+    if (cambios.has("nota")) partes.push(ahora.nota ? `Nota: «${recortar(ahora.nota)}»` : "Nota borrada");
+    if (cambios.has("talla")) partes.push(`Etiqueta: ${antes.talla} → ${ahora.talla}`);
+    if (cambios.has("publicado_en") && !cambios.has("vigencia_desde")) partes.push(`Publicación original: ${fecha(antes.publicado_en)} → ${fecha(ahora.publicado_en)}`);
+    return partes;
+  }
+
   function describirCambio(h) {
     const antes = h.fila_anterior || {};
     const ahora = h.fila_nueva || {};
-    if (h.operacion === "INSERT") return [`Registrada como ${(GUARDADOS[ahora.estado] || ahora.estado || "").toLowerCase()}`];
-    if (h.operacion === "DELETE") return ["Eliminada por mantenimiento"];
     const cambios = new Set(h.cambios || []);
-    const partes = [];
-    if (cambios.has("estado")) partes.push(`${GUARDADOS[antes.estado] || antes.estado} → ${GUARDADOS[ahora.estado] || ahora.estado}`);
-    if (ahora.estado === "CONFIRMADA" && (cambios.has("vigencia_desde") || cambios.has("vigencia_horas"))) {
-      partes.push(`vigencia desde ${fecha(ahora.vigencia_desde)} por ${ahora.vigencia_horas} h (${ORIGENES[ahora.origen] || ahora.origen})`);
+    if (h.operacion === "DELETE") return [`${TIPO_FILA[h.tabla] || "Registro"} eliminado por mantenimiento`];
+    if (h.tabla === "tallas") {
+      const partes = describirTalla(h, antes, ahora, cambios);
+      return partes.length ? partes : ["Otros datos internos actualizados"];
     }
-    if (cambios.has("activa")) partes.push(ahora.activa ? "reactivada" : "desactivada");
-    if (cambios.has("nota")) partes.push(ahora.nota ? `nota: «${ahora.nota}»` : "nota borrada");
-    if (cambios.has("talla")) partes.push(`etiqueta ${antes.talla} → ${ahora.talla}`);
-    if (!partes.length) partes.push("otros datos actualizados");
+    if (h.operacion === "INSERT") {
+      if (h.tabla === "productos") {
+        return [`Zapatilla creada: ${[ahora.marca, ahora.categoria].filter(Boolean).join(" · ")}`,
+          `Público: ${textoPublico(ahora.publico)}`, ahora.activo ? "Publicada en la tienda" : "Oculta en la tienda"];
+      }
+      return [`Color agregado: ${ahora.color} (${ahora.codigo_variante})`, `Precio: ${textoPrecio(ahora.precio)}`,
+        ahora.activa === false ? "Oculto en la tienda" : "Visible en la tienda"];
+    }
+    const partes = [];
+    if (h.tabla === "productos") {
+      if (cambios.has("activo")) partes.push(ahora.activo ? "Publicada en la tienda" : "Oculta en la tienda");
+      if (cambios.has("retirado_en")) partes.push(ahora.retirado_en ? "Retirada del catálogo" : "Restaurada (sigue oculta)");
+      if (cambios.has("descripcion")) partes.push(ahora.descripcion ? "Descripción actualizada" : "Descripción borrada");
+    }
+    if (h.tabla === "variantes" && cambios.has("activa")) partes.push(ahora.activa ? "Color visible en la tienda" : "Color oculto en la tienda");
+    const campos = CAMPOS[h.tabla] || {};
+    for (const [clave, [etiqueta, formato]] of Object.entries(campos)) {
+      if (cambios.has(clave)) partes.push(`${etiqueta}: ${recortar(formato(antes[clave]))} → ${recortar(formato(ahora[clave]))}`);
+    }
+    const otros = [...cambios].filter((c) => !INTERNOS.has(c) && !(c in campos) && !["activo", "retirado_en", "descripcion", "activa"].includes(c));
+    if (otros.length) partes.push(`Otros datos actualizados (${otros.join(", ")})`);
+    if (!partes.length) {
+      // Un guardado del panel siempre sube la versión de la zapatilla; si nada más cambió en ella,
+      // lo que cambió está en sus colores o tallas (mismo «lote»).
+      partes.push(h.tabla === "productos" && cambios.has("version")
+        ? "Guardada desde el panel sin cambios en sus datos (lo que cambió está en sus colores o tallas, en la misma operación)"
+        : "Datos internos actualizados");
+    }
     return partes;
   }
 
   function autorDe(h) {
     if (!h.autor) return "Sistema o mantenimiento";
     if (usuarioActual && h.autor === usuarioActual.id) return "Tú";
-    return `Otra cuenta (${String(h.autor).slice(0, 8)})`;
+    const nombre = nombresAdmin.get(h.autor);
+    return nombre ? `${nombre} (${String(h.autor).slice(0, 8)})` : `Otra cuenta (${String(h.autor).slice(0, 8)})`;
   }
 
+  // Qué zapatilla, color o talla se afectó: primero con el tablero actual; si el registro ya no
+  // está en él, con los datos guardados en el propio evento.
   function ubicacionDe(h) {
+    const fila = h.fila_nueva || h.fila_anterior || {};
+    const zapatilla = (id) => catalogo.find((p) => p.id === id);
+    const color = (id) => {
+      for (const p of catalogo) { const v = p.variantes.find((x) => x.id === id); if (v) return { p, v }; }
+      return null;
+    };
+    if (h.tabla === "productos") {
+      const p = zapatilla(h.fila_id);
+      if (p) return `${p.nombre} (${p.codigo_interno})`;
+      return `${fila.nombre || "Zapatilla"}${fila.codigo_interno ? ` (${fila.codigo_interno})` : ""} · ya no está en el tablero`;
+    }
+    if (h.tabla === "variantes") {
+      const encontrado = color(h.fila_id);
+      if (encontrado) return `${encontrado.p.nombre} · ${encontrado.v.color} (${encontrado.v.codigo_variante})`;
+      const p = zapatilla(fila.producto_id);
+      return `${p ? `${p.nombre} · ` : ""}${fila.color || "Color"}${fila.codigo_variante ? ` (${fila.codigo_variante})` : ""}${p ? "" : " · ya no está en el tablero"}`;
+    }
     for (const p of catalogo) for (const v of p.variantes) {
       const t = v.tallas.find((x) => x.id === h.fila_id);
       if (t) return `${p.nombre} · ${v.color} · talla ${t.talla}`;
     }
-    const talla = (h.fila_nueva || h.fila_anterior || {}).talla;
-    return talla ? `Talla ${talla} (fuera de la lista actual)` : "Talla fuera de la lista actual";
+    const encontrado = color(fila.variante_id);
+    if (encontrado) return `${encontrado.p.nombre} · ${encontrado.v.color} · talla ${fila.talla}`;
+    return fila.talla ? `Talla ${fila.talla} · su color ya no está en el tablero` : "Talla que ya no está en el tablero";
+  }
+
+  function pintarFiltrosHistorial() {
+    document.querySelectorAll("#historial [data-historial-filtro]").forEach((b) => {
+      b.setAttribute("aria-pressed", String(b.dataset.historialFiltro === historialFiltro));
+    });
   }
 
   async function alternarHistorial() {
@@ -1293,40 +1410,194 @@
     seccion.hidden = !abrir;
     $("#boton-historial").setAttribute("aria-expanded", String(abrir));
     if (abrir) await cargarHistorial(true);
+    else historialPeticion += 1; // lo que llegue tarde ya no se pinta
+  }
+
+  function elegirFiltroHistorial(id) {
+    if (!HISTORIAL_FILTROS[id] || id === historialFiltro) return;
+    historialFiltro = id;
+    pintarFiltrosHistorial();
+    cargarHistorial(true);
+  }
+
+  async function leerNombresAdmin() {
+    try {
+      const r = await cliente.from("administradores").select("user_id,nombre");
+      if (!r.error) nombresAdmin = new Map((r.data || []).filter((a) => a.nombre).map((a) => [a.user_id, a.nombre]));
+    } catch { /* sin nombres: se muestra el identificador abreviado */ }
+  }
+
+  function itemHistorial(h, anterior) {
+    const item = nodo("li", "historial-item");
+    item.dataset.tabla = h.tabla;
+    item.dataset.id = String(h.id);
+    if (h.lote) item.dataset.lote = h.lote;
+    const mismoLote = Boolean(h.lote) && anterior?.dataset.lote === h.lote;
+    if (mismoLote) item.classList.add("historial-mismo-lote");
+    const meta = nodo("p", "historial-meta");
+    const cuando = nodo("time", "historial-fecha", fecha(h.ocurrido_en));
+    cuando.dateTime = h.ocurrido_en;
+    meta.append(nodo("span", "historial-tipo", TIPO_FILA[h.tabla] || h.tabla), cuando, nodo("span", "historial-quien", autorDe(h)));
+    if (h.lote) {
+      const lote = nodo("span", "historial-lote", mismoLote ? "misma operación" : `operación ${String(h.lote).slice(0, 8)}`);
+      lote.title = `Identificador de la operación: ${h.lote}`;
+      meta.append(lote);
+    }
+    const cambios = nodo("ul", "historial-cambios");
+    for (const texto of describirCambio(h)) cambios.append(nodo("li", "", texto));
+    item.append(meta, nodo("strong", "historial-donde", ubicacionDe(h)), cambios);
+    return item;
   }
 
   async function cargarHistorial(reiniciar) {
     const mia = generacion;
+    const peticion = ++historialPeticion;
+    const filtroPedido = historialFiltro;
+    const vigente = () => mia === generacion && peticion === historialPeticion && !$("#historial").hidden;
     const lista = $("#historial-lista");
     const estado = $("#historial-estado");
     const mas = $("#historial-mas");
     if (reiniciar) { lista.replaceChildren(); historialCursor = null; }
+    const cursor = historialCursor;
     mas.hidden = true;
     estado.textContent = "Cargando historial…";
-    const acceso = await comprobarAcceso();
-    if (mia !== generacion) return;
-    if (!(await aplicarAcceso(acceso))) return;
-    let consulta = cliente.from("historial")
-      .select("id,fila_id,operacion,cambios,fila_anterior,fila_nueva,autor,ocurrido_en")
-      .eq("tabla", "tallas").order("id", { ascending: false }).limit(25);
-    if (historialCursor) consulta = consulta.lt("id", historialCursor);
-    let r;
-    try { r = await consulta; } catch { r = { error: { status: 0 } }; }
-    if (mia !== generacion) return;
-    if (r.error) { estado.textContent = "No pudimos cargar el historial. Revisa tu conexión e inténtalo de nuevo."; return; }
-    const filas = r.data || [];
-    for (const h of filas) {
-      const item = nodo("li", "historial-item");
-      const cuando = nodo("time", "historial-fecha", fecha(h.ocurrido_en));
-      cuando.dateTime = h.ocurrido_en;
-      item.append(cuando, nodo("strong", "historial-donde", ubicacionDe(h)),
-        nodo("span", "historial-que", describirCambio(h).join(" · ")),
-        nodo("span", "historial-quien", autorDe(h)));
-      lista.append(item);
+    $("#historial").setAttribute("aria-busy", "true");
+    try {
+      const acceso = await comprobarAcceso();
+      if (mia !== generacion) return;
+      if (!(await aplicarAcceso(acceso))) return;
+      if (!vigente()) return;
+      if (reiniciar) await leerNombresAdmin();
+      if (!vigente()) return;
+      let consulta = cliente.from("historial")
+        .select("id,tabla,fila_id,operacion,cambios,fila_anterior,fila_nueva,autor,lote,ocurrido_en")
+        .in("tabla", HISTORIAL_FILTROS[filtroPedido].tablas)
+        .order("id", { ascending: false }).limit(HISTORIAL_PAGINA);
+      if (cursor) consulta = consulta.lt("id", cursor);
+      let r;
+      try { r = await consulta; } catch { r = { error: { status: 0 } }; }
+      if (!vigente()) return;
+      if (r.error) {
+        if (clasificar(r.error) === "sin-sesion") { await aplicarAcceso({ estado: "sin-sesion" }); return; }
+        estado.textContent = "No pudimos cargar el historial. Revisa tu conexión e inténtalo de nuevo.";
+        mas.hidden = !cursor; // si ya había páginas, se puede volver a pedir la siguiente
+        return;
+      }
+      const filas = r.data || [];
+      for (const h of filas) lista.append(itemHistorial(h, lista.lastElementChild));
+      if (filas.length) historialCursor = filas[filas.length - 1].id;
+      mas.hidden = filas.length < HISTORIAL_PAGINA;
+      const n = lista.children.length;
+      const filtro = HISTORIAL_FILTROS[filtroPedido];
+      estado.textContent = n
+        ? `${n} ${n === 1 ? "cambio" : "cambios"}${filtroPedido === "todos" ? "" : ` (${filtro.texto.toLowerCase()})`}, del más reciente al más antiguo. Hora de Colombia.`
+        : filtro.vacio;
+    } finally {
+      if (peticion === historialPeticion) $("#historial").removeAttribute("aria-busy");
     }
-    if (filas.length) historialCursor = filas[filas.length - 1].id;
-    mas.hidden = filas.length < 25;
-    estado.textContent = lista.children.length ? `${lista.children.length} ${lista.children.length === 1 ? "cambio" : "cambios"}, del más reciente al más antiguo. Hora de Colombia.` : "Todavía no hay cambios de disponibilidad registrados.";
+  }
+
+  // ------------------------------------------------------------- exportar (17)
+  /* CSV del inventario COMPLETO (también lo oculto y lo retirado): una fila por color y talla; un
+   * modelo sin colores o un color sin tallas da una fila con esas columnas vacías. UTF-8 con BOM y
+   * punto y coma, para que Excel en español lo abra bien. Se comprueba el acceso y se reutilizan
+   * las lecturas paginadas del tablero: si cualquier página falla, no se descarga nada. */
+  const ESTADO_ZAPATILLA = (p) => (p.retirado_en ? "Retirada" : p.activo ? "Publicada" : "Oculta");
+  const DISPONIBILIDAD_TIENDA = { DISPONIBLE: "Disponible", POR_REVISAR: "Por revisar", AGOTADO: "Agotada", OCULTA: "No visible en la tienda" };
+  const COLUMNAS_CSV = [
+    "Código zapatilla", "Modelo", "Marca", "Categoría", "Público", "Referencia proveedor", "Estado en la tienda",
+    "Código color", "Color", "Referencia proveedor color", "Color visible", "Precio (COP)", "Precio anterior (COP)",
+    "Talla EU", "Talla activa", "Disponibilidad guardada", "Disponibilidad en la tienda", "Procedencia",
+    "Vigencia desde (hora Colombia)", "Vence (hora Colombia)", "Vigencia (horas)"
+  ];
+  const formatoFechaCsv = new Intl.DateTimeFormat("en-CA", { timeZone: ZONA, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+  const fechaCsv = (iso) => (iso ? formatoFechaCsv.format(new Date(iso)).replace(",", "") : "");
+  let exportando = false;
+
+  // Una celda de texto: protegida contra fórmulas de hoja de cálculo y escapada.
+  function celdaCsv(valor, { numero = false } = {}) {
+    let texto = valor === null || valor === undefined ? "" : String(valor);
+    if (!numero && /^[=+\-@\t\r]/.test(texto)) texto = `'${texto}`;
+    return /[";\r\n]/.test(texto) || /^\s|\s$/.test(texto) ? `"${texto.replace(/"/g, '""')}"` : texto;
+  }
+
+  function filasCsv(productos) {
+    const filas = [];
+    for (const p of productos) {
+      const base = [p.codigo_interno, p.nombre, p.marca, p.categoria, p.publico ? PUBLICO_TEXTO[p.publico] || p.publico : "Sin clasificar",
+        p.referencia_proveedor || "", ESTADO_ZAPATILLA(p)].map((v) => celdaCsv(v));
+      if (!p.variantes.length) { filas.push([...base, ...Array(COLUMNAS_CSV.length - base.length).fill("")]); continue; }
+      for (const v of p.variantes) {
+        const color = [celdaCsv(v.codigo_variante), celdaCsv(v.color), celdaCsv(v.referencia_variante || ""), celdaCsv(v.activa ? "Sí" : "No"),
+          celdaCsv(v.precio ?? 0, { numero: true }), celdaCsv(Number(v.precio_anterior) > 0 ? v.precio_anterior : "", { numero: true })];
+        if (!v.tallas.length) { filas.push([...base, ...color, ...Array(COLUMNAS_CSV.length - base.length - color.length).fill("")]); continue; }
+        for (const t of v.tallas) {
+          filas.push([...base, ...color, celdaCsv(t.talla), celdaCsv(t.activa ? "Sí" : "No"), celdaCsv(GUARDADOS[t.estado] || t.estado),
+            celdaCsv(DISPONIBILIDAD_TIENDA[t.efectivo] || t.efectivo), celdaCsv(ORIGENES[t.origen] || t.origen || ""),
+            celdaCsv(fechaCsv(t.vigencia_desde)), celdaCsv(fechaCsv(t.vence_en)), celdaCsv(t.vigencia_desde ? t.vigencia_horas : "", { numero: true })]);
+        }
+      }
+    }
+    return filas;
+  }
+
+  function descargarCsv(nombre, filas) {
+    const texto = [COLUMNAS_CSV.map((c) => celdaCsv(c)), ...filas].map((f) => f.join(";")).join("\r\n") + "\r\n";
+    const blob = new Blob(["﻿", texto], { type: "text/csv;charset=utf-8" });
+    const enlace = document.createElement("a");
+    enlace.href = URL.createObjectURL(blob);
+    enlace.download = nombre;
+    enlace.hidden = true;
+    document.body.append(enlace);
+    enlace.click();
+    enlace.remove();
+    setTimeout(() => URL.revokeObjectURL(enlace.href), 60000);
+  }
+
+  async function exportarCatalogo() {
+    if (ocupado || exportando) return;
+    const mia = generacion;
+    const boton = $("#boton-exportar");
+    exportando = true;
+    boton.disabled = true;
+    boton.setAttribute("aria-busy", "true");
+    boton.textContent = "Exportando…";
+    try {
+      const acceso = await comprobarAcceso();
+      if (mia !== generacion) return;
+      if (!(await aplicarAcceso(acceso))) return;
+      const respuestas = await Promise.all([
+        leerPaginado(() => cliente.from("productos")
+          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,publico,activo,orden,retirado_en," +
+                  "variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden)")
+          .order("orden").order("codigo_interno").order("id")),
+        leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).order("variante_id").order("id")),
+        leerPaginado(() => cliente.from("catalogo_publico").select("codigoInterno,variantes").order("orden").order("codigoInterno"))
+      ]);
+      if (mia !== generacion) return;
+      const fallo = respuestas.find((r) => r.error);
+      if (fallo) {
+        if (clasificar(fallo.error) === "sin-sesion") { await aplicarAcceso({ estado: "sin-sesion" }); return; }
+        anunciarResultado({ titulo: "No se pudo exportar el catálogo", texto: "Falló la lectura de una de las páginas del inventario. No se descargó ningún archivo para no entregar un catálogo incompleto. Revisa tu conexión e inténtalo de nuevo.", tipo: "aviso" });
+        return;
+      }
+      const productos = preparar(respuestas[0].data, respuestas[1].data, respuestas[2].data);
+      const filas = filasCsv(productos);
+      const nombre = `gama-talla-catalogo-${hoyEnColombia()}.csv`;
+      descargarCsv(nombre, filas);
+      const colores = productos.reduce((n, p) => n + p.variantes.length, 0);
+      const tallas = productos.reduce((n, p) => n + p.variantes.reduce((m, v) => m + v.tallas.length, 0), 0);
+      anunciarResultado({
+        titulo: "Catálogo exportado",
+        texto: `${nombre}: ${filas.length} ${filas.length === 1 ? "fila" : "filas"} con ${productos.length} ${productos.length === 1 ? "zapatilla" : "zapatillas"}, ${colores} ${colores === 1 ? "color" : "colores"} y ${tallas} ${tallas === 1 ? "talla" : "tallas"}, incluidas las ocultas y retiradas.`,
+        tipo: "ok"
+      });
+    } finally {
+      exportando = false;
+      boton.disabled = ocupado;
+      boton.removeAttribute("aria-busy");
+      boton.textContent = "Exportar catálogo";
+    }
   }
 
   // ------------------------------------------------------- puente con el editor
@@ -1395,6 +1666,8 @@
       else if (accion === "actualizar") { if (!ocupado) cargarCatalogo({ conservarPosicion: true }); }
       else if (accion === "historial") { if (!ocupado) alternarHistorial(); }
       else if (accion === "historial-mas") { if (!ocupado) cargarHistorial(false); }
+      else if (accion === "historial-filtro") { if (!ocupado) elegirFiltroHistorial(e.target.closest("[data-historial-filtro]").dataset.historialFiltro); }
+      else if (accion === "exportar") { if (!ocupado) exportarCatalogo(); }
       else if (accion in ACCIONES) abrirAccion(accion);
       else if (accion === "deseleccionar") { if (!ocupado) quitarSeleccion(); }
       else if (accion === "cancelar-dialogo") cerrarDialogo();

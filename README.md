@@ -49,7 +49,8 @@ gama-y-talla/
 
 ### 1. Configura WhatsApp
 
-Al inicio de `app.js`, dentro de `CONFIG`, reemplaza:
+**En Netlify**, el número sale de la variable `WHATSAPP_COMERCIAL` (ver «Publicar en Netlify»); no hace falta editar el código.
+En desarrollo, al inicio de `app.js`, dentro de `CONFIG`, está:
 
 ```js
 whatsapp: "573000000000"
@@ -70,7 +71,7 @@ La conexión se declara **fuera del código**, en `config.js` (no se versiona):
 1. Copia `config.ejemplo.js` como `config.js`, en la raíz del sitio.
 2. Escribe la URL del proyecto y su clave **publicable** (`sb_publishable_…`). Nunca la secreta: la
    tienda la rechaza, no la usa y no imprime su valor.
-3. Al publicar, `config.js` debe estar en la carpeta que se sube (por ejemplo, en Netlify Drop).
+3. En Netlify, `config.js` no se sube: lo genera `scripts/preparar-publicacion.mjs` con las variables de entorno (ver «Publicar en Netlify»).
 
 Cómo carga la tienda:
 
@@ -171,12 +172,64 @@ Alternativa: ejecuta `python -m http.server 8000` desde la carpeta del proyecto 
 
 ## Publicar en Netlify
 
-1. Entra a [Netlify Drop](https://app.netlify.com/drop).
-2. Arrastra la carpeta `gama-y-talla` que contiene `index.html` en su raíz.
-3. Netlify publicará el sitio y generará una dirección `*.netlify.app`.
-4. Abre la dirección publicada y comprueba el catálogo, las imágenes y el proceso de pedido.
+El sitio se publica desde GitHub: Netlify ejecuta `node scripts/preparar-publicacion.mjs`, que arma la carpeta
+**`dist`** (solo lo necesario de la tienda y de `/admin/`) y la sirve. `netlify.toml` ya trae el comando y el
+directorio de publicación.
 
-El proyecto no requiere comando de compilación. `netlify.toml` configura `publish = "."`.
+### Importar el proyecto
+
+1. En Netlify: **Add new project → Import an existing project → GitHub**, y elige `kevinsampedro2008-collab/Gama_Y_Talla`
+   (rama `main`).
+2. Verifica que Netlify lea `netlify.toml`: **Build command** `node scripts/preparar-publicacion.mjs` y
+   **Publish directory** `dist`.
+3. Antes del primer despliegue, en **Site configuration → Environment variables** crea las **tres** variables de producción
+   (sin ellas la compilación se detiene y dice cuál falta):
+
+   | Variable | Qué va |
+   |---|---|
+   | `SUPABASE_URL` | `https://<referencia>.supabase.co` del proyecto (hoy `gama-talla-dev`) |
+   | `SUPABASE_PUBLISHABLE_KEY` | La clave **publicable** (`sb_publishable_…`) de *Project Settings → API Keys*. Nunca la secreta |
+   | `WHATSAPP_COMERCIAL` | El número comercial con prefijo de país (p. ej. `57` + diez dígitos). No el provisional |
+
+   El comando rechaza una clave secreta o un JWT, una URL que no sea la HTTPS del proyecto aprobado y un número inválido o
+   provisional. Nunca imprime los valores.
+4. **Deploy**. Si cambias una variable, haz **Deploys → Trigger deploy → Clear cache and deploy site**.
+
+Qué contiene `dist`: la tienda, `/admin/` (con el SDK del panel), las guías de tallas, la escena 3D y los recursos de
+portada. No incluye los 28 ejemplos, las pruebas, los respaldos, las migraciones ni archivos `.env`. `config.js` y
+`admin/config.js` se **generan** al compilar con las variables anteriores (no se versionan). En producción, `?datos-prueba`
+no activa el catálogo de demostración.
+
+Probar el empaquetado en local (con valores ficticios; `dist/` está ignorado por Git):
+
+```bash
+SUPABASE_URL=https://mwhiusocfdwzxnzenfsz.supabase.co SUPABASE_PUBLISHABLE_KEY=sb_publishable_FICTICIA_1234   WHATSAPP_COMERCIAL=573001234567 node scripts/preparar-publicacion.mjs
+python -m http.server 8080 --directory dist     # y abrir http://127.0.0.1:8080/
+npx playwright test tests/etapa17/publicacion.spec.js --workers=1
+```
+
+### Después de publicar: qué comprobar
+
+1. **Enlace público.** Abre la dirección `*.netlify.app`: portada, catálogo (viene de `catalogo_publico`), fotos, filtros,
+   ficha y carrito. Añade un par, completa los datos de envío y pulsa **Enviar pedido por WhatsApp**.
+2. **Panel.** Abre `/admin/` (y `/admin`, que redirige): debe verse «Panel de la tienda» con el acceso. Ingresa con la cuenta
+   administradora. El panel lleva `noindex` y su propia política de seguridad.
+3. **Borrador de WhatsApp desde el iPhone.** En Safari, arma un pedido y envíalo: WhatsApp debe abrirse con el chat del número
+   comercial y un borrador que empieza por «GAMA & TALLA — NUEVO PEDIDO». **No lo envíes**: cierra el borrador. Comprueba que
+   no se vean caracteres «�» y que los saltos de línea y los datos de envío estén completos.
+4. **Caché de la presentación.** Los modelos 3D y los pósteres llevan un hash en el nombre (por ejemplo
+   `af1-model-medium.c6ba8831f9.glb`): su URL cambia solo si cambian sus bytes. `dist/_headers` les da
+   `Cache-Control: public, max-age=31536000, immutable`; el HTML se revalida y los `config.js` son `no-store`.
+   - Encabezado real: `curl -I https://<tu-sitio>/assets/images/models/optimized/<archivo-con-hash>.glb` debe mostrar
+     `cache-control: public, max-age=31536000, immutable`.
+   - Segunda visita: abre el sitio con una carga normal, abre las herramientas del navegador → **Red/Network**, recarga
+     normalmente (sin «Disable cache» ni recarga forzada) y mira la columna **Size**/**Tamaño** de los `.glb` y los
+     pósteres: debe decir **disk cache** o **memory cache**, sin transferir bytes.
+   - Si quieres ver la presentación otra vez con el modelo en caché, usa «Volver a ver la presentación».
+5. **Dominio (Hostinger).** En Netlify, **Domain management → Domains → Add a domain** y, dentro del dominio, **Set up Netlify DNS /
+   Check DNS configuration**: ahí Netlify lista los registros exactos (normalmente un registro **A** o **ALIAS** para el dominio raíz y un
+   **CNAME** para `www`). Cópialos en Hostinger → **Dominios → DNS / Nameservers → Administrar registros DNS**. Los cambios pueden tardar
+   en propagarse; el certificado HTTPS se emite solo cuando el DNS apunta a Netlify.
 
 ## Lista antes de vender
 

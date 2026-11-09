@@ -1,0 +1,10 @@
+# Gama & Talla en Netlify (Import an existing project → GitHub).
+# Variables de entorno de compilación (Site configuration → Environment variables), las tres obligatorias:
+#   SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, WHATSAPP_COMERCIAL
+# Detalles y verificación posterior a la publicación: README.md, sección «Publicar en Netlify».
+[build]
+  command = "node scripts/preparar-publicacion.mjs"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"

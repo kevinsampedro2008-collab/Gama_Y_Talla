@@ -164,7 +164,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       const enviar = pagina.locator('#carrito-enviar');
       await expect(enviar).toHaveAttribute('aria-disabled', 'true');
       await expect(pagina.locator('#carrito-envio-aviso')).toHaveText('Completa tus datos de envío para continuar.');
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       await expect(pagina.locator('#carrito-copiar')).toHaveCount(0);
       // Playwright no pulsa un botón con aria-disabled: se fuerza el clic y se prueba el teclado.
       await enviar.click({ force: true });
@@ -205,9 +205,13 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       await pagina.locator('#envio-guardar').click();
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
       expect(await abiertas(pagina)).toBe(0);
+      // Etapa 17.1: la dirección es una fila breve con la ciudad; los datos completos están en el detalle plegado.
+      await expect(pagina.locator('#carrito-entrega-ciudad')).toHaveText('Barranquilla');
+      await expect(pagina.locator('#carrito-envio'), 'el detalle empieza plegado').toBeHidden();
+      await pagina.locator('#carrito-envio-ver').click();
       await expect(pagina.locator('#carrito-envio')).toBeVisible();
       await expect(pagina.locator('#carrito-envio-datos')).toContainText('Calle 84 # 51B-20, apto 302');
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Cambiar dirección de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Cambiar');
       await expect(pagina.locator('#carrito-envio-aviso')).toBeHidden();
       await expect(enviar).toHaveAttribute('aria-disabled', 'false');
       await pagina.screenshot({ path: path.join(CAPTURAS, `carrito-datos-${browserName}-390.png`) });
@@ -229,8 +233,8 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       let mensaje = await ultimoMensaje(pagina);
       expect(mensaje).toContain('NUEVO PEDIDO');
       expect(mensaje).toContain([
-        '─────────────────', 'Mis datos:', `Nombre: ${DATOS.nombre}`, `Teléfono: ${DATOS.telefono}`, `Ciudad: ${DATOS.ciudad}`,
-        `Dirección: ${DATOS.direccion}`, `Nota: ${DATOS.nota}`, '─────────────────', '💰TOTAL: $120.000', '🚚 Envío: Por confirmar.'
+        '────────────────', '*Mis datos:*', `Nombre: ${DATOS.nombre}`, `Teléfono: ${DATOS.telefono}`, `Ciudad: ${DATOS.ciudad}`,
+        `Dirección: ${DATOS.direccion}`, `Nota: ${DATOS.nota}`, '────────────────', '💰TOTAL: $120.000', '🚚 Envío: Por confirmar.'
       ].join('\n'));
       expect(await guardadoV3(pagina), 'abrir WhatsApp no vacía el carrito').toEqual(antes);
 
@@ -248,7 +252,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       expect(mensaje).toContain('* Cantidad: 2');
       expect(mensaje).toContain('* Subtotal: $240.000');
       expect(mensaje).toContain('💰TOTAL: $240.000');
-      expect(mensaje).toContain(`Dirección: ${DATOS.direccion}\n─────────────────\n💰TOTAL`);
+      expect(mensaje).toContain(`Dirección: ${DATOS.direccion}\n────────────────\n💰TOTAL`);
       await sinRastroFueraDeLaLibreta(pagina);
     }, { respuesta: BASE });
   });
@@ -567,7 +571,7 @@ for (const vista of VISTAS) {
       // Con datos válidos el botón de envío recupera su color (tras su transición).
       await pagina.mouse.move(1, 1);
       await expect.poll(() => pagina.locator('#carrito-enviar').evaluate((b) => getComputedStyle(b).backgroundColor)).toBe('rgb(15, 122, 65)');
-      await pagina.locator('#carrito-envio').scrollIntoViewIfNeeded();
+      await pagina.locator('#carrito-entrega').scrollIntoViewIfNeeded();
       await pagina.screenshot({ path: path.join(CAPTURAS, `carrito-resumen-${browserName}-${vista.nombre}.png`) });
       expect(await pagina.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       // Gestor de direcciones (16.2): sin desbordes y con controles cómodos.
@@ -639,7 +643,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       pagina.on('console', (m) => consola.push(m.text()));
       await anadir(pagina, SAMBA, '40', 1);
       await abrirCarrito(pagina);
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       // Escribir no guarda nada: solo confirmar un formulario válido.
       await pagina.locator('#carrito-datos').click();
       await expect(pagina.locator('#envio-formulario .envio-intro')).toContainText('únicamente en este navegador');
@@ -648,7 +652,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       expect(await libretaGuardada(pagina), 'nada se guarda mientras se escribe').toBeNull();
       await pagina.locator('#envio-guardar').click();
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Cambiar dirección de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Cambiar');
       await expect(pagina.locator('#carrito-envio-datos')).toContainText(DATOS.direccion);
       // La segunda NO sobrescribe la primera y queda elegida.
       await anadirDireccion(pagina, DATOS2);
@@ -809,7 +813,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await recargar();
       expect(await guardadoV3(pagina)).toEqual(carrito);
       await abrirCarrito(pagina);
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       await pagina.locator('#carrito-datos').click();
       await expect(pagina.locator('#envio-formulario-aviso')).toContainText('No pudimos leer las direcciones guardadas');
       await rellenarEnvio(pagina);
@@ -844,7 +848,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await expect(pagina.locator('#envio-formulario-aviso')).toContainText('no reconoce; no las modificamos');
       await rellenarEnvio(pagina);
       await pagina.locator('#envio-guardar').click();
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('No la guardamos para no modificar las direcciones de una versión más nueva');
+      await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('No la guardamos para no modificar las direcciones de una versión más nueva');
       await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
       expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_LIBRETA), 'el formato nuevo queda intacto').toBe(futuro);
       await pagina.keyboard.press('Escape');
@@ -861,14 +865,14 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina);
       await pagina.locator('#envio-guardar').click();
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('Este navegador no nos deja guardarla: servirá durante esta visita, pero no se recordará.');
+      await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('Este navegador no nos deja guardarla: servirá durante esta visita, pero no se recordará.');
       await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
       await pagina.locator('#carrito-enviar').click();
       expect(await ultimoMensaje(pagina)).toContain(`Dirección: ${DATOS.direccion}`);
       expect(await guardadoV3(pagina), 'el carrito no se rompe').toEqual(carrito);
       await recargar();
       await abrirCarrito(pagina);
-      await expect(pagina.locator('#carrito-datos'), 'no se presenta como guardada').toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos'), 'no se presenta como guardada').toHaveText('Agregar dirección');
       expect(await guardadoV3(pagina)).toEqual(carrito);
     }, { respuesta: BASE });
   });
@@ -1134,7 +1138,7 @@ test.describe('Libreta: guardados solapados y datos dañados (16.3)', () => {
       const futuro = JSON.stringify({ version: 2, libreta: ['formato nuevo'] });
       await pagina.evaluate(([c, f]) => localStorage.setItem(c, f), [CLAVE_LIBRETA, futuro]);
       await anadirDireccion(pagina, DATOS2);
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('No la guardamos para no modificar las direcciones de una versión más nueva');
+      await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('No la guardamos para no modificar las direcciones de una versión más nueva');
       expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_LIBRETA), 'el formato nuevo sigue intacto').toBe(futuro);
       await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
       await pagina.locator('#carrito-enviar').click();
@@ -1220,7 +1224,7 @@ test.describe('Libreta: escritura bloqueada durante la visita (cierre 16.3)', ()
       await expect(pagina.locator('#carrito-envio-datos')).toContainText(DATOS.direccion);
       // Dos direcciones en la misma visita: la segunda no puede hacer olvidar la primera.
       await anadirDireccion(pagina, DATOS2);
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('servirá durante esta visita');
+      await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('servirá durante esta visita');
       await anadirDireccion(pagina, DATOS3);
       await pagina.locator('#carrito-datos').click();
       await expect(pagina.locator('#envio-direcciones .envio-direccion')).toHaveCount(3);

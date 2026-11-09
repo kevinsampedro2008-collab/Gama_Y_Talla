@@ -507,10 +507,30 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
 .historial-cabecera h2 { font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
 .historial-estado { color: var(--tinta-2); font-size: 0.9375rem; }
 .historial-lista { display: grid; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
-.historial-item { display: grid; gap: 2px; padding-top: var(--e-3); border-top: 1px solid var(--linea); }
-.historial-fecha, .historial-quien { font-size: 0.875rem; color: var(--tinta-2); }
-.historial-que { overflow-wrap: anywhere; }
+.historial-item { display: grid; gap: var(--e-1); min-width: 0; padding-top: var(--e-3); border-top: 1px solid var(--linea); }
 .historial > .boton { justify-self: start; }
+/* 17: filtros, tipo de registro, autor, operación y cambios con «antes → ahora». */
+.historial-filtros { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.historial-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--e-3); font-size: 0.875rem; color: var(--tinta-2); }
+.historial-tipo {
+  padding: 1px var(--e-2);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: 999px;
+  font-family: var(--fuente-mono);
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tinta);
+}
+.historial-lote { font-family: var(--fuente-mono); font-size: 0.75rem; }
+.historial-donde { overflow-wrap: anywhere; }
+.historial-cambios { display: grid; gap: 2px; margin: 0; padding-left: 1.1em; list-style: disc; overflow-wrap: anywhere; }
+/* Cambios de una misma operación (mismo «lote»): unidos por un filete a la izquierda. */
+.historial-mismo-lote { margin-top: calc(-1 * var(--e-2)); padding-left: var(--e-3); border-top-style: dashed; box-shadow: inset 2px 0 0 var(--linea-fuerte); }
+@media (max-width: 767px) {
+  .historial { padding: var(--e-4); }
+  .historial-filtros .filtro { flex: 1 1 calc(50% - var(--e-2)); }
+}
 
 /* Diálogo de confirmación */
 .dialogo {
@@ -815,6 +835,8 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
   .tablero-botones { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2); }
   .tablero-botones .boton { width: 100%; min-height: 2.75rem; }
   #boton-nuevo { grid-column: 1 / -1; min-height: 3rem; font-size: 1rem; }
+  /* 17: «Exportar catálogo» debajo, a lo ancho (Historial y Actualizar siguen juntos). */
+  #boton-exportar { grid-column: 1 / -1; }
   /* Buscador a todo el ancho, con etiqueta breve (el nombre accesible sigue completo). */
   .buscador { max-width: none; }
   .buscador-etiqueta-detalle {
@@ -838,7 +860,10 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
 
 /* Editor: público y muestra del color. */
 .editor-publico { display: grid; gap: var(--e-2); }
-.editor-publico > .boton-texto { justify-self: start; }
+/* 17: público obligatorio. El error va junto al grupo; el grupo se marca con un filete rojo. */
+.editor-publico[aria-invalid="true"] { padding-left: var(--e-3); border-left: 3px solid #8e1c1c; }
+.editor-publico-error, .editor-publico-pendiente { margin: 0; }
+.editor-publico-error { font-weight: 600; }
 .editor-muestra-fila { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2); }
 .editor-muestra-vista {
   flex: none;

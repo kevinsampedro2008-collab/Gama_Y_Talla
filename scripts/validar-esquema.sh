@@ -117,6 +117,7 @@ bateria "10. Integridad de tallas y vigencia (14f.2)" supabase/pruebas/60_integr
 bateria "10b. Catálogo desde el panel y políticas de fotos (etapa 16)" supabase/pruebas/70_catalogo_admin.sql
 bateria "10c. Códigos editables y mayúsculas (etapa 16.2)" supabase/pruebas/90_codigos_editables.sql
 bateria "10d. Público y muestras de color (etapa 16.3)" supabase/pruebas/91_publico_y_muestras.sql
+bateria "10e. Público obligatorio con Unisex (etapa 17)" supabase/pruebas/92_publico_obligatorio.sql
 
 titulo "11. Auditoría de funciones (solo lectura; cero filas = sin hallazgos)"
 if psql_ -tA -F ' | ' -v ON_ERROR_STOP=1 < supabase/pruebas/auditar_funciones.sql > "$REGISTRO/auditoria.txt" 2>&1; then

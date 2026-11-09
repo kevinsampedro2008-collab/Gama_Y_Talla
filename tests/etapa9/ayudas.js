@@ -66,7 +66,7 @@ export async function enTienda({ browser, browserName }, vista, cuerpo, { url = 
    Datos FICTICIOS para las pruebas y ayudas para completarlos y enviar. */
 export const DATOS_ENVIO = Object.freeze({ nombre: 'Camila Rodríguez', telefono: '300 123 4567', ciudad: 'Barranquilla', direccion: 'Calle 84 # 51B-20, apto 302', nota: '' });
 export const lineasDatosEnvio = (d = DATOS_ENVIO) => [
-  '─────────────────', 'Mis datos:', `Nombre: ${d.nombre}`, `Teléfono: ${d.telefono}`, `Ciudad: ${d.ciudad}`, `Dirección: ${d.direccion}`, ...(d.nota ? [`Nota: ${d.nota}`] : []),
+  '────────────────', '*Mis datos:*', `Nombre: ${d.nombre}`, `Teléfono: ${d.telefono}`, `Ciudad: ${d.ciudad}`, `Dirección: ${d.direccion}`, ...(d.nota ? [`Nota: ${d.nota}`] : []),
 ];
 
 // Con la ventana de datos de envío abierta: rellena y guarda.

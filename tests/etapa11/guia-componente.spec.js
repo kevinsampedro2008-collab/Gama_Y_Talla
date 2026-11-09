@@ -271,8 +271,9 @@ test.describe('Productos sin guía', () => {
       for (const t of textos) {
         expect(t.texto, t.nombre).not.toMatch(/pendientes de confirmar|por investigar|sin verificar/i);
         // Cada ficha lleva la guía de su propia marca, nunca la de otra.
-        if (t.ident) expect(t.ident.startsWith(t.marca), `${t.nombre}: ${t.ident} con marca ${t.marca}`).toBe(true);
-        else expect(t.marca).toMatch(/^CAMBIAR/);
+        // 17.4: la marca se muestra con mayúscula inicial («Le coq sportif»); se compara sin distinguir mayúsculas.
+        if (t.ident) expect(t.ident.toLowerCase().startsWith(t.marca.toLowerCase()), `${t.nombre}: ${t.ident} con marca ${t.marca}`).toBe(true);
+        else expect(t.marca).toMatch(/^CAMBIAR/i);
       }
     }, { reducido: true });
   });

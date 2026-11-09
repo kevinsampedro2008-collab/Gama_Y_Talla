@@ -4,7 +4,7 @@ import { CELULAR, ESCRITORIO, URL_PRUEBA, enTienda, abrirDetalle, DATOS_ENVIO, l
 import { anadirDesdeFicha, ventanaDe, volverAlCatalogo, textoDe, cifras, CLAVE_CARRITO, NUMERO } from './ayudas-etapa12.js';
 
 const ENCABEZADO = '*GAMA & TALLA — NUEVO PEDIDO*';
-const SEPARADOR = '─────────────────';
+const SEPARADOR = '────────────────';
 const DESPEDIDA = 'Quedo a la espera de confirmación. ¡Gracias!';
 // Campos consecutivos (sin líneas vacías) y con «* » literal al inicio.
 const entrada = (n, nombre, marca, color, referencia, talla, cantidad, unitario, subtotal) => [
@@ -34,7 +34,7 @@ function comprobarFormato(mensaje) {
   const final = lineas.lastIndexOf(SEPARADOR);
   expect(lineas[final + 1], 'total justo bajo el separador').toMatch(/^💰TOTAL: (\$[\d.]+|Por confirmar)$/);
   expect(lineas[final + 2], 'envío justo bajo el total').toBe('🚚 Envío: Por confirmar.');
-  const datos = lineas.indexOf('Mis datos:');
+  const datos = lineas.indexOf('*Mis datos:*');
   expect(lineas[datos - 1], 'separador sobre los datos de envío').toBe(SEPARADOR);
   expect(lineas[datos - 2], 'línea vacía tras el último producto').toBe('');
   for (const rotulo of ['Nombre', 'Teléfono', 'Ciudad', 'Dirección']) expect(mensaje).toMatch(new RegExp(`^${rotulo}: \\S`, 'm'));
@@ -138,7 +138,7 @@ test.describe('Desde el carrito: «Enviar pedido»', () => {
       const mensaje = textoDe(url);
       expect(mensaje.split('\n')).toEqual([
         '*GAMA & TALLA — NUEVO PEDIDO*',
-        '─────────────────',
+        '────────────────',
         '',
         '1. SAMBA',
         '* Marca: Adidas',
@@ -158,13 +158,13 @@ test.describe('Desde el carrito: «Enviar pedido»', () => {
         '* Precio unit.: $120.000',
         '* Subtotal: $120.000',
         '',
-        '─────────────────',
-        'Mis datos:',
+        '────────────────',
+        '*Mis datos:*',
         'Nombre: Camila Rodríguez',
         'Teléfono: 300 123 4567',
         'Ciudad: Barranquilla',
         'Dirección: Calle 84 # 51B-20, apto 302',
-        '─────────────────',
+        '────────────────',
         '💰TOTAL: $240.000',
         '🚚 Envío: Por confirmar.',
         '',
@@ -234,7 +234,7 @@ test.describe('Desde el carrito: «Enviar pedido»', () => {
       await anadirPorCodigo(pagina, 'SAMBA', '42');
       await abrirCarritoDesdeCabecera(pagina);
       await expect(pagina.locator('#carrito-copiar')).toHaveCount(0);
-      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       await expect(pagina.locator('#carrito-respaldo'), 'la copia del mensaje completo solo aparece con pedidos largos').toBeHidden();
     }, { reducido: true });
   });
@@ -348,7 +348,7 @@ test.describe('Enlace de WhatsApp (simulado, sin red externa)', () => {
     await enTienda({ browser, browserName }, CELULAR, async (pagina) => {
       const externas = [];
       pagina.on('request', (r) => { if (/whatsapp\.(com|net)/.test(r.url())) externas.push(r.url()); });
-      const mensaje = ['*GAMA & TALLA — NUEVO PEDIDO*', '─────────────────', '💰TOTAL: $120.000', '🚚 Envío: Por confirmar.', 'Ñandú «comillas» #2 & 50% + más'].join('\n');
+      const mensaje = ['*GAMA & TALLA — NUEVO PEDIDO*', '────────────────', '💰TOTAL: $120.000', '🚚 Envío: Por confirmar.', 'Ñandú «comillas» #2 & 50% + más'].join('\n');
       const enlace = await pagina.evaluate((m) => enlaceWhatsApp(m), mensaje);
       const url = new URL(enlace);
       expect(url.origin + url.pathname).toBe('https://api.whatsapp.com/send');

@@ -58,6 +58,47 @@ Comprueba que la vista conserva cada campo e identificador anterior, que lo exis
 clasificar y sin muestra, y que un cliente anterior no borra lo guardado. Después:
 `supabase/pruebas/91_publico_y_muestras.sql` (también la ejecuta `scripts/validar-esquema.sh`).
 
+## Etapa 17 · Migrar desde las 14 anteriores con un producto sin público
+
+```bash
+npx --yes supabase@3.0.0 db reset --local --version 20261108040000
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/datos_previos_17.sql
+npx --yes supabase@3.0.0 migration up --local
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/verificar_migracion_17.sql
+npx --yes supabase@3.0.0 db reset --local
+```
+
+Comprueba que la vista, las filas y el historial no cambian al migrar, que el heredado sin público
+sigue visible en «Todos» con su identidad, que guardarlo o publicarlo exige clasificarlo, que un
+cliente anterior conserva la clasificación existente y que no se puede quitar. Después:
+`supabase/pruebas/92_publico_obligatorio.sql` (también la ejecuta `scripts/validar-esquema.sh`).
+
+## Etapa 17 · Ciclo de respaldo y recuperación
+
+Necesita el stack de este proyecto (origen, catálogo vacío), OTRO stack local vacío preparado con
+`scripts/respaldo/preparar-destino.mjs` y la tienda en `127.0.0.1:8765`:
+
+```bash
+node scripts/respaldo/preparar-destino.mjs --carpeta "<destino>" --id gt_restauracion_17
+npx --yes supabase@3.0.0 start --workdir "<destino>" -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<destino>" --salida "<carpeta fuera del repo>"
+# Para repetirlo: npx --yes supabase@3.0.0 db reset --workdir "<destino>"
+```
+
+## Etapa 17.1 · Verificación de la restauración (1.001 productos y un 503)
+
+```bash
+# Sin Supabase: servidor HTTP simulado con max_rows = 1000
+node --test supabase/pruebas/reproducir/pruebas_vista_respaldo.mjs
+
+# Con el origen (este proyecto, vacío) y un destino local vacío; el paquete pequeño es el que deja
+# ciclo_respaldo_17.mjs. Siembra 1.001 productos, los respalda, los restaura y repite con un 503.
+node supabase/pruebas/reproducir/ciclo_verificacion_17_1.mjs --destino-workdir "<destino>" --salida "<carpeta fuera del repo>" --paquete-chico "<paquete>"
+```
+
+`GT_RESPALDO_SIMULAR_FALLO=vista-503` hace que `catalogo_publico` responda 503 con un cuerpo de texto
+DESPUÉS de confirmar la base (solo pruebas).
+
 ## Orden
 
 Desde la raíz del proyecto:

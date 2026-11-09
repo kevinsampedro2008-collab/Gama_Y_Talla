@@ -51,9 +51,12 @@ for (const vista of VISTAS) {
       for (const f of fichas) {
         const ctx = `«${f.textoNombre}»`;
         // Los valores salen de los datos reales: la pareja marca/categoría existe en el JSON para ese modelo.
-        const registro = catalogo.find((p) => p.nombre === f.textoNombre && f.textoMarca === `${p.marca} · ${p.categoria}`);
+        // 17.4: la marca se muestra con mayúscula inicial («Le coq sportif»); se compara sin distinguir mayúsculas.
+        const registro = catalogo.find((p) => p.nombre === f.textoNombre && f.textoMarca.toLowerCase() === `${p.marca} · ${p.categoria}`.toLowerCase());
         expect(registro, `${ctx}: «${f.textoMarca}» sale del catálogo real`).toBeTruthy();
-        expect(f.meta.startsWith(f.textoMarca), `${ctx}: coincide con su tarjeta`).toBe(true);
+        // Etapa 17: la tarjeta lleva «MARCA · PÚBLICO · N COLORES»; la categoría ya no va en ella
+        // (sigue en la ficha, comprobada arriba).
+        expect(f.meta.toLowerCase().startsWith(registro.marca.toLowerCase()) && !f.meta.includes(` · ${registro.categoria}`), `${ctx}: coincide con su tarjeta, sin la categoría`).toBe(true);
         expect(f.marcas, `${ctx}: una sola línea de marca`).toBe(1);
         // Sin duplicar: la ruta ya no nombra marca ni categoría; solo el catálogo y el modelo.
         expect(f.ruta, `${ctx}: ruta`).toBe(`Catálogo${f.textoNombre}`);

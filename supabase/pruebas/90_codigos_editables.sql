@@ -33,6 +33,7 @@ returns jsonb language sql as $$
   select jsonb_build_object(
     'id', '10000000-9090-0000-0000-00000000000a',
     'nombre', 'samba niño', 'marca', 'adidas', 'categoria', 'Urbanas', 'descripcion', 'Texto en minúsculas.',
+    'publico', 'hombre',  -- etapa 17: el público es obligatorio al guardar
     'variantes', jsonb_build_array(
       jsonb_build_object('id', '20000000-9090-0000-0000-00000000000a', 'color', 'Beige/Blancas', 'precio', 120000, 'activa', true, 'orden', 0,
                          'referencia_variante', 'prov-a',

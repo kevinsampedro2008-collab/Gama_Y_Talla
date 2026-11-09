@@ -89,6 +89,22 @@ para que **ningún rol de aplicación necesite permiso sobre la secuencia**.
   comprueba la columna `publico` y, con un esquema anterior, bloquea esas opciones y lo avisa.
 - Los productos existentes quedan sin clasificar y sin muestra. No toca existencias, vigencias,
   fotos, códigos ni claves del carrito.
+
+### Público obligatorio con Unisex (migración `20261109010000`, etapa 17)
+
+- `productos.publico` admite `hombre`, `dama` y `unisex`; `null` queda solo para los registros
+  heredados sin clasificar (siguen en «Todos», sin etiqueta). La tienda rotula `unisex` como
+  «Unisex». Sigue siendo independiente de `segmento`. La migración no modifica ninguna fila.
+- `fn_admin_guardar_producto` (misma firma y permisos): el público es **obligatorio**. Enviado, debe
+  ser uno de los tres (`null`, vacío u otro valor → `PT422`, así que nadie quita una clasificación);
+  ausente, un cliente anterior que edita una zapatilla ya clasificada la conserva, pero al crear o si
+  aún no tiene público se rechaza. El error lleva `detail = {"motivo":"publico"}` y la respuesta,
+  `publico_obligatorio: true`.
+- `fn_admin_estado_producto` (misma firma y permisos): «publicar» exige también el público
+  («Para publicarla falta: el público en la tienda…»); ocultar, retirar y restaurar no.
+- `catalogo_publico` no cambia. Pruebas: `supabase/pruebas/92_publico_obligatorio.sql` y, desde las
+  14 migraciones anteriores, `supabase/pruebas/reproducir/datos_previos_17.sql` +
+  `verificar_migracion_17.sql`.
 - **Solo aplicada y probada en local.** Su aplicación remota queda pendiente de revisión.
 
 ## Formato de las tallas (migración `20261107030000`)

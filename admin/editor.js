@@ -47,6 +47,11 @@
   // 16.3: «publico» y «muestra_color» solo existen con la migración 20261108040000. Con un esquema
   // anterior se leen las columnas de siempre y esas opciones quedan bloqueadas (se avisa).
   let publicoYMuestras = null;   // null = aún no se sabe; true/false = el servidor los admite o no
+  // Etapa 17: el público es obligatorio (Hombre, Dama o Unisex) al guardar y al publicar. Solo los
+  // registros heredados pueden llegar sin él; el formulario pide clasificarlos.
+  const PUBLICOS = [["hombre", "Hombre"], ["dama", "Dama"], ["unisex", "Unisex"]];
+  const publicoValido = (valor) => PUBLICOS.some(([v]) => v === valor);
+  const MENSAJE_PUBLICO = "Elige el público en la tienda: Hombre, Dama o Unisex.";
   const MUESTRA_HEX = /^#[0-9a-f]{6}$/i;
   const columnas = () => "id,codigo_interno,referencia_proveedor,nombre,marca,categoria,descripcion,segmento,destacado,nuevo_ingreso,activo,orden,version,ultima_operacion,retirado_en" +
     (publicoYMuestras === false ? "" : ",publico") +
@@ -118,7 +123,7 @@
       modo: "editar", id: p.id, codigo: p.codigo_interno, version: p.version, activo: p.activo, retirado: Boolean(p.retirado_en),
       datos: {
         codigo_interno: p.codigo_interno || "",
-        publico: p.publico === "hombre" || p.publico === "dama" ? p.publico : "",
+        publico: publicoValido(p.publico) ? p.publico : "",
         nombre: p.nombre || "", marca: p.marca || "", categoria: p.categoria || "", referencia_proveedor: p.referencia_proveedor || "",
         descripcion: p.descripcion || "", segmento: p.segmento || "", destacado: Boolean(p.destacado), nuevo_ingreso: Boolean(p.nuevo_ingreso),
         orden: String(p.orden ?? 0)
@@ -176,7 +181,7 @@
     return {
       id: e.id,
       codigo_interno: codigoLimpio(d.codigo_interno),
-      publico: d.publico === "hombre" || d.publico === "dama" ? d.publico : null,
+      publico: publicoValido(d.publico) ? d.publico : null,
       nombre: mayus(d.nombre.trim()), marca: mayus(d.marca.trim()), categoria: mayus(d.categoria.trim()),
       referencia_proveedor: d.referencia_proveedor.trim() || null, descripcion: d.descripcion.trim() || null,
       segmento: d.segmento || null, destacado: d.destacado, nuevo_ingreso: d.nuevo_ingreso,
@@ -206,6 +211,9 @@
     exigir(d.marca.trim() && d.marca.trim().length <= LIM.marca, "ed-marca", "Escribe la marca (hasta 60 caracteres).");
     exigir(d.categoria.trim() && d.categoria.trim().length <= LIM.categoria, "ed-categoria", "Escribe la categoría (hasta 60 caracteres).");
     exigir(d.referencia_proveedor.trim().length <= LIM.referencia, "ed-referencia", "La referencia admite hasta 60 caracteres.");
+    // 17: sin público no se guarda (tampoco «Guardar oculta») ni se publica. Con un servidor anterior
+    // a 16.3 la opción está bloqueada y el servidor no lo pide: no se exige.
+    if (publicoYMuestras !== false) exigir(publicoValido(d.publico), "ed-publico-hombre", MENSAJE_PUBLICO);
     exigir(d.descripcion.trim().length <= LIM.descripcion, "ed-descripcion", "La descripción admite hasta 2000 caracteres.");
     exigir(/^-?[0-9]{1,6}$/.test(String(d.orden).trim() || "0"), "ed-orden", "El orden debe ser un número entero.");
     exigir(ed.variantes.length >= 1, "ed-agregar-color", "Agrega al menos un color.");
@@ -384,12 +392,15 @@
       listaOpciones.append(caja);
     });
     segmento.append(listaOpciones);
-    // 16.3: público de la tienda, independiente de la tabla de la guía de tallas.
+    // 16.3 y 17: público de la tienda, obligatorio e independiente de la tabla de la guía de tallas.
+    // Al crear no hay ninguna opción marcada: hay que elegir una. No se puede volver a «sin asignar».
     const publico = nodo("fieldset", "editor-opciones editor-publico");
     publico.id = "ed-publico";
-    publico.append(nodo("legend", "", "Público en la tienda"));
+    const leyenda = nodo("legend", "", "Público en la tienda");
+    leyenda.append(nodo("span", "campo-obligatorio", " (obligatorio)"));
+    publico.append(leyenda);
     const listaPublico = nodo("div", "editor-opciones-lista");
-    [["hombre", "Hombre"], ["dama", "Dama"]].forEach(([valor, texto]) => {
+    PUBLICOS.forEach(([valor, texto]) => {
       const caja = nodo("label", "casilla");
       const radio = nodo("input");
       radio.type = "radio";
@@ -397,19 +408,24 @@
       radio.id = `ed-publico-${valor}`;
       radio.value = valor;
       radio.checked = d.publico === valor;
+      radio.required = publicoYMuestras !== false;
       radio.dataset.campo = "publico";
       radio.dataset.opcionNueva = "";
       if (publicoYMuestras === false) radio.dataset.bloqueado = "1";
       caja.append(radio, nodo("span", "", texto));
       listaPublico.append(caja);
     });
-    const quitarPublico = boton("Dejar sin asignar", "quitar-publico", "boton boton-texto boton-mini");
-    quitarPublico.id = "ed-publico-quitar";
-    quitarPublico.hidden = !d.publico || publicoYMuestras === false;
-    const ayudaPublico = nodo("p", "campo-ayuda", "En la tienda se muestra como «Caballero» o «Dama». Sin marcar = sin clasificar: aparece solo en «Todos». No cambia la tabla de la guía de tallas.");
+    const ayudaPublico = nodo("p", "campo-ayuda", "En la tienda se muestra como «Caballero», «Dama» o «Unisex», y en su filtro. No cambia la tabla de la guía de tallas.");
     ayudaPublico.id = "ed-publico-ayuda";
-    publico.setAttribute("aria-describedby", ayudaPublico.id);
-    publico.append(listaPublico, ayudaPublico, quitarPublico);
+    // Registro heredado sin clasificar: se pide elegirlo para guardarlo o publicarlo.
+    const pendientePublico = nodo("p", "editor-nota editor-publico-pendiente", "Esta zapatilla todavía no tiene público (es un registro anterior). Elígelo para poder guardarla o publicarla.");
+    pendientePublico.id = "ed-publico-pendiente";
+    pendientePublico.hidden = !(ed.modo === "editar" && !publicoValido(d.publico) && publicoYMuestras !== false);
+    const errorPublico = nodo("p", "campo-error editor-publico-error", "");
+    errorPublico.id = "ed-publico-error";
+    errorPublico.hidden = true;
+    publico.setAttribute("aria-describedby", `${ayudaPublico.id} ${pendientePublico.id} ${errorPublico.id}`);
+    publico.append(listaPublico, errorPublico, ayudaPublico, pendientePublico);
     const avisoPublico = nodo("p", "editor-nota editor-codigos-aviso", "Este servidor todavía no admite el público ni las muestras de color: falta aplicar la migración 20261108040000_publico_y_muestras. Puedes guardar lo demás; esas opciones no se guardarán.");
     avisoPublico.id = "ed-publico-aviso";
     avisoPublico.setAttribute("role", "status");
@@ -564,7 +580,13 @@
     });
     const aviso = $("#ed-publico-aviso");
     if (aviso) aviso.hidden = !antiguo;
-    if (antiguo) document.querySelectorAll('#editor [data-editor="quitar-publico"], #editor [data-editor="quitar-muestra"]').forEach((b) => { b.hidden = true; });
+    if (antiguo) {
+      document.querySelectorAll('#editor [data-editor="quitar-muestra"]').forEach((b) => { b.hidden = true; });
+      document.querySelectorAll('#editor input[name="ed-publico"]').forEach((r) => { r.required = false; });
+      const pendiente = $("#ed-publico-pendiente");
+      if (pendiente) pendiente.hidden = true;
+      errorPublicoVisible("");
+    }
     pintarBotones();
   }
 
@@ -767,6 +789,21 @@
   function marcarErrores(errores) {
     document.querySelectorAll("#editor [aria-invalid='true']").forEach((n) => { if (!n.dataset.agregarTalla) n.removeAttribute("aria-invalid"); });
     for (const e of errores) if (e.campo) document.getElementById(e.campo)?.setAttribute("aria-invalid", "true");
+    errorPublicoVisible(errores.find((e) => e.campo === "ed-publico-hombre")?.mensaje || "");
+  }
+
+  // 17: el error del público se muestra también junto a su grupo (además del aviso del pie).
+  function errorPublicoVisible(texto) {
+    const caja = $("#ed-publico-error");
+    const grupo = $("#ed-publico");
+    if (!caja || !grupo) return;
+    if (caja.textContent !== texto) caja.textContent = texto;
+    caja.hidden = !texto;
+    if (texto) grupo.setAttribute("aria-invalid", "true");
+    else {
+      grupo.removeAttribute("aria-invalid");
+      grupo.querySelectorAll("input[aria-invalid]").forEach((r) => r.removeAttribute("aria-invalid"));
+    }
   }
 
   // ------------------------------------------------------------ abrir y cerrar
@@ -969,7 +1006,22 @@
       return;
     }
     ed.pendiente = null;
-    if (tipo === "datos") { error(`${r.error.message || "El servidor rechazó los datos."} No se guardó nada; corrige y vuelve a guardar.`); resultado(""); return; }
+    if (tipo === "datos") {
+      const mensaje = String(r.error.message || "");
+      // 17: un servidor sin la migración 20261109010000 rechaza «Unisex» con su regla anterior
+      // («Hombre o Dama»). Nada se guardó y el formulario se conserva tal cual.
+      if (op.extras?.publico === "unisex" && /Hombre o Dama/.test(mensaje)) {
+        const texto = "Este servidor todavía no admite «Unisex»: falta aplicar la migración 20261109010000_publico_unisex.";
+        errorPublicoVisible(texto);
+        error(`${texto} No se guardó nada y tus datos siguen en el formulario. Elige Hombre o Dama, o vuelve a guardar cuando se aplique la migración.`);
+        resultado("");
+        return;
+      }
+      if (/Elige el público/.test(mensaje)) errorPublicoVisible(mensaje);
+      error(`${mensaje || "El servidor rechazó los datos."} No se guardó nada; corrige y vuelve a guardar.`);
+      resultado("");
+      return;
+    }
     if (tipo === "no-existe") { error("Esta zapatilla ya no existe en el servidor."); resultado(""); return; }
     if (tipo === "sin-sesion" || tipo === "sin-permiso") {
       resultado("");
@@ -1481,14 +1533,6 @@
         if (f?.blob) subirFoto(v, f);
         break;
       }
-      case "quitar-publico": {
-        ed.datos.publico = "";
-        document.querySelectorAll('#editor input[name="ed-publico"]').forEach((r) => { r.checked = false; });
-        objetivo.hidden = true;
-        document.getElementById("ed-publico-hombre")?.focus();
-        pintarBotones();
-        break;
-      }
       case "quitar-muestra": {
         if (!v) break;
         v.muestra = "";
@@ -1521,7 +1565,7 @@
       if (n.type === "radio" && !n.checked) return;
       ed.datos[n.dataset.campo] = n.type === "checkbox" ? n.checked : n.value;
       if (n.dataset.campo === "nombre") $("#editor-titulo").textContent = ed.modo === "crear" ? "Nueva zapatilla" : (n.value.trim() || "Zapatilla sin nombre");
-      if (n.dataset.campo === "publico") { const quitar = $("#ed-publico-quitar"); if (quitar) quitar.hidden = !n.value; }
+      if (n.dataset.campo === "publico") errorPublicoVisible("");
     } else if (n.dataset.variante && n.dataset.vselector === "muestra") {
       // El selector de color escribe en el campo de texto, que es el que se guarda.
       const v = varianteDe(n.dataset.variante);

@@ -48,6 +48,7 @@ returns jsonb language sql as $$
   select jsonb_build_object(
     'id', '10000000-7777-0000-0000-00000000000a',
     'nombre', p_nombre, 'marca', 'Marca 70', 'categoria', 'Running', 'referencia_proveedor', 'REF-70',
+    'publico', 'hombre',  -- etapa 17: el público es obligatorio al guardar
     'variantes', jsonb_build_array(
       jsonb_build_object('id', '20000000-7777-0000-0000-00000000000a', 'color', 'Negro', 'precio', 250000,
                          'precio_anterior', 0, 'activa', true, 'orden', 0,
@@ -391,6 +392,7 @@ declare
 begin
   insert into storage.objects (bucket_id, name) values ('fotos-catalogo', v_a), ('fotos-catalogo', v_b), ('fotos-catalogo', v_c);
   v_datos := jsonb_build_object('id', '10000000-7777-0000-0000-00000000000b', 'nombre', 'PRUEBA 70 COLORES', 'marca', 'Marca 70', 'categoria', 'Running',
+    'publico', 'dama',  -- etapa 17: el público es obligatorio al guardar
     'variantes', jsonb_build_array(
       jsonb_build_object('id', '20000000-7777-0000-0000-00000000000c', 'color', 'A con foto', 'precio', 1000, 'activa', true, 'orden', 0,
                          'tallas', '[]'::jsonb, 'fotos', jsonb_build_array(jsonb_build_object('ruta', v_base || v_a))),
