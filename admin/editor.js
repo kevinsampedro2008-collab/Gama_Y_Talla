@@ -35,10 +35,23 @@
   const formatoPesos = (n) => pesos.format(n).replace(/ /g, " ");
 
   const LIM = { nombre: 120, marca: 60, categoria: 60, referencia: 60, descripcion: 2000, color: 60, precioMax: 100000000, colores: 20, tallas: 40 };
+  // Etapa 16.2: códigos comerciales editables (misma regla que el servidor) y mayúsculas reales.
+  const LIM_CODIGO = { producto: 30, color: 40 };
+  const FORMATO_CODIGO = /^[A-Z0-9Ñ][A-Z0-9Ñ._/-]*[A-Z0-9Ñ]$/u;
+  const mayus = (texto) => String(texto ?? "").toLocaleUpperCase("es");
+  const codigoLimpio = (texto) => mayus(String(texto ?? "").trim());
+  // ¿El servidor admite cambiar códigos (migración 20261108030000)? null = aún no se sabe.
+  let codigosEditables = null;
   const ESTADO_GUARDADO = { CONFIRMADA: "confirmada", AGOTADA: "agotada", REVISAR: "por revisar" };
   const SEGMENTOS = [["", "Sin indicar (la guía muestra la tabla de hombre)"], ["hombre", "Hombre"], ["mujer", "Mujer"]];
-  const COLUMNAS = "id,codigo_interno,referencia_proveedor,nombre,marca,categoria,descripcion,segmento,destacado,nuevo_ingreso,activo,orden,version,ultima_operacion,retirado_en," +
-    "variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden,fotos(id,ruta,orden,alt))";
+  // 16.3: «publico» y «muestra_color» solo existen con la migración 20261108040000. Con un esquema
+  // anterior se leen las columnas de siempre y esas opciones quedan bloqueadas (se avisa).
+  let publicoYMuestras = null;   // null = aún no se sabe; true/false = el servidor los admite o no
+  const MUESTRA_HEX = /^#[0-9a-f]{6}$/i;
+  const columnas = () => "id,codigo_interno,referencia_proveedor,nombre,marca,categoria,descripcion,segmento,destacado,nuevo_ingreso,activo,orden,version,ultima_operacion,retirado_en" +
+    (publicoYMuestras === false ? "" : ",publico") +
+    `,variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden${publicoYMuestras === false ? "" : ",muestra_color"},fotos(id,ruta,orden,alt))`;
+  const faltaColumnaNueva = (error) => String(error?.code) === "42703" || /publico|muestra_color/.test(error?.message || "");
 
   let ed = null;          // estado del formulario abierto
   let borrador = null;    // formulario sin guardar conservado al perder la sesión
@@ -82,13 +95,13 @@
 
   // ------------------------------------------------------------- estado base
   function variantePorDefecto(orden) {
-    return { id: uuid(), nueva: true, codigo: "", color: "", referencia: "", precio: "", precioAnterior: "", activa: true, orden, tallas: [], fotos: [], entradaTalla: "", errorTalla: "" };
+    return { id: uuid(), nueva: true, codigo: "", codigoGuardado: "", color: "", referencia: "", muestra: "", precio: "", precioAnterior: "", activa: true, orden, tallas: [], fotos: [], entradaTalla: "", errorTalla: "" };
   }
 
   function estadoNuevo() {
     return {
       modo: "crear", id: uuid(), codigo: "", version: null, activo: false, retirado: false,
-      datos: { nombre: "", marca: "", categoria: "", referencia_proveedor: "", descripcion: "", segmento: "", destacado: false, nuevo_ingreso: false, orden: "0" },
+      datos: { codigo_interno: "", publico: "", nombre: "", marca: "", categoria: "", referencia_proveedor: "", descripcion: "", segmento: "", destacado: false, nuevo_ingreso: false, orden: "0" },
       variantes: [variantePorDefecto(0)],
       operaciones: new Set(), pendiente: null, subidasSesion: new Set(), firmaGuardada: "", sinUsar: null
     };
@@ -104,6 +117,8 @@
     const estado = {
       modo: "editar", id: p.id, codigo: p.codigo_interno, version: p.version, activo: p.activo, retirado: Boolean(p.retirado_en),
       datos: {
+        codigo_interno: p.codigo_interno || "",
+        publico: p.publico === "hombre" || p.publico === "dama" ? p.publico : "",
         nombre: p.nombre || "", marca: p.marca || "", categoria: p.categoria || "", referencia_proveedor: p.referencia_proveedor || "",
         descripcion: p.descripcion || "", segmento: p.segmento || "", destacado: Boolean(p.destacado), nuevo_ingreso: Boolean(p.nuevo_ingreso),
         orden: String(p.orden ?? 0)
@@ -111,7 +126,8 @@
       variantes: [...(p.variantes || [])]
         .sort((a, b) => a.orden - b.orden || a.codigo_variante.localeCompare(b.codigo_variante))
         .map((v) => ({
-          id: v.id, nueva: false, codigo: v.codigo_variante, color: v.color || "", referencia: v.referencia_variante || "",
+          id: v.id, nueva: false, codigo: v.codigo_variante, codigoGuardado: v.codigo_variante, color: v.color || "", referencia: v.referencia_variante || "",
+          muestra: typeof v.muestra_color === "string" ? v.muestra_color : "",
           precio: String(v.precio ?? 0), precioAnterior: v.precio_anterior ? String(v.precio_anterior) : "", activa: v.activa, orden: v.orden,
           tallas: (porVariante.get(v.id) || []).sort(ordenTalla).map((t) => ({ id: t.id, talla: t.talla, activa: t.activa, activaGuardada: t.activa, nueva: false, estado: t.estado })),
           fotos: [...(v.fotos || [])].sort((a, b) => a.orden - b.orden).map((f) => ({ clave: nuevaClave(), ruta: f.ruta, alt: f.alt || "", estado: "guardada" })),
@@ -126,7 +142,11 @@
   async function leerProducto(id) {
     const c = panel().cliente();
     try {
-      const r = await c.from("productos").select(COLUMNAS).eq("id", id).maybeSingle();
+      let r = await c.from("productos").select(columnas()).eq("id", id).maybeSingle();
+      if (r.error && publicoYMuestras !== false && faltaColumnaNueva(r.error)) {
+        publicoYMuestras = false;
+        r = await c.from("productos").select(columnas()).eq("id", id).maybeSingle();
+      }
       if (r.error) return { error: r.error };
       if (!r.data) return { data: null };
       const ids = (r.data.variantes || []).map((v) => v.id);
@@ -149,16 +169,21 @@
     return /^[0-9]+$/.test(limpio) ? Number(limpio) : NaN;
   };
 
+  // Modelo, marca, categoría y color van en MAYÚSCULAS (el servidor también lo hace). Los códigos,
+  // en mayúsculas y sin espacios exteriores: vacío al crear = automático.
   function datosParaGuardar(e = ed) {
     const d = e.datos;
     return {
       id: e.id,
-      nombre: d.nombre.trim(), marca: d.marca.trim(), categoria: d.categoria.trim(),
+      codigo_interno: codigoLimpio(d.codigo_interno),
+      publico: d.publico === "hombre" || d.publico === "dama" ? d.publico : null,
+      nombre: mayus(d.nombre.trim()), marca: mayus(d.marca.trim()), categoria: mayus(d.categoria.trim()),
       referencia_proveedor: d.referencia_proveedor.trim() || null, descripcion: d.descripcion.trim() || null,
       segmento: d.segmento || null, destacado: d.destacado, nuevo_ingreso: d.nuevo_ingreso,
       orden: Number.isInteger(Number(d.orden)) ? Number(d.orden) : 0,
       variantes: e.variantes.map((v) => ({
-        id: v.id, color: v.color.trim(), referencia_variante: v.referencia.trim() || null,
+        id: v.id, codigo_variante: codigoLimpio(v.codigo), color: mayus(v.color.trim()), referencia_variante: v.referencia.trim() || null,
+        muestra_color: v.muestra.trim() ? v.muestra.trim().toLowerCase() : null,
         precio: entero(v.precio), precio_anterior: entero(v.precioAnterior), activa: v.activa, orden: v.orden,
         // Las existentes llevan también cómo estaban al abrir el formulario: el servidor solo
         // aplica lo que se cambió aquí y conserva lo que cambió en otro lugar (por ejemplo, una
@@ -184,8 +209,33 @@
     exigir(d.descripcion.trim().length <= LIM.descripcion, "ed-descripcion", "La descripción admite hasta 2000 caracteres.");
     exigir(/^-?[0-9]{1,6}$/.test(String(d.orden).trim() || "0"), "ed-orden", "El orden debe ser un número entero.");
     exigir(ed.variantes.length >= 1, "ed-agregar-color", "Agrega al menos un color.");
+    // Códigos: los mismos límites que el servidor, y únicos (el servidor lo vuelve a comprobar).
+    const otras = panel().productos().filter((p) => p.id !== ed.id);
+    const codigoP = codigoLimpio(d.codigo_interno);
+    if (codigosEditables !== false && (ed.modo === "editar" || codigoP)) {
+      const usa = otras.find((p) => codigoLimpio(p.codigo_interno) === codigoP);
+      if (!codigoP) exigir(false, "ed-codigo", "Escribe el código de la zapatilla: no puede quedar vacío.");
+      else if (codigoP.length < 2 || codigoP.length > LIM_CODIGO.producto || !FORMATO_CODIGO.test(codigoP)) {
+        exigir(false, "ed-codigo", `El código de la zapatilla debe tener entre 2 y ${LIM_CODIGO.producto} caracteres: letras, números y - _ . / (sin espacios).`);
+      } else if (usa) exigir(false, "ed-codigo", `El código ${codigoP} ya lo usa la zapatilla «${usa.nombre}». Elige otro.`);
+    }
     ed.variantes.forEach((v, i) => {
       const nombre = v.color.trim() || `el color ${i + 1}`;
+      if (v.muestra.trim() && !MUESTRA_HEX.test(v.muestra.trim())) {
+        exigir(false, `ed-v-${v.id}-muestra`, `La muestra de ${nombre} debe ser un color hexadecimal como #E8DCC8 (o quedar vacía).`);
+      }
+      const codigoV = codigoLimpio(v.codigo);
+      if (codigosEditables !== false && (!v.nueva || codigoV)) {
+        const campoCodigo = `ed-v-${v.id}-codigo`;
+        const enOtra = otras.flatMap((p) => (p.variantes || []).map((x) => ({ ...x, producto: p.nombre })))
+          .find((x) => codigoLimpio(x.codigo_variante) === codigoV);
+        if (!codigoV) exigir(false, campoCodigo, `Escribe el código de ${nombre}: no puede quedar vacío.`);
+        else if (codigoV.length < 2 || codigoV.length > LIM_CODIGO.color || !FORMATO_CODIGO.test(codigoV)) {
+          exigir(false, campoCodigo, `El código de ${nombre} debe tener entre 2 y ${LIM_CODIGO.color} caracteres: letras, números y - _ . / (sin espacios).`);
+        } else if (ed.variantes.some((o) => o !== v && codigoLimpio(o.codigo) === codigoV)) {
+          exigir(false, campoCodigo, `Dos colores tienen el mismo código ${codigoV}.`);
+        } else if (enOtra) exigir(false, campoCodigo, `El código ${codigoV} ya lo usa «${enOtra.producto} · ${enOtra.color}». Elige otro.`);
+      }
       exigir(v.color.trim() && v.color.trim().length <= LIM.color, `ed-v-${v.id}-color`, `Escribe el nombre del color ${i + 1} (hasta 60 caracteres).`);
       const precio = entero(v.precio);
       const anterior = entero(v.precioAnterior);
@@ -240,11 +290,11 @@
     poner($('[data-editor="cancelar"]'), "textContent", cambios ? "Cancelar" : "Cerrar");
     document.querySelectorAll("#editor button, #editor input, #editor select, #editor textarea").forEach((n) => {
       if (n.closest("#editor-salida")) return;
-      poner(n, "disabled", enCurso && !n.matches('[data-editor="cerrar-forzado"]'));
+      poner(n, "disabled", (enCurso && !n.matches('[data-editor="cerrar-forzado"]')) || n.dataset.bloqueado === "1");
     });
   }
 
-  function campo({ id, etiqueta, valor = "", tipo = "text", ayuda = "", lista = "", max = 0, modo = "", obligatorio = false, datos = {} }) {
+  function campo({ id, etiqueta, valor = "", tipo = "text", ayuda = "", lista = "", max = 0, modo = "", obligatorio = false, datos = {}, mayusculas = false }) {
     const caja = nodo("div", "campo");
     const label = nodo("label", "", etiqueta);
     label.htmlFor = id;
@@ -257,6 +307,9 @@
     if (modo) entrada.inputMode = modo;
     if (lista) entrada.setAttribute("list", lista);
     entrada.autocomplete = "off";
+    // Mayúsculas visibles al escribir (sin mover el cursor); el valor se normaliza al salir del
+    // campo y antes de guardar.
+    if (mayusculas) entrada.classList.add("campo-mayus");
     Object.assign(entrada.dataset, datos);
     caja.append(label, entrada);
     if (ayuda) {
@@ -298,16 +351,24 @@
     const d = ed.datos;
     const fila1 = nodo("div", "campos-fila");
     fila1.append(
-      campo({ id: "ed-nombre", etiqueta: "Modelo", valor: d.nombre, max: LIM.nombre, obligatorio: true, datos: { campo: "nombre" } }),
-      campo({ id: "ed-marca", etiqueta: "Marca", valor: d.marca, max: LIM.marca, lista: "ed-marcas", obligatorio: true, datos: { campo: "marca" } }));
+      campo({ id: "ed-nombre", etiqueta: "Modelo", valor: d.nombre, max: LIM.nombre, obligatorio: true, mayusculas: true, datos: { campo: "nombre" } }),
+      campo({ id: "ed-marca", etiqueta: "Marca", valor: d.marca, max: LIM.marca, lista: "ed-marcas", obligatorio: true, mayusculas: true, datos: { campo: "marca" } }));
     const fila2 = nodo("div", "campos-fila");
     fila2.append(
-      campo({ id: "ed-categoria", etiqueta: "Categoría", valor: d.categoria, max: LIM.categoria, lista: "ed-categorias", obligatorio: true, ayuda: "Por ejemplo: Running, Urbanas, Casuales.", datos: { campo: "categoria" } }),
-      campo({ id: "ed-referencia", etiqueta: "Referencia del proveedor", valor: d.referencia_proveedor, max: LIM.referencia, ayuda: "Puede repetirse en varias zapatillas: no es su identificador.", datos: { campo: "referencia_proveedor" } }));
+      campo({ id: "ed-categoria", etiqueta: "Categoría", valor: d.categoria, max: LIM.categoria, lista: "ed-categorias", obligatorio: true, mayusculas: true, ayuda: "Por ejemplo: RUNNING, URBANAS, CASUALES. Se guarda en mayúsculas.", datos: { campo: "categoria" } }),
+      campoCodigoProducto());
+    const fila3 = nodo("div", "campos-fila");
+    fila3.append(
+      campo({ id: "ed-referencia", etiqueta: "Referencia del proveedor", valor: d.referencia_proveedor, max: LIM.referencia, ayuda: "Para tu control: no se muestra al cliente. Puede repetirse en varias zapatillas; no es su código.", datos: { campo: "referencia_proveedor" } }));
+    const avisoCodigos = nodo("p", "editor-nota editor-codigos-aviso", "Este servidor todavía no admite cambiar los códigos: falta aplicar la migración 20261108030000_codigos_editables_y_mayusculas. Puedes guardar lo demás; los códigos se mantienen.");
+    avisoCodigos.id = "ed-codigos-aviso";
+    avisoCodigos.setAttribute("role", "status");
+    avisoCodigos.hidden = codigosEditables !== false;
     // Opciones en lugar de <select>: más cómodas al tacto (y el <select> de WebKit en Windows
     // inyecta un estilo interno que la política de seguridad de la página bloquea).
-    const segmento = nodo("fieldset", "campo editor-opciones");
+    const segmento = nodo("fieldset", "editor-opciones");
     segmento.append(nodo("legend", "", "Tabla de la guía de tallas"));
+    const listaOpciones = nodo("div", "editor-opciones-lista");
     const opciones = [...SEGMENTOS];
     if (d.segmento && !opciones.some(([v]) => v === d.segmento)) opciones.push([d.segmento, `${d.segmento} (valor guardado)`]);
     opciones.forEach(([valor, texto], i) => {
@@ -320,13 +381,45 @@
       radio.checked = d.segmento === valor;
       radio.dataset.campo = "segmento";
       caja.append(radio, nodo("span", "", texto));
-      segmento.append(caja);
+      listaOpciones.append(caja);
     });
-    const fila3 = nodo("div", "campos-fila");
-    fila3.append(segmento, campo({ id: "ed-orden", etiqueta: "Orden en el catálogo", valor: d.orden, tipo: "text", modo: "numeric", ayuda: "Los números más bajos aparecen primero.", datos: { campo: "orden" } }));
+    segmento.append(listaOpciones);
+    // 16.3: público de la tienda, independiente de la tabla de la guía de tallas.
+    const publico = nodo("fieldset", "editor-opciones editor-publico");
+    publico.id = "ed-publico";
+    publico.append(nodo("legend", "", "Público en la tienda"));
+    const listaPublico = nodo("div", "editor-opciones-lista");
+    [["hombre", "Hombre"], ["dama", "Dama"]].forEach(([valor, texto]) => {
+      const caja = nodo("label", "casilla");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = "ed-publico";
+      radio.id = `ed-publico-${valor}`;
+      radio.value = valor;
+      radio.checked = d.publico === valor;
+      radio.dataset.campo = "publico";
+      radio.dataset.opcionNueva = "";
+      if (publicoYMuestras === false) radio.dataset.bloqueado = "1";
+      caja.append(radio, nodo("span", "", texto));
+      listaPublico.append(caja);
+    });
+    const quitarPublico = boton("Dejar sin asignar", "quitar-publico", "boton boton-texto boton-mini");
+    quitarPublico.id = "ed-publico-quitar";
+    quitarPublico.hidden = !d.publico || publicoYMuestras === false;
+    const ayudaPublico = nodo("p", "campo-ayuda", "En la tienda se muestra como «Caballero» o «Dama». Sin marcar = sin clasificar: aparece solo en «Todos». No cambia la tabla de la guía de tallas.");
+    ayudaPublico.id = "ed-publico-ayuda";
+    publico.setAttribute("aria-describedby", ayudaPublico.id);
+    publico.append(listaPublico, ayudaPublico, quitarPublico);
+    const avisoPublico = nodo("p", "editor-nota editor-codigos-aviso", "Este servidor todavía no admite el público ni las muestras de color: falta aplicar la migración 20261108040000_publico_y_muestras. Puedes guardar lo demás; esas opciones no se guardarán.");
+    avisoPublico.id = "ed-publico-aviso";
+    avisoPublico.setAttribute("role", "status");
+    avisoPublico.hidden = publicoYMuestras !== false;
+    // El orden va en su propia fila: junto a las opciones de la guía quedaba descolocado.
+    const orden = campo({ id: "ed-orden", etiqueta: "Orden en el catálogo", valor: d.orden, tipo: "text", modo: "numeric", ayuda: "Los números más bajos aparecen primero.", datos: { campo: "orden" } });
+    orden.classList.add("editor-orden");
     const marcas = nodo("div", "casillas");
     marcas.append(casilla("ed-destacado", "Destacada", d.destacado, { campo: "destacado" }), casilla("ed-nuevo", "Nuevo ingreso", d.nuevo_ingreso, { campo: "nuevo_ingreso" }));
-    modelo.append(h, fila1, fila2, fila3,
+    modelo.append(h, avisoCodigos, avisoPublico, fila1, fila2, fila3, publico, segmento, orden,
       campo({ id: "ed-descripcion", etiqueta: "Descripción (opcional)", valor: d.descripcion, tipo: "textarea", max: LIM.descripcion, ayuda: "Solo información real del modelo. La tienda la muestra en «Sobre este modelo».", datos: { campo: "descripcion" } }),
       marcas, listaDatos("ed-marcas", unicos("marca")), listaDatos("ed-categorias", unicos("categoria")));
 
@@ -355,7 +448,7 @@
     const cabecera = nodo("div", "editor-variante-cabecera");
     const titulo = nodo("h4", "", v.color.trim() || `Color ${i + 1}`);
     titulo.id = `ed-v-${v.id}-titulo`;
-    cabecera.append(titulo, nodo("span", "codigo codigo-suave", v.codigo || "nuevo"));
+    cabecera.append(titulo, nodo("span", "codigo codigo-suave", v.codigoGuardado || "nuevo"));
     if (v.nueva && ed.variantes.filter((x) => x.nueva).length && v.tallas.length === 0 && v.fotos.length === 0 && ed.variantes.length > 1) {
       cabecera.append(boton("Quitar este color", "quitar-color", "boton boton-texto boton-compacto", { variante: v.id }));
     }
@@ -363,16 +456,142 @@
 
     const filaA = nodo("div", "campos-fila");
     filaA.append(
-      campo({ id: `ed-v-${v.id}-color`, etiqueta: "Color", valor: v.color, max: LIM.color, obligatorio: true, datos: { variante: v.id, vcampo: "color" } }),
-      campo({ id: `ed-v-${v.id}-referencia`, etiqueta: "Referencia del color (opcional)", valor: v.referencia, max: LIM.referencia, datos: { variante: v.id, vcampo: "referencia" } }));
+      campo({ id: `ed-v-${v.id}-color`, etiqueta: "Color", valor: v.color, max: LIM.color, obligatorio: true, mayusculas: true, datos: { variante: v.id, vcampo: "color" } }),
+      campoCodigoColor(v));
+    const filaR = nodo("div", "campos-fila");
+    filaR.append(campo({ id: `ed-v-${v.id}-referencia`, etiqueta: "Referencia del proveedor para este color (opcional)", valor: v.referencia, max: LIM.referencia,
+      ayuda: "Dato del proveedor, solo informativo: no cambia el código del color ni es la referencia que ve el cliente.", datos: { variante: v.id, vcampo: "referencia" } }));
     const filaB = nodo("div", "campos-fila");
     filaB.append(
       campo({ id: `ed-v-${v.id}-precio`, etiqueta: "Precio actual (COP)", valor: v.precio, modo: "numeric", ayuda: textoPrecio(v), datos: { variante: v.id, vcampo: "precio" } }),
       campo({ id: `ed-v-${v.id}-anterior`, etiqueta: "Precio anterior (opcional)", valor: v.precioAnterior, modo: "numeric", ayuda: "Para mostrar un descuento: debe ser mayor que el actual.", datos: { variante: v.id, vcampo: "precioAnterior" } }));
     const visible = casilla(`ed-v-${v.id}-activa`, "Color visible en la tienda", v.activa, { variante: v.id, vcampo: "activa" });
 
-    li.append(cabecera, filaA, filaB, visible, pintarTallas(v), pintarFotos(v));
+    li.append(cabecera, filaA, filaR, campoMuestra(v), filaB, visible, pintarTallas(v), pintarFotos(v));
     return li;
+  }
+
+  /* Códigos comerciales (etapa 16.2). Son los que ve el cliente (el del color es la referencia de
+     la ficha, el carrito y WhatsApp) y el tablero. Editables: el carrito y las fotos usan
+     identificadores que no cambian. Al crear, vacío = automático (GT-…). */
+  function campoDeCodigo({ id, etiqueta, valor, max, ayuda, nuevo, datos }) {
+    const caja = campo({ id, etiqueta, valor, max, ayuda, mayusculas: true, datos: { ...datos, codigo: "" } });
+    const entrada = $("input", caja);
+    entrada.spellcheck = false;
+    entrada.setAttribute("autocapitalize", "characters");
+    if (nuevo) entrada.placeholder = "Automático (GT-…)";
+    entrada.readOnly = codigosEditables === false;
+    return caja;
+  }
+  function campoCodigoProducto() {
+    const nuevo = ed.modo === "crear";
+    return campoDeCodigo({ id: "ed-codigo", etiqueta: "Código de la zapatilla", valor: ed.datos.codigo_interno, max: LIM_CODIGO.producto, nuevo,
+      ayuda: nuevo ? "Déjalo vacío para asignar uno automático, o escribe el tuyo. Debe ser único."
+        : "Debe ser único. Cambiarlo no cambia los códigos de los colores ni afecta a los carritos guardados.",
+      datos: { campo: "codigo_interno" } });
+  }
+  function campoCodigoColor(v) {
+    return campoDeCodigo({ id: `ed-v-${v.id}-codigo`, etiqueta: "Código del color", valor: v.codigo, max: LIM_CODIGO.color, nuevo: v.nueva,
+      ayuda: v.nueva ? "Vacío = automático (código de la zapatilla + letra). Es la referencia que ve el cliente."
+        : "Es la referencia que ve el cliente en la ficha, el carrito y WhatsApp. Debe ser único.",
+      datos: { variante: v.id, vcampo: "codigo" } });
+  }
+
+  /* 16.3: muestra del color (opcional). El campo de texto manda (#rrggbb o vacío); el selector de
+     color solo ayuda a elegirlo. La vista previa usa el valor solo si es un hexadecimal válido. */
+  function pintarVistaMuestra(vista, valor) {
+    const valido = MUESTRA_HEX.test(String(valor || "").trim());
+    vista.classList.toggle("es-neutra", !valido);
+    if (valido) vista.style.setProperty("--muestra", valor.trim().toLowerCase());
+    else vista.style.removeProperty("--muestra");
+  }
+  function campoMuestra(v) {
+    const id = `ed-v-${v.id}-muestra`;
+    const caja = nodo("div", "campo editor-muestra");
+    const label = nodo("label", "", "Muestra del color (opcional)");
+    label.htmlFor = id;
+    const fila = nodo("div", "editor-muestra-fila");
+    const vista = nodo("span", "editor-muestra-vista");
+    vista.id = `${id}-vista`;
+    vista.setAttribute("aria-hidden", "true");
+    pintarVistaMuestra(vista, v.muestra);
+    const texto = nodo("input");
+    texto.type = "text";
+    texto.id = id;
+    texto.value = v.muestra;
+    texto.maxLength = 7;
+    texto.placeholder = "#E8DCC8";
+    texto.autocomplete = "off";
+    texto.spellcheck = false;
+    texto.setAttribute("autocapitalize", "off");
+    Object.assign(texto.dataset, { variante: v.id, vcampo: "muestra", opcionNueva: "" });
+    texto.readOnly = publicoYMuestras === false;
+    const selector = nodo("input");
+    selector.type = "color";
+    selector.id = `${id}-selector`;
+    selector.value = MUESTRA_HEX.test(v.muestra) ? v.muestra.toLowerCase() : "#d9d9d4";
+    selector.setAttribute("aria-label", `Elegir la muestra de ${v.color.trim() || "este color"}`);
+    Object.assign(selector.dataset, { variante: v.id, vselector: "muestra", opcionNueva: "" });
+    if (publicoYMuestras === false) selector.dataset.bloqueado = "1";
+    const quitar = boton("Quitar", "quitar-muestra", "boton boton-texto boton-mini", { variante: v.id });
+    quitar.id = `${id}-quitar`;
+    quitar.hidden = !v.muestra || publicoYMuestras === false;
+    quitar.setAttribute("aria-label", `Quitar la muestra de ${v.color.trim() || "este color"}`);
+    fila.append(vista, texto, selector, quitar);
+    const ayuda = nodo("p", "campo-ayuda", "Color del círculo que verá el cliente, útil para nombres como «BEIGE/BLANCAS». Vacía: un nombre simple usa la paleta de la tienda y uno compuesto, un círculo neutro.");
+    ayuda.id = `${id}-ayuda`;
+    texto.setAttribute("aria-describedby", ayuda.id);
+    caja.append(label, fila, ayuda);
+    return caja;
+  }
+
+  async function comprobarPublicoYMuestras() {
+    if (publicoYMuestras !== null) return;
+    try {
+      const r = await panel().cliente().from("productos").select("publico").limit(1);
+      if (!r.error) publicoYMuestras = true;
+      else if (faltaColumnaNueva(r.error)) publicoYMuestras = false;
+    } catch { /* sin conexión: se sabrá al guardar */ }
+  }
+  // Con el esquema anterior, público y muestras quedan bloqueados y se avisa: el servidor los
+  // ignoraría y el panel no puede presentarlos como guardados.
+  function aplicarCapacidadPublico() {
+    if (!ed) return;
+    const antiguo = publicoYMuestras === false;
+    document.querySelectorAll("#editor [data-opcion-nueva]").forEach((n) => {
+      n.dataset.bloqueado = antiguo ? "1" : "";
+      if (n.type === "text") n.readOnly = antiguo;
+    });
+    const aviso = $("#ed-publico-aviso");
+    if (aviso) aviso.hidden = !antiguo;
+    if (antiguo) document.querySelectorAll('#editor [data-editor="quitar-publico"], #editor [data-editor="quitar-muestra"]').forEach((b) => { b.hidden = true; });
+    pintarBotones();
+  }
+
+  async function comprobarCodigosEditables() {
+    if (codigosEditables !== null) return;
+    try {
+      const r = await panel().cliente().from("productos").select("clave_catalogo").limit(1);
+      if (!r.error) codigosEditables = true;
+      else if (String(r.error.code) === "42703" || /clave_catalogo/.test(r.error.message || "")) codigosEditables = false;
+    } catch { /* sin conexión: se sabrá al guardar */ }
+  }
+  // Con el esquema anterior los códigos quedan de solo lectura y con su valor guardado: el RPC
+  // antiguo los ignoraría y el panel no puede presentar ese cambio como guardado.
+  function aplicarCapacidadCodigos() {
+    if (!ed) return;
+    const antiguo = codigosEditables === false;
+    if (antiguo) {
+      ed.datos.codigo_interno = ed.codigo || "";
+      for (const v of ed.variantes) v.codigo = v.codigoGuardado || "";
+    }
+    document.querySelectorAll("#editor input[data-codigo]").forEach((n) => {
+      n.readOnly = antiguo;
+      if (antiguo) n.value = n.dataset.campo ? ed.datos.codigo_interno : (varianteDe(n.dataset.variante)?.codigo || "");
+    });
+    const aviso = $("#ed-codigos-aviso");
+    if (aviso) aviso.hidden = !antiguo;
+    pintarBotones();
   }
 
   function textoPrecio(v) {
@@ -584,6 +803,10 @@
     pintarTodo();
     if (!dialogo.open) dialogo.showModal();
     $("#editor-titulo").focus();
+    if (codigosEditables === null) comprobarCodigosEditables().then(aplicarCapacidadCodigos);
+    if (publicoYMuestras === null) comprobarPublicoYMuestras().then(aplicarCapacidadPublico);
+    else if (publicoYMuestras === false) aplicarCapacidadPublico();
+    else if (codigosEditables === false) aplicarCapacidadCodigos();
   }
 
   function cerrar() {
@@ -660,6 +883,15 @@
     if (publicar && ed.modo === "editar" && !sucio() && !ed.pendiente) { await cambiarEstado("publicar"); return; }
 
     const datos = datosParaGuardar();
+    // Con el esquema anterior no se envían códigos: el servidor los ignoraría.
+    if (codigosEditables === false) {
+      delete datos.codigo_interno;
+      for (const v of datos.variantes) delete v.codigo_variante;
+    }
+    if (publicoYMuestras === false) {
+      delete datos.publico;
+      for (const v of datos.variantes) delete v.muestra_color;
+    }
     const huella = JSON.stringify(datos);
     // La misma operación para el mismo contenido: reintentar no aplica nada dos veces.
     if (!ed.pendiente || ed.pendiente.huella !== huella || ed.pendiente.version !== ed.version || ed.pendiente.tipo !== "guardar") {
@@ -667,6 +899,10 @@
       ed.pendiente = { tipo: "guardar", operacion: uuid(), huella, version: ed.version, crear: ed.modo === "crear", publicar };
     }
     ed.pendiente.publicar = publicar;
+    ed.pendiente.codigos = codigosPedidos(datos);
+    ed.pendiente.extras = "publico" in datos
+      ? { publico: datos.publico, muestras: Object.fromEntries(datos.variantes.map((v) => [v.id, v.muestra_color ?? null])) }
+      : null;
     ed.operaciones.add(ed.pendiente.operacion);
     const op = ed.pendiente;
 
@@ -745,6 +981,33 @@
     resultado("");
   }
 
+  // Códigos que este guardado pidió (los vacíos al crear son automáticos y no cuentan).
+  const codigosPedidos = (datos) => ({
+    producto: datos.codigo_interno || "",
+    colores: Object.fromEntries((datos.variantes || []).filter((v) => v.codigo_variante).map((v) => [v.id, v.codigo_variante]))
+  });
+  // Lo pedido que el servidor NO guardó (por ejemplo, un servidor con el esquema anterior).
+  function codigosSinAplicar(pedidos, producto) {
+    if (!pedidos || !producto) return [];
+    const faltan = [];
+    if (pedidos.producto && producto.codigo_interno !== pedidos.producto) faltan.push(`zapatilla ${pedidos.producto}`);
+    for (const v of producto.variantes || []) {
+      const pedido = pedidos.colores[v.id];
+      if (pedido && v.codigo_variante !== pedido) faltan.push(`color ${pedido}`);
+    }
+    return faltan;
+  }
+
+  // ¿Se pidió un público o una muestra que el servidor no guardó? Con el esquema anterior las
+  // columnas ni siquiera se leen: si se pidió algún valor, no se guardó.
+  function extrasSinAplicar(pedidos, producto) {
+    if (!pedidos || !producto) return false;
+    const algoPedido = pedidos.publico !== null || Object.values(pedidos.muestras).some((m) => m !== null);
+    if (!("publico" in producto)) return algoPedido;
+    if ((producto.publico ?? null) !== pedidos.publico) return true;
+    return (producto.variantes || []).some((v) => v.id in pedidos.muestras && (v.muestra_color ?? null) !== pedidos.muestras[v.id]);
+  }
+
   async function confirmarGuardado(respuesta, op, comprobado = false) {
     const publicarDespues = op.publicar;
     ed.pendiente = null;
@@ -754,6 +1017,12 @@
     // Se relee del servidor: códigos asignados, estados de las tallas y la galería guardada.
     const leido = await leerProducto(ed.id);
     if (!ed) return;
+    if (respuesta?.codigos_editables === true) codigosEditables = true;
+    const sinAplicar = codigosSinAplicar(op.codigos, leido.data);
+    if (sinAplicar.length) codigosEditables = false;
+    if (respuesta?.publico_y_muestras === true) publicoYMuestras = true;
+    const extrasSinGuardar = extrasSinAplicar(op.extras, leido.data);
+    if (extrasSinGuardar) publicoYMuestras = false;
     if (leido.data) {
       const anterior = ed;
       ed = estadoDesdeServidor(leido.data, leido.tallas, anterior);
@@ -767,17 +1036,25 @@
       ed.firmaGuardada = firma(ed);
     }
     pintarTodo();
+    if (sinAplicar.length) aplicarCapacidadCodigos();
+    if (extrasSinGuardar) aplicarCapacidadPublico();
     panel().recargar();
+    const avisoCodigos = sinAplicar.length
+      ? ` Atención: el código no cambió (${sinAplicar.join(", ")}). Este servidor todavía no admite editar códigos (falta aplicar la migración 20261108030000); lo demás sí se guardó.`
+      : "";
+    const avisoExtras = extrasSinGuardar
+      ? " Atención: el público y las muestras de color no se guardaron. Este servidor todavía no los admite (falta aplicar la migración 20261108040000); lo demás sí se guardó."
+      : "";
     const conservadas = (Array.isArray(respuesta?.tallas_conservadas) ? respuesta.tallas_conservadas : [])
       .map((t) => `La talla ${t.talla} de «${t.color}» cambió en otro lugar mientras editabas (se ${t.activa ? "reactivó" : "desactivó"}) y se conservó ese cambio.`);
-    const base = [comprobado ? "Guardado (comprobado con el identificador de esta operación)." : respuesta?.estado === "ya_aplicada" ? "Ese guardado ya se había aplicado; no se repitió." : "Guardado.", ...conservadas].join(" ");
+    const base = [comprobado ? "Guardado (comprobado con el identificador de esta operación)." : respuesta?.estado === "ya_aplicada" ? "Ese guardado ya se había aplicado; no se repitió." : "Guardado.", ...conservadas].join(" ") + avisoCodigos + avisoExtras;
     if (publicarDespues && !ed.activo) {
       resultado(`${base} Publicando…`, [], "ok");
       enCurso = false;
       await cambiarEstado("publicar", { trasGuardar: base });
       return;
     }
-    resultado(`${base} ${ed.activo ? "Los cambios ya se ven en la tienda." : "La zapatilla sigue oculta en la tienda."}`, [], "ok");
+    resultado(`${base} ${ed.activo ? "Los cambios ya se ven en la tienda." : "La zapatilla sigue oculta en la tienda."}`, [], avisoCodigos || avisoExtras ? "aviso" : "ok");
   }
 
   // Solo lectura: ¿se aplicó la operación pendiente?
@@ -1204,6 +1481,25 @@
         if (f?.blob) subirFoto(v, f);
         break;
       }
+      case "quitar-publico": {
+        ed.datos.publico = "";
+        document.querySelectorAll('#editor input[name="ed-publico"]').forEach((r) => { r.checked = false; });
+        objetivo.hidden = true;
+        document.getElementById("ed-publico-hombre")?.focus();
+        pintarBotones();
+        break;
+      }
+      case "quitar-muestra": {
+        if (!v) break;
+        v.muestra = "";
+        const texto = document.getElementById(`ed-v-${v.id}-muestra`);
+        if (texto) { texto.value = ""; texto.removeAttribute("aria-invalid"); texto.focus(); }
+        const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
+        if (vista) pintarVistaMuestra(vista, "");
+        objetivo.hidden = true;
+        pintarBotones();
+        break;
+      }
       case "sin-usar": cargarSinUsar().then(() => ed && repintarSinUsar('[data-editor="sin-usar"]')); break;
       case "pedir-borrado": case "no-borrar": {
         const item = ed.sinUsar?.lista.find((o) => o.objeto === objetivo.dataset.objeto);
@@ -1225,6 +1521,18 @@
       if (n.type === "radio" && !n.checked) return;
       ed.datos[n.dataset.campo] = n.type === "checkbox" ? n.checked : n.value;
       if (n.dataset.campo === "nombre") $("#editor-titulo").textContent = ed.modo === "crear" ? "Nueva zapatilla" : (n.value.trim() || "Zapatilla sin nombre");
+      if (n.dataset.campo === "publico") { const quitar = $("#ed-publico-quitar"); if (quitar) quitar.hidden = !n.value; }
+    } else if (n.dataset.variante && n.dataset.vselector === "muestra") {
+      // El selector de color escribe en el campo de texto, que es el que se guarda.
+      const v = varianteDe(n.dataset.variante);
+      if (!v) return;
+      v.muestra = n.value.toUpperCase();
+      const texto = document.getElementById(`ed-v-${v.id}-muestra`);
+      if (texto) { texto.value = v.muestra; texto.removeAttribute("aria-invalid"); }
+      const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
+      if (vista) pintarVistaMuestra(vista, v.muestra);
+      const quitar = document.getElementById(`ed-v-${v.id}-muestra-quitar`);
+      if (quitar) quitar.hidden = false;
     } else if (n.dataset.variante && n.dataset.vcampo) {
       const v = varianteDe(n.dataset.variante);
       if (!v) return;
@@ -1232,6 +1540,14 @@
       if (n.dataset.vcampo === "color") { const t = document.getElementById(`ed-v-${v.id}-titulo`); if (t) t.textContent = n.value.trim() || `Color ${ed.variantes.indexOf(v) + 1}`; }
       if (n.dataset.vcampo === "precio") { const ayuda = document.getElementById(`${n.id}-ayuda`); if (ayuda) ayuda.textContent = textoPrecio(v); }
       if (n.dataset.vcampo === "activa") document.getElementById(`ed-v-${v.id}`)?.classList.toggle("es-inactiva", !n.checked);
+      if (n.dataset.vcampo === "muestra") {
+        const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
+        if (vista) pintarVistaMuestra(vista, n.value);
+        const selector = document.getElementById(`ed-v-${v.id}-muestra-selector`);
+        if (selector && MUESTRA_HEX.test(n.value.trim())) selector.value = n.value.trim().toLowerCase();
+        const quitar = document.getElementById(`ed-v-${v.id}-muestra-quitar`);
+        if (quitar) quitar.hidden = !n.value.trim();
+      }
     } else return;
     if (n.getAttribute("aria-invalid") === "true" && !n.dataset.agregarTalla) n.removeAttribute("aria-invalid");
     pintarBotones();
@@ -1239,6 +1555,11 @@
 
   function alCambiar(e) {
     const n = e.target;
+    // Al salir del campo, el valor REAL queda en mayúsculas (y el código sin espacios exteriores).
+    if (ed && n.classList?.contains("campo-mayus")) {
+      const normal = n.dataset.codigo !== undefined ? codigoLimpio(n.value) : mayus(n.value);
+      if (n.value !== normal) n.value = normal;
+    }
     if (!ed || n.type !== "file") { alEscribir(e); return; }
     const archivos = [...(n.files || [])];
     n.value = "";

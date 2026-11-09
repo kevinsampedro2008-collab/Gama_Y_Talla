@@ -94,9 +94,12 @@ for (const antes of hoy) {
   const comparar = (campo, a, b) => {
     if (JSON.stringify(a) !== JSON.stringify(b)) diferencias.push(`${antes.clave} · ${campo}: ${JSON.stringify(a)} -> ${JSON.stringify(b)}`);
   };
-  comparar('nombre', antes.nombre, ahora.nombre);
-  comparar('marca', antes.marca, ahora.marca);
-  comparar('categoria', antes.categoria, ahora.categoria);
+  // Etapa 16.2: modelo, marca, categoría y color se guardan en MAYÚSCULAS (disparador), así que se
+  // comparan contra el valor de hoy en mayúsculas; todo lo demás debe seguir idéntico.
+  const may = (t) => String(t ?? '').toLocaleUpperCase('es-CO');
+  comparar('nombre', may(antes.nombre), ahora.nombre);
+  comparar('marca', may(antes.marca), ahora.marca);
+  comparar('categoria', may(antes.categoria), ahora.categoria);
   comparar('destacado', antes.destacado, ahora.destacado);
   comparar('nuevoIngreso', antes.nuevoIngreso, ahora.nuevoIngreso);
   comparar('variantes.length', antes.variantes.length, ahora.variantes.length);
@@ -104,8 +107,10 @@ for (const antes of hoy) {
     const vb = ahora.variantes[i];
     if (!vb) return;
     comparar(`variante[${i}].id`, va.id, vb.id);
-    comparar(`variante[${i}].color`, va.color, vb.color);
-    comparar(`variante[${i}].referencia`, va.referencia, vb.referencia);
+    comparar(`variante[${i}].color`, may(va.color), vb.color);
+    // Etapa 16.2: la referencia visible es el código ACTUAL del color (GT-00001-A), no la del
+    // proveedor ni el identificador de antes. El id (carrito) sí debe seguir idéntico (arriba).
+    if (!/^GT-\d{5}-[A-Z]$/.test(vb.referencia)) diferencias.push(`${antes.clave} · variante[${i}].referencia: ${JSON.stringify(vb.referencia)} no es un código de color GT-nnnnn-X`);
     comparar(`variante[${i}].precio`, va.precio, vb.precio);
     comparar(`variante[${i}].precioAnterior`, va.precioAnterior, vb.precioAnterior);
     comparar(`variante[${i}].imagenes`, va.imagenes, vb.imagenes);
@@ -166,7 +171,7 @@ const conEstados = (texto, cambios) => {
 
 // Abre la tienda en un contexto nuevo. El carrito se siembra solo si no existe, para que
 // una recarga demuestre que lo que queda es lo que la tienda guardó.
-async function abrirTienda({ catalogo, carritoGuardado, configuracion = null, cache = null }) {
+async function abrirTienda({ catalogo, carritoGuardado, configuracion = null, cache = null, direccion = false }) {
   const ctx = await navegador.newContext();
   // Etapa 16: la tienda carga config.js (no versionado); aquí se sirve vacío.
   await ctx.route(new URL('/config.js', URL_TIENDA).href, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
@@ -184,6 +189,16 @@ async function abrirTienda({ catalogo, carritoGuardado, configuracion = null, ca
   await p.addInitScript(([clave, texto]) => {
     if (localStorage.getItem(clave) === null) localStorage.setItem(clave, texto);
   }, [CLAVE_CARRITO, JSON.stringify(carritoGuardado)]);
+  // WhatsApp no se abre de verdad: se registra el enlace. Con `direccion`, la libreta de la
+  // etapa 16.2 trae una dirección FICTICIA elegida (sin ella el envío está bloqueado desde 16.1).
+  await p.addInitScript((conDireccion) => {
+    window.__abiertas = [];
+    window.open = (enlace) => { window.__abiertas.push(String(enlace)); return {}; };
+    if (conDireccion && localStorage.getItem('gama-talla-direcciones') === null) {
+      localStorage.setItem('gama-talla-direcciones', JSON.stringify({ version: 1, seleccionada: 'validacion-0001',
+        direcciones: [{ id: 'validacion-0001', nombre: 'Cliente Ficticio', telefono: '300 000 0000', ciudad: 'Barranquilla', direccion: 'Calle 1 # 2-3', nota: '' }] }));
+    }
+  }, direccion);
   await p.goto(URL_TIENDA, { waitUntil: 'load' });
   await p.waitForFunction("typeof estado !== 'undefined' && estado.catalogoListo === true", null, { timeout: 30000 });
   return { ctx, p, excepciones };
@@ -251,7 +266,8 @@ exigir('Escenarios con productos de nombre distinto (para leer los mensajes sin 
   exigir('POR REVISAR: el carrito muestra las 2 líneas, marcadas por revisar',
     ui.lineas.length === 2 && ui.lineas.every((l) => l.porRevisar), JSON.stringify(ui.lineas));
   exigir('POR REVISAR: no se puede enviar como pedido confirmado (enviar y copiar ocultos, aria-disabled, sin enlace)',
-    ui.enviar.oculto === true && ui.enviar.ariaDisabled === 'true' && ui.enviar.texto === null && ui.copiarOculto === true, JSON.stringify(ui.enviar));
+    // 16.1: «Copiar pedido» ya no existe como acción (null = no está); lo que no puede ser es visible.
+    ui.enviar.oculto === true && ui.enviar.ariaDisabled === 'true' && ui.enviar.texto === null && ui.copiarOculto !== false, JSON.stringify(ui.enviar));
   exigir('POR REVISAR: se puede consultar por WhatsApp con producto, talla y cantidad de cada línea',
     ui.consultar.oculto === false && /CONSULTA DE DISPONIBILIDAD/.test(ui.consultar.texto || '') && !/NUEVO PEDIDO/.test(ui.consultar.texto || '')
     && bloque(ui.consultar.texto, nombre(lineaA), lineaA.talla, lineaA.cantidad) && bloque(ui.consultar.texto, nombre(lineaB), lineaB.talla, lineaB.cantidad),
@@ -276,7 +292,7 @@ exigir('Escenarios con productos de nombre distinto (para leer los mensajes sin 
     { producto: lineaC.producto, variante: lineaC.variante, talla: lineaC.talla, estado: 'AGOTADO' }
   ]);
   const guardadoB = { version: 3, lineas: [lineaA, lineaC, lineaB], pendientes: [] };
-  const { ctx, p, excepciones } = await abrirTienda({ catalogo, carritoGuardado: guardadoB });
+  const { ctx, p, excepciones } = await abrirTienda({ catalogo, carritoGuardado: guardadoB, direccion: true });
   const b = await leerEstado(p);
   exigir('AGOTADA: se retira solo la línea agotada; la disponible y la pendiente siguen en memoria',
     JSON.stringify(b.memoria) === JSON.stringify(esencial([lineaA, lineaB])), JSON.stringify(b.memoria));
@@ -284,16 +300,21 @@ exigir('Escenarios con productos de nombre distinto (para leer los mensajes sin 
   exigir('AGOTADA: LocalStorage V3 guarda las 2 que quedan, idénticas y en su orden',
     guardado?.version === 3 && JSON.stringify(guardado.lineas) === JSON.stringify([lineaA, lineaB]) && JSON.stringify(guardado.pendientes) === '[]',
     b.guardado);
-  exigir('AGOTADA: queda un aviso que nombra lo retirado', /agotados/.test(b.aviso) && b.aviso.includes(nombre(lineaC)), b.aviso);
+  // 16.2: los nombres se muestran en mayúsculas.
+  exigir('AGOTADA: queda un aviso que nombra lo retirado', /agotados/.test(b.aviso) && b.aviso.toLocaleUpperCase('es-CO').includes(mayusculas(nombre(lineaC))), b.aviso);
   exigir('Mezcla: la disponible es comprable y la pendiente queda para consultar',
     JSON.stringify(b.comprables) === JSON.stringify([`${lineaA.producto}|${lineaA.talla}`])
     && JSON.stringify(b.porRevisar) === JSON.stringify([`${lineaB.producto}|${lineaB.talla}`]), JSON.stringify(b));
   const ui = await leerCarritoAbierto(p);
+  // 16.1/16.2: el envío es una acción explícita con la dirección elegida; no hay enlace previo.
+  await p.evaluate(() => document.querySelector('#carrito-enviar').click());
+  const enviado = await p.evaluate(() => { const e = window.__abiertas.at(-1); return e ? new URL(e).searchParams.get('text') : null; });
   exigir('Mezcla: el pedido confirmado lleva solo la línea DISPONIBLE',
-    ui.enviar.oculto === false && ui.enviar.ariaDisabled === 'false' && /NUEVO PEDIDO/.test(ui.enviar.texto || '')
-    && bloque(ui.enviar.texto, nombre(lineaA), lineaA.talla, lineaA.cantidad)
-    && !(ui.enviar.texto || '').includes(mayusculas(nombre(lineaB))) && !(ui.enviar.texto || '').includes(mayusculas(nombre(lineaC))),
-    (ui.enviar.texto || '(sin enlace)').slice(0, 200));
+    ui.enviar.oculto === false && ui.enviar.ariaDisabled === 'false' && /NUEVO PEDIDO/.test(enviado || '')
+    && /Dirección: Calle 1 # 2-3/.test(enviado || '')
+    && bloque(enviado, nombre(lineaA), lineaA.talla, lineaA.cantidad)
+    && !(enviado || '').includes(mayusculas(nombre(lineaB))) && !(enviado || '').includes(mayusculas(nombre(lineaC))),
+    (enviado || '(sin enlace)').slice(0, 200));
   exigir('Mezcla: la consulta lleva solo la línea POR REVISAR',
     ui.consultar.oculto === false && bloque(ui.consultar.texto, nombre(lineaB), lineaB.talla, lineaB.cantidad)
     && !(ui.consultar.texto || '').includes(mayusculas(nombre(lineaA))), (ui.consultar.texto || '(sin enlace)').slice(0, 200));

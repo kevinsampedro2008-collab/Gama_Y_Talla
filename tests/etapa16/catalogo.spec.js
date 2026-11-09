@@ -17,6 +17,7 @@ import {
   limpiarRestosDePruebas, MARCA, CAPTURAS, objetosDe, productosDePrueba, tallasDe, limpiarCatalogo16, prepararFotos,
   revisarEditor, borrarObjetos
 } from './ayudas-catalogo.js';
+import { guardarDatosEnvio } from '../etapa9/ayudas.js';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -65,7 +66,7 @@ async function rellenarModelo(page, { nombre, marca = MARCA, categoria = 'Runnin
   await editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true }).fill(nombre);
   await editor(page).getByRole('combobox', { name: 'Marca (obligatorio)', exact: true }).fill(marca);
   await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill(categoria);
-  if (referencia) await editor(page).getByLabel('Referencia del proveedor').fill(referencia);
+  if (referencia) await editor(page).getByLabel('Referencia del proveedor', { exact: true }).fill(referencia);
 }
 
 async function rellenarColor(page, n, { nombre, precio = '', anterior = '', tallas = [] }) {
@@ -98,7 +99,8 @@ async function crearCompleta(page, nombre, { conFotos = true } = {}) {
   }
   await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
-  const [p] = (await productosDePrueba()).filter((x) => x.nombre === nombre);
+  // Etapa 16.2: el servidor guarda el modelo en mayúsculas.
+  const [p] = (await productosDePrueba()).filter((x) => x.nombre === nombre.toUpperCase());
   return p;
 }
 
@@ -186,9 +188,9 @@ test('crear: varios colores, tallas y fotos; se guarda oculta y sin confirmar na
   const tallas = await tallasDe(p.variantes.map((v) => v.id));
   expect(tallas).toHaveLength(5);
   for (const t of tallas) expect(t, 'una talla nueva nace por revisar, sin vigencia').toMatchObject({ estado: 'REVISAR', vigencia_desde: null, vence_en: null, origen: 'manual' });
-  const negro = p.variantes.find((v) => v.color === 'Negro');
+  const negro = p.variantes.find((v) => v.color === 'NEGRO');
   expect(negro).toMatchObject({ precio: 289000, precio_anterior: 329000 });
-  expect(p.variantes.find((v) => v.color === 'Blanco')).toMatchObject({ precio: 0, precio_anterior: 0 });
+  expect(p.variantes.find((v) => v.color === 'BLANCO')).toMatchObject({ precio: 0, precio_anterior: 0 });
   // Los archivos están en Storage, son WebP y pesan lo previsto.
   const objetos = await objetosDe(p.id);
   expect(objetos).toHaveLength(3);
@@ -245,7 +247,7 @@ test('validación: mensajes claros, nada se guarda y el formulario conserva los 
   await expect(page.locator('#editor-error')).toContainText('equivale a la talla 40,5');
   await expect(page.locator('#editor-error')).toContainText('No se guardó nada');
   expect(await productosDePrueba()).toHaveLength(0);
-  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Validada ${sufijo}`);
+  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Validada ${sufijo}`.toUpperCase());
   await page.unroute('**/rpc/fn_admin_guardar_producto*');
   await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
@@ -281,7 +283,7 @@ test('publicar, editar datos y precios conservando identificadores; la tienda lo
   await expect(tarjeta).toContainText('$ 259.000');
   await expect(tarjeta).toContainText('$ 329.000');
   // Publicar no confirmó ninguna talla: todas siguen por revisar en la tienda.
-  const estados = await pagina.evaluate((n) => estado.productos.find((p) => p.nombre === n).variantes[0].estadosTalla, `Editada ${sufijo}`);
+  const estados = await pagina.evaluate((n) => estado.productos.find((p) => p.nombre === n).variantes[0].estadosTalla, `Editada ${sufijo}`.toUpperCase());
   expect(Object.values(estados)).toEqual(['POR_REVISAR', 'POR_REVISAR', 'POR_REVISAR']);
   await contexto.close();
 });
@@ -476,7 +478,7 @@ test('respuesta perdida al guardar: se comprueba por la operación y nunca se du
   await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(resultado(page)).toContainText('comprobado con el identificador de esta operación');
   const [p] = await productosDePrueba();
-  expect(p).toMatchObject({ nombre: `Perdida y reintentada ${sufijo}`, version: 3 });
+  expect(p).toMatchObject({ nombre: `Perdida y reintentada ${sufijo}`.toUpperCase(), version: 3 });
   expect(p.variantes).toHaveLength(1);
   expect(p.variantes[0].precio).toBe(199000);
 
@@ -491,7 +493,7 @@ test('respuesta perdida al guardar: se comprueba por la operación y nunca se du
   modo = 'normal';
   await resultado(page).getByRole('button', { name: 'Reintentar el guardado' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
-  const nuevas = (await productosDePrueba()).filter((x) => x.nombre === `Sin llegar ${sufijo}`);
+  const nuevas = (await productosDePrueba()).filter((x) => x.nombre === `Sin llegar ${sufijo}`.toUpperCase());
   expect(nuevas).toHaveLength(1);
   const operaciones = cuerpos.slice(-2).map((c) => c.p_operacion);
   expect(operaciones[0], 'el reintento reutiliza la operación').toBe(operaciones[1]);
@@ -509,10 +511,10 @@ test('conflicto: una edición más reciente no se sobrescribe y el formulario se
   await expect(resultado(page)).toContainText('No se cambió nada y tus datos siguen en el formulario.');
   await expect(color(page, 0).getByLabel('Precio actual (COP)')).toHaveValue('111000');
   const [fila] = await productosDePrueba();
-  expect(fila).toMatchObject({ nombre: `Cambio externo ${sufijo}`, version: p.version + 1 });
+  expect(fila).toMatchObject({ nombre: `Cambio externo ${sufijo}`.toUpperCase(), version: p.version + 1 });
   expect(fila.variantes[0].precio).toBe(289000);
   await resultado(page).getByRole('button', { name: 'Cargar la versión actual' }).click();
-  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Cambio externo ${sufijo}`);
+  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Cambio externo ${sufijo}`.toUpperCase());
   await expect(color(page, 0).getByLabel('Precio actual (COP)')).toHaveValue('289000');
 });
 
@@ -551,7 +553,7 @@ test('permisos: visitantes y sesiones sin permiso no escriben productos ni fotos
     await borrarUsuario(otro.id);
   }
   const [fila] = await productosDePrueba();
-  expect(fila).toMatchObject({ nombre: `Permisos ${sufijo}`, version: p.version, activo: false });
+  expect(fila).toMatchObject({ nombre: `Permisos ${sufijo}`.toUpperCase(), version: p.version, activo: false });
   expect(await objetosDe(p.id)).toHaveLength(0);
 });
 
@@ -576,12 +578,12 @@ test('desactivar tallas y colores, ocultar, retirar y restaurar sin borrar nada'
   expect(tallas).toHaveLength(4);
   const t40 = tallas.find((t) => t.talla === '40');
   expect(t40.activa).toBe(false);
-  expect(fila.variantes.find((v) => v.color === 'Blanco').activa).toBe(false);
+  expect(fila.variantes.find((v) => v.color === 'BLANCO').activa).toBe(false);
 
   let tienda = await abrirTienda(browser);
   await tienda.pagina.locator('article', { hasText: `Ciclo ${sufijo}` }).waitFor();
-  const visto = await tienda.pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); return { colores: x.variantes.map((v) => v.color), tallas: Object.keys(x.variantes[0].estadosTalla) }; }, `Ciclo ${sufijo}`);
-  expect(visto).toEqual({ colores: ['Negro'], tallas: ['40,5', '41 1/3'] });
+  const visto = await tienda.pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); return { colores: x.variantes.map((v) => v.color), tallas: Object.keys(x.variantes[0].estadosTalla) }; }, `Ciclo ${sufijo}`.toUpperCase());
+  expect(visto).toEqual({ colores: ['NEGRO'], tallas: ['40,5', '41 1/3'] });
   await tienda.contexto.close();
 
   // Ocultar → retirar → (no se puede publicar) → restaurar → reactivar la misma talla.
@@ -639,7 +641,7 @@ test('editor antiguo: no deshace la reactivación hecha desde 15B ni toca su con
   await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
   // d) La reactivación se conserva, y se dice; estado, confirmación y vigencia no cambian.
-  await expect(resultado(page)).toContainText('La talla 40 de «Negro» cambió en otro lugar mientras editabas (se reactivó) y se conservó ese cambio.');
+  await expect(resultado(page)).toContainText('La talla 40 de «NEGRO» cambió en otro lugar mientras editabas (se reactivó) y se conservó ese cambio.');
   const [despues] = await servicio('GET', `/rest/v1/tallas?select=${columnas}&id=eq.${t40.id}`);
   expect(despues).toEqual(tras15B);
   const [fila] = (await productosDePrueba()).filter((x) => x.id === p.id);
@@ -665,7 +667,7 @@ test('cambios sin guardar: se pide confirmación antes de cerrar y al abandonar 
   await expect(editor(page).getByRole('button', { name: 'Seguir editando' })).toBeFocused();
   await editor(page).getByRole('button', { name: 'Seguir editando' }).click();
   await expect(page.locator('#editor-salida')).toBeHidden();
-  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Sin guardar ${sufijo}`);
+  await expect(editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true })).toHaveValue(`Sin guardar ${sufijo}`.toUpperCase());
   await page.keyboard.press('Escape');
   await expect(page.locator('#editor-salida')).toBeVisible();
 
@@ -698,13 +700,13 @@ test('disponibilidad: crear no confirma; la acción de 15B sí. Tienda, carrito 
   // Tienda: 40 disponible; se añade al carrito y el pedido lleva modelo, color, referencia y talla.
   const { contexto, pagina } = await abrirTienda(browser);
   await pagina.locator('article', { hasText: `Venta ${sufijo}` }).waitFor();
-  const estados = await pagina.evaluate((n) => estado.productos.find((x) => x.nombre === n).variantes[0].estadosTalla, `Venta ${sufijo}`);
+  const estados = await pagina.evaluate((n) => estado.productos.find((x) => x.nombre === n).variantes[0].estadosTalla, `Venta ${sufijo}`.toUpperCase());
   expect(estados).toEqual({ 40: 'DISPONIBLE', '40,5': 'POR_REVISAR', '41 1/3': 'POR_REVISAR' });
-  await pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); agregarAlCarrito(x.clave, x.variantes[0].id, '40', 2); }, `Venta ${sufijo}`);
+  await pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); agregarAlCarrito(x.clave, x.variantes[0].id, '40', 2); }, `Venta ${sufijo}`.toUpperCase());
   const lineas = await pagina.evaluate(() => lineasComprables().map((l) => ({ producto: l.producto.nombre, color: l.variante.color, talla: l.talla, cantidad: l.cantidad })));
-  expect(lineas).toEqual([{ producto: `Venta ${sufijo}`, color: 'Negro', talla: '40', cantidad: 2 }]);
+  expect(lineas).toEqual([{ producto: `Venta ${sufijo}`.toUpperCase(), color: 'NEGRO', talla: '40', cantidad: 2 }]);
   const mensaje = await pagina.evaluate(() => crearMensajePedido(lineasComprables()));
-  for (const t of [`1. VENTA ${sufijo.toLocaleUpperCase('es-CO')}`, '* Color: Negro', '* Talla EU: 40', '* Cantidad: 2', '* Precio unit.: $289.000', '* Subtotal: $578.000']) {
+  for (const t of [`1. VENTA ${sufijo.toLocaleUpperCase('es-CO')}`, '* Color: NEGRO', '* Talla EU: 40', '* Cantidad: 2', '* Precio unit.: $289.000', '* Subtotal: $578.000']) {
     expect(mensaje).toContain(t);
   }
   const guardado = await pagina.evaluate(() => localStorage.getItem('gama-talla-carrito-v3'));
@@ -734,7 +736,7 @@ test('disponibilidad: crear no confirma; la acción de 15B sí. Tienda, carrito 
     if (esperado === 'consulta') {
       await expect(pag.locator('#aviso-respaldo')).toContainText('Modo consulta');
       await pag.locator('article', { hasText: `Venta ${sufijo}` }).waitFor();
-      const enConsulta = await pag.evaluate((n) => estado.productos.find((x) => x.nombre === n).variantes[0].estadosTalla, `Venta ${sufijo}`);
+      const enConsulta = await pag.evaluate((n) => estado.productos.find((x) => x.nombre === n).variantes[0].estadosTalla, `Venta ${sufijo}`.toUpperCase());
       expect(Object.values(enConsulta).every((s) => s === 'POR_REVISAR'), 'en modo consulta todo queda por revisar').toBe(true);
     } else {
       // Ni la caché de otro proyecto ni la antigua (que podía contener los ejemplos) se usan.
@@ -790,4 +792,517 @@ test('disposición: el editor en los cinco anchos, foco atrapado en el diálogo 
     await tienda.screenshot({ path: path.join(CAPTURAS, `tienda-${browserName}-${ancho}.png`) });
     await contexto.close();
   }
+});
+
+// =====================================================================
+// Etapa 16.1
+// =====================================================================
+// =====================================================================
+// Etapa 16.2 · Códigos comerciales editables y mayúsculas reales
+// (sustituye a la prueba de 16.1 «referencia visible»: ahora se editan los códigos GT reales y
+// la referencia del proveedor queda aparte, solo informativa)
+// =====================================================================
+const campoCodigo = (page) => editor(page).getByRole('textbox', { name: 'Código de la zapatilla', exact: true });
+const campoCodigoColor = (page, n) => color(page, n).getByRole('textbox', { name: 'Código del color', exact: true });
+const campoColor = (page, n) => color(page, n).getByRole('textbox', { name: 'Color (obligatorio)', exact: true });
+const guardarCambios = (page) => editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
+
+test('códigos editables: zapatilla y color en mayúsculas; tienda, carrito anterior, búsqueda y WhatsApp', async ({ page, browser, browserName }) => {
+  await abrirPanel(page);
+  const p = await crearCompleta(page, `Códigos ${sufijo}`);
+  const NOMBRE = `Códigos ${sufijo}`.toUpperCase();
+  const v = p.variantes[0];
+  expect(p.codigo_interno).toMatch(/^GT-\d{5}$/);
+  expect(v.codigo_variante).toBe(`${p.codigo_interno}-A`);
+  // La 40 confirmada (mantenimiento local) para poder pedirla en la tienda.
+  const t40 = (await tallasDe([v.id])).find((t) => t.talla === '40');
+  await servicio('PATCH', `/rest/v1/tallas?id=eq.${t40.id}`, { estado: 'CONFIRMADA', origen: 'proveedor', vigencia_desde: new Date(Date.now() - 3600e3).toISOString() });
+  await editor(page).getByRole('button', { name: 'Publicar' }).click();
+  await expect(resultado(page)).toContainText('Publicada');
+
+  // Campos claros: los dos códigos reales; la referencia del proveedor, aparte e informativa.
+  await expect(campoCodigo(page)).toHaveValue(p.codigo_interno);
+  await expect(campoCodigoColor(page, 0)).toHaveValue(v.codigo_variante);
+  await expect(color(page, 0).getByRole('textbox', { name: 'Referencia del proveedor para este color (opcional)' })).toBeVisible();
+  await expect(color(page, 0).locator('.campo-ayuda', { hasText: 'no cambia el código del color' })).toBeVisible();
+  await expect(editor(page).getByRole('textbox', { name: /Referencia visible/ })).toHaveCount(0);
+
+  // La tienda, con una línea en el carrito guardada ANTES de cambiar los códigos.
+  const tienda = await abrirTienda(browser);
+  await tienda.pagina.locator('article', { hasText: NOMBRE }).waitFor();
+  await tienda.pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); agregarAlCarrito(x.clave, x.variantes[0].id, '40', 2); }, NOMBRE);
+  const carritoAntes = await tienda.pagina.evaluate(() => JSON.parse(localStorage.getItem('gama-talla-carrito-v3')));
+  const visto = await tienda.pagina.evaluate((n) => { const x = estado.productos.find((q) => q.nombre === n); return { clave: x.clave, variante: x.variantes[0].id, referencia: x.variantes[0].referencia }; }, NOMBRE);
+  expect(visto, 'la identidad del carrito es la clave inmutable (el UUID para lo nuevo), no el código').toEqual({ clave: p.id, variante: v.id, referencia: v.codigo_variante });
+
+  // Mayúsculas al escribir: se ven en mayúsculas, el cursor no salta y el valor REAL se normaliza al salir.
+  const colorCampo = campoColor(page, 0);
+  expect(await colorCampo.evaluate((n) => getComputedStyle(n).textTransform)).toBe('uppercase');
+  await colorCampo.fill('negro ñandú');
+  await colorCampo.press('Home');
+  await colorCampo.press('ArrowRight');
+  await colorCampo.pressSequentially('x');
+  expect(await colorCampo.evaluate((n) => [n.value, n.selectionStart]), 'escribir en medio no mueve el cursor').toEqual(['nxegro ñandú', 2]);
+  await colorCampo.fill('negro añil');
+  await colorCampo.press('Tab');
+  await expect(colorCampo).toHaveValue('NEGRO AÑIL');
+
+  // Ambos códigos: sin prefijo GT, en minúsculas y con espacios exteriores; se normalizan.
+  await campoCodigo(page).fill(' zap-ñu.162 ');
+  await campoCodigo(page).press('Tab');
+  await campoCodigoColor(page, 0).fill('col-negro/162');
+  await campoCodigoColor(page, 0).press('Tab');
+  await expect(campoCodigo(page)).toHaveValue('ZAP-ÑU.162');
+  await expect(campoCodigoColor(page, 0)).toHaveValue('COL-NEGRO/162');
+  for (const ancho of [390, 1440]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await campoCodigo(page).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(CAPTURAS, `editor-codigos-${browserName}-${ancho}.png`) });
+  }
+  const tallasAntes = await tallasDe([v.id]);
+  await guardarCambios(page);
+  await expect(resultado(page)).toContainText('Guardado.');
+  await expect(resultado(page)).not.toContainText('Atención');
+  const [fila] = await servicio('GET', `/rest/v1/productos?select=id,codigo_interno,clave_catalogo,variantes(id,codigo_variante,clave_catalogo,color,fotos(ruta,orden))&id=eq.${p.id}`);
+  expect(fila).toMatchObject({ id: p.id, codigo_interno: 'ZAP-ÑU.162', clave_catalogo: p.id });
+  expect(fila.variantes[0]).toMatchObject({ id: v.id, codigo_variante: 'COL-NEGRO/162', clave_catalogo: v.id, color: 'NEGRO AÑIL' });
+  expect(fila.variantes[0].fotos.map((f) => f.ruta), 'las fotos siguen en sus rutas por UUID').toEqual(v.fotos.map((f) => f.ruta));
+  expect(await tallasDe([v.id]), 'cambiar códigos no toca existencias, estados ni vigencias').toEqual(tallasAntes);
+  const [historia] = await servicio('GET', `/rest/v1/historial?select=cambios,fila_anterior,fila_nueva&tabla=eq.productos&fila_id=eq.${p.id}&order=id.desc&limit=1`);
+  expect(historia.cambios).toContain('codigo_interno');
+  expect(historia.fila_anterior.codigo_interno).toBe(p.codigo_interno);
+
+  // Encabezados y tablero con los códigos nuevos.
+  await expect(page.locator('#editor-codigo')).toHaveText('ZAP-ÑU.162');
+  await expect(color(page, 0).locator('.editor-variante-cabecera .codigo')).toHaveText('COL-NEGRO/162');
+  await editor(page).getByRole('button', { name: 'Cerrar el editor' }).click();
+  const enTablero = page.locator('.producto', { hasText: NOMBRE });
+  await expect(enTablero.locator('.codigo').first()).toHaveText('ZAP-ÑU.162');
+  await expect(enTablero).toContainText('COL-NEGRO/162');
+  await expect(enTablero).toContainText('NEGRO AÑIL');
+
+  // Tienda recargada: el MISMO carrito (línea, talla y cantidad) con la referencia nueva.
+  await tienda.pagina.reload();
+  await tienda.pagina.locator('article', { hasText: NOMBRE }).waitFor();
+  expect(await tienda.pagina.evaluate(() => JSON.parse(localStorage.getItem('gama-talla-carrito-v3')))).toEqual(carritoAntes);
+  expect(await tienda.pagina.evaluate(() => lineasComprables().map((l) => [l.talla, l.cantidad, l.variante.referencia]))).toEqual([['40', 2, 'COL-NEGRO/162']]);
+  await tienda.pagina.locator('#boton-carrito').click();
+  await expect(tienda.pagina.locator('#carrito .linea')).toHaveCount(1);
+  await expect(tienda.pagina.locator('#carrito .linea-unitario')).toContainText('Ref. COL-NEGRO/162');
+  await tienda.pagina.locator('#carrito-datos').click();
+  await guardarDatosEnvio(tienda.pagina);
+  await tienda.pagina.locator('#carrito-enviar').click();
+  const mensaje = await tienda.pagina.evaluate(() => new URL(window.__abiertas.at(-1)).searchParams.get('text'));
+  for (const parte of [`1. ${NOMBRE}`, `* Marca: ${MARCA}`, '* Color: NEGRO AÑIL', '* Referencia: COL-NEGRO/162', '* Talla EU: 40', '* Cantidad: 2']) expect(mensaje).toContain(parte);
+  await tienda.pagina.keyboard.press('Escape');
+  // Búsqueda por los códigos ACTUALES; ni el código anterior ni la clave técnica encuentran nada.
+  for (const [texto, cuantas] of [['ZAP-ÑU.162', 1], ['col-negro/162', 1], [p.codigo_interno, 0], [p.id, 0]]) {
+    await tienda.pagina.locator('#buscar').fill(texto);
+    await expect(tienda.pagina.locator('article.tarjeta'), `búsqueda «${texto}»`).toHaveCount(cuantas);
+  }
+  await tienda.pagina.locator('#buscar').fill('ZAP-ÑU.162');
+  await tienda.pagina.locator('article.tarjeta').getByRole('button', { name: /^Ver detalles de/ }).click();
+  await expect(tienda.pagina.locator('#detalle-referencia')).toHaveText('COL-NEGRO/162');
+  await tienda.pagina.screenshot({ path: path.join(CAPTURAS, `tienda-codigo-color-${browserName}.png`) });
+  await tienda.contexto.close();
+});
+
+test('códigos: duplicados, conflicto entre editores y respuesta perdida; el formulario se conserva', async ({ page }) => {
+  await abrirPanel(page);
+  const a = await crearCompleta(page, `Primera ${sufijo}`, { conFotos: false });
+  await editor(page).getByRole('button', { name: 'Cerrar el editor' }).click();
+  const b = await crearCompleta(page, `Segunda ${sufijo}`, { conFotos: false });
+  let llamadas = 0;
+  let modo = 'normal';
+  await page.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
+    llamadas += 1;
+    if (modo === 'respuesta-perdida') { await r.fetch(); return r.abort('internetdisconnected'); }
+    return r.continue();
+  });
+
+  // Duplicado que el panel ya conoce: aviso claro, sin enviar nada.
+  await campoCodigo(page).fill(a.codigo_interno.toLowerCase());
+  await guardarCambios(page);
+  await expect(page.locator('#editor-error')).toContainText(`El código ${a.codigo_interno} ya lo usa la zapatilla «${`Primera ${sufijo}`.toUpperCase()}»`);
+  await expect(campoCodigo(page)).toHaveAttribute('aria-invalid', 'true');
+  // Dos colores con el mismo código.
+  await campoCodigo(page).fill(b.codigo_interno);
+  await editor(page).getByRole('button', { name: 'Agregar color' }).click();
+  await rellenarColor(page, 1, { nombre: 'Blanco', precio: '1000' });
+  await campoCodigoColor(page, 1).fill(b.variantes[0].codigo_variante.toLowerCase());
+  await guardarCambios(page);
+  await expect(page.locator('#editor-error')).toContainText(`Dos colores tienen el mismo código ${b.variantes[0].codigo_variante}`);
+  expect(llamadas, 'los duplicados conocidos no se envían').toBe(0);
+
+  // Duplicado que el panel no podía saber (otra cuenta lo tomó después): lo rechaza el servidor.
+  await campoCodigoColor(page, 1).fill('');
+  await servicio('PATCH', `/rest/v1/productos?id=eq.${a.id}`, { codigo_interno: `TOMADO-${b.id.slice(0, 6)}`.toUpperCase() });
+  await campoCodigo(page).fill(`tomado-${b.id.slice(0, 6)}`);
+  await guardarCambios(page);
+  await expect(page.locator('#editor-error')).toContainText(`ya lo usa la zapatilla «${`Primera ${sufijo}`.toUpperCase()}»`);
+  await expect(page.locator('#editor-error')).toContainText('No se guardó nada');
+  expect(llamadas).toBe(1);
+  await expect(campoCodigo(page)).toHaveValue(`TOMADO-${b.id.slice(0, 6)}`.toUpperCase());
+  await expect(campoColor(page, 1)).toHaveValue('BLANCO');
+  let [fila] = (await productosDePrueba()).filter((x) => x.id === b.id);
+  expect(fila).toMatchObject({ codigo_interno: b.codigo_interno, version: b.version });
+  expect(fila.variantes, 'el rechazo no guardó el color nuevo').toHaveLength(1);
+
+  // Conflicto: otra edición cambia el código mientras este formulario sigue abierto.
+  await servicio('PATCH', `/rest/v1/productos?id=eq.${b.id}`, { codigo_interno: 'OTRO-EDITOR-162', version: b.version + 1 });
+  await campoCodigo(page).fill('mio-162');
+  await guardarCambios(page);
+  await expect(resultado(page)).toContainText('Otra edición de esta zapatilla se guardó antes que la tuya.');
+  await expect(resultado(page)).toContainText('tus datos siguen en el formulario');
+  await expect(campoCodigo(page)).toHaveValue('MIO-162');
+  [fila] = (await productosDePrueba()).filter((x) => x.id === b.id);
+  expect(fila.codigo_interno, 'no se sobrescribe la edición más reciente').toBe('OTRO-EDITOR-162');
+  await resultado(page).getByRole('button', { name: 'Cargar la versión actual' }).click();
+  await expect(campoCodigo(page)).toHaveValue('OTRO-EDITOR-162');
+
+  // Respuesta perdida con un cambio de código: se comprueba por la operación, una sola vez.
+  modo = 'respuesta-perdida';
+  await campoCodigo(page).fill('perdido-162');
+  await guardarCambios(page);
+  await expect(resultado(page)).toContainText('Guardado (comprobado con el identificador de esta operación).');
+  [fila] = (await productosDePrueba()).filter((x) => x.id === b.id);
+  expect(fila).toMatchObject({ codigo_interno: 'PERDIDO-162', version: b.version + 2 });
+  await expect(page.locator('#editor-codigo')).toHaveText('PERDIDO-162');
+});
+
+test('servidor con el esquema anterior: los códigos no se presentan como guardados', async ({ page, browser, browserName }) => {
+  // (a) Falta la migración (la columna clave_catalogo no existe): códigos de solo lectura y aviso.
+  const sinColumna = (url) => url.pathname.endsWith('/rest/v1/productos') && url.searchParams.get('select') === 'clave_catalogo';
+  await page.route(sinColumna, (r) => r.fulfill({ status: 400, contentType: 'application/json',
+    body: JSON.stringify({ code: '42703', message: 'column productos.clave_catalogo does not exist', details: null, hint: null }) }));
+  // Coherente con ese esquema: la función de guardado antigua no anuncia «codigos_editables».
+  await page.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
+    const respuesta = await r.fetch();
+    const json = await respuesta.json();
+    if (json && typeof json === 'object') delete json.codigos_editables;
+    await r.fulfill({ response: respuesta, json });
+  });
+  await abrirPanel(page);
+  const p = await crearCompleta(page, `Esquema ${sufijo}`, { conFotos: false });
+  await expect(page.locator('#ed-codigos-aviso')).toBeVisible();
+  await expect(page.locator('#ed-codigos-aviso')).toContainText('falta aplicar la migración 20261108030000');
+  await expect(campoCodigo(page)).toHaveJSProperty('readOnly', true);
+  await expect(campoCodigoColor(page, 0)).toHaveJSProperty('readOnly', true);
+  const cuerpos = [];
+  page.on('request', (r) => { if (r.url().includes('/rpc/fn_admin_guardar_producto')) cuerpos.push(JSON.parse(r.postData())); });
+  await color(page, 0).getByLabel('Precio actual (COP)').fill('199000');
+  await guardarCambios(page);
+  await expect(resultado(page)).toContainText('Guardado.');
+  expect(cuerpos.at(-1).p_datos, 'sin códigos en la petición').not.toHaveProperty('codigo_interno');
+  expect(cuerpos.at(-1).p_datos.variantes[0]).not.toHaveProperty('codigo_variante');
+  await page.screenshot({ path: path.join(CAPTURAS, `editor-esquema-anterior-${browserName}.png`) });
+
+  // (b) Una función de guardado antigua que IGNORA los códigos: el panel lo detecta al releer.
+  const contexto = await browser.newContext({ locale: 'es-CO', viewport: { width: 1280, height: 900 } });
+  const otra = await contexto.newPage();
+  await otra.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
+    const cuerpo = JSON.parse(r.request().postData());
+    delete cuerpo.p_datos.codigo_interno;
+    for (const x of cuerpo.p_datos.variantes || []) delete x.codigo_variante;
+    const respuesta = await r.fetch({ postData: JSON.stringify(cuerpo) });
+    const json = await respuesta.json();
+    delete json.codigos_editables;
+    await r.fulfill({ response: respuesta, json });
+  });
+  await abrirPanel(otra);
+  await otra.locator('.producto', { hasText: `Esquema ${sufijo}` }).getByRole('button', { name: /^Editar/ }).click();
+  await expect(campoCodigo(otra)).toHaveJSProperty('readOnly', false);
+  await campoCodigo(otra).fill('nuevo-esquema');
+  await guardarCambios(otra);
+  await expect(resultado(otra)).toContainText('Atención: el código no cambió (zapatilla NUEVO-ESQUEMA)');
+  await expect(resultado(otra)).toContainText('falta aplicar la migración 20261108030000');
+  await expect(resultado(otra)).not.toContainText('Guardado. La zapatilla sigue oculta');
+  const [fila] = (await productosDePrueba()).filter((x) => x.id === p.id);
+  expect(fila.codigo_interno).toBe(p.codigo_interno);
+  await expect(campoCodigo(otra)).toHaveValue(p.codigo_interno);
+  await expect(campoCodigo(otra)).toHaveJSProperty('readOnly', true);
+  await contexto.close();
+});
+
+test('opciones de la guía y casillas: control y texto juntos, pulsables por la etiqueta y con teclado', async ({ page, browserName }) => {
+  await abrirPanel(page);
+  await page.getByRole('button', { name: 'Agregar zapatilla' }).first().click();
+  const grupo = editor(page).getByRole('group', { name: 'Tabla de la guía de tallas' });
+  await expect(grupo).toBeVisible();
+  for (const ancho of [360, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await grupo.scrollIntoViewIfNeeded();
+    const medidas = await editor(page).evaluate((e) => [...e.querySelectorAll('.editor-opciones .casilla, .casillas .casilla, .editor-variante .casilla')].map((l) => {
+      const input = l.querySelector('input').getBoundingClientRect();
+      const texto = l.querySelector('span').getBoundingClientRect();
+      const r = l.getBoundingClientRect();
+      return { texto: l.textContent.trim(), ancho: input.width, alto: input.height, etiqueta: r.height, hueco: texto.left - input.right, dentro: r.right <= document.documentElement.clientWidth + 1 };
+    }));
+    expect(medidas.length).toBeGreaterThanOrEqual(6);
+    for (const m of medidas) {
+      expect(m.ancho, `${ancho}px · ${m.texto}: control sin estirar`).toBeLessThanOrEqual(24);
+      expect(m.alto, `${ancho}px · ${m.texto}`).toBeLessThanOrEqual(24);
+      expect(m.etiqueta, `${ancho}px · ${m.texto}: superficie táctil`).toBeGreaterThanOrEqual(40);
+      expect(m.hueco, `${ancho}px · ${m.texto}: texto junto al control`).toBeGreaterThanOrEqual(0);
+      expect(m.hueco, `${ancho}px · ${m.texto}: texto junto al control`).toBeLessThanOrEqual(16);
+      expect(m.dentro, `${ancho}px · ${m.texto}: sin desborde`).toBe(true);
+    }
+    const orden = await editor(page).locator('.editor-orden').boundingBox();
+    expect(orden.width, `${ancho}px: «Orden en el catálogo» sin estirarse`).toBeLessThanOrEqual(16 * 16 + 1);
+    const r = await revisarEditor(page);
+    expect(r.desborde, `${ancho}px`).toBe(0);
+    await grupo.screenshot({ path: path.join(CAPTURAS, `guia-opciones-${browserName}-${ancho}.png`) });
+  }
+  // Toda la etiqueta es pulsable (también el texto) y el teclado cambia la opción.
+  await grupo.getByText('Mujer', { exact: true }).click();
+  await expect(grupo.getByRole('radio', { name: 'Mujer', exact: true })).toBeChecked();
+  await grupo.getByRole('radio', { name: 'Mujer', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(grupo.getByRole('radio', { name: 'Hombre', exact: true })).toBeChecked();
+  await page.keyboard.press('ArrowRight');
+  await expect(grupo.getByRole('radio', { name: 'Mujer', exact: true })).toBeChecked();
+  await editor(page).getByText('Destacada', { exact: true }).click();
+  await expect(editor(page).getByRole('checkbox', { name: 'Destacada' })).toBeChecked();
+  // El valor se guarda igual que antes.
+  await rellenarModelo(page, { nombre: `Guía ${sufijo}` });
+  await rellenarColor(page, 0, { nombre: 'Negro', precio: '100000' });
+  await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  const [fila] = await servicio('GET', `/rest/v1/productos?select=segmento,destacado&marca=eq.${encodeURIComponent(MARCA)}&nombre=eq.${encodeURIComponent(`Guía ${sufijo}`.toUpperCase())}`);
+  expect(fila).toEqual({ segmento: 'mujer', destacado: true });
+});
+
+test('ingreso oscuro: legible, con foco visible, solo en el ingreso; el flujo no cambia', async ({ page, browserName }) => {
+  await configurarPanel(page);
+  await page.goto(PANEL);
+  await expect(page.locator('#vista-ingreso')).toBeVisible();
+  const colores = await page.evaluate(() => {
+    const c = (sel, prop) => getComputedStyle(document.querySelector(sel))[prop];
+    return { fondo: c('#vista-ingreso', 'backgroundColor'), cuerpo: c('body', 'backgroundColor'), formulario: c('#formulario-ingreso', 'backgroundColor'),
+             campo: c('#correo', 'backgroundColor'), texto: c('#correo', 'color'), boton: c('#boton-ingresar', 'backgroundColor'), botonTexto: c('#boton-ingresar', 'color'),
+             esquema: c('#vista-ingreso', 'colorScheme'), etiqueta: c('#boton-ingresar .boton-texto', 'color') };
+  });
+  expect(colores).toMatchObject({ fondo: 'rgb(11, 11, 11)', cuerpo: 'rgb(11, 11, 11)', formulario: 'rgb(21, 21, 21)', campo: 'rgb(14, 14, 14)',
+    texto: 'rgb(243, 243, 240)', boton: 'rgb(243, 243, 240)', botonTexto: 'rgb(11, 11, 11)', esquema: 'dark', etiqueta: 'rgb(11, 11, 11)' });
+  await expect(page.locator('#boton-ingresar')).toHaveText('Ingresar');
+  // Foco visible.
+  await page.locator('#correo').focus();
+  const foco = await page.locator('#correo').evaluate((n) => getComputedStyle(n).outlineStyle);
+  expect(foco).not.toBe('none');
+  // Error genérico, legible sobre el fondo oscuro; Enter envía; mostrar y ocultar.
+  await page.getByLabel('Correo').fill(admin.correo);
+  await page.getByLabel('Contraseña', { exact: true }).fill('clave-equivocada-ficticia');
+  await page.getByRole('button', { name: 'Mostrar contraseña' }).click();
+  await expect(page.locator('#clave')).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Ocultar contraseña' }).click();
+  await expect(page.locator('#clave')).toHaveAttribute('type', 'password');
+  await page.locator('#clave').press('Enter');
+  await expect(page.locator('#error-ingreso')).toHaveText('El correo o la contraseña no son correctos.');
+  expect(await page.locator('#error-ingreso').evaluate((n) => getComputedStyle(n).color)).toBe('rgb(255, 194, 194)');
+  for (const ancho of [360, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width: ancho, height: ancho < 768 ? 800 : 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${ancho}px sin desborde`).toBe(true);
+    await page.screenshot({ path: path.join(CAPTURAS, `ingreso-oscuro-${browserName}-${ancho}.png`) });
+  }
+  // Ingreso correcto: el tablero conserva su tema claro.
+  await page.getByLabel('Contraseña', { exact: true }).fill(admin.clave);
+  await page.locator('#clave').press('Enter');
+  await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(243, 243, 240)');
+  await page.getByRole('button', { name: 'Cerrar sesión' }).first().click();
+  await expect(page.locator('#aviso-ingreso')).toHaveText('Cerraste la sesión en este dispositivo.');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe('rgb(11, 11, 11)');
+});
+
+// =====================================================================
+// Etapa 16.3 · Público (Hombre / Dama), muestra de color y panel en celular
+// =====================================================================
+const radioPublico = (page, texto) => editor(page).getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: texto, exact: true });
+const campoMuestra = (page, n) => color(page, n).getByRole('textbox', { name: 'Muestra del color (opcional)' });
+
+test('público y muestra: se guardan, se ven en la tienda y lo existente queda sin clasificar', async ({ page, browser, browserName }) => {
+  await abrirPanel(page);
+  const p = await crearCompleta(page, `Público ${sufijo}`);
+  const NOMBRE = `Público ${sufijo}`.toUpperCase();
+  let [fila] = await servicio('GET', `/rest/v1/productos?select=publico,segmento,variantes(muestra_color)&id=eq.${p.id}`);
+  expect(fila, 'sin elegir nada: sin clasificar y sin muestra').toEqual({ publico: null, segmento: null, variantes: [{ muestra_color: null }] });
+  await editor(page).getByRole('button', { name: 'Publicar' }).click();
+  await expect(resultado(page)).toContainText('Publicada');
+  // Sin clasificar: la tienda no pone etiqueta.
+  let tienda = await abrirTienda(browser);
+  await tienda.pagina.locator('article', { hasText: NOMBRE }).waitFor();
+  await expect(tienda.pagina.locator('article', { hasText: NOMBRE }).locator('.tarjeta-publico')).toHaveCount(0);
+  await tienda.contexto.close();
+
+  // Dama + muestra (escrita y con el selector de color).
+  await expect(editor(page).getByRole('group', { name: 'Público en la tienda' })).toContainText('No cambia la tabla de la guía de tallas');
+  await radioPublico(page, 'Dama').check();
+  await expect(editor(page).getByRole('button', { name: 'Dejar sin asignar' })).toBeVisible();
+  await campoMuestra(page, 0).fill('#12');
+  await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(page.locator('#editor-error')).toContainText('debe ser un color hexadecimal');
+  await color(page, 0).locator('input[type="color"]').fill('#e8dcc8');
+  await expect(campoMuestra(page, 0)).toHaveValue('#E8DCC8');
+  expect(await color(page, 0).locator('.editor-muestra-vista').evaluate((n) => n.style.getPropertyValue('--muestra'))).toBe('#e8dcc8');
+  for (const ancho of [390, 1440]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await editor(page).getByRole('group', { name: 'Público en la tienda' }).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(CAPTURAS, `editor-publico-${browserName}-${ancho}.png`) });
+    await campoMuestra(page, 0).scrollIntoViewIfNeeded();
+    await page.screenshot({ path: path.join(CAPTURAS, `editor-muestra-${browserName}-${ancho}.png`) });
+  }
+  const tallasAntes = await tallasDe([p.variantes[0].id]);
+  await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  await expect(resultado(page)).not.toContainText('Atención');
+  [fila] = await servicio('GET', `/rest/v1/productos?select=publico,segmento,variantes(muestra_color)&id=eq.${p.id}`);
+  expect(fila, 'el público no cambia la tabla de la guía').toEqual({ publico: 'dama', segmento: null, variantes: [{ muestra_color: '#e8dcc8' }] });
+  expect(await tallasDe([p.variantes[0].id]), 'no toca existencias ni vigencias').toEqual(tallasAntes);
+  tienda = await abrirTienda(browser);
+  const tarjeta = tienda.pagina.locator('article', { hasText: NOMBRE });
+  await tarjeta.waitFor();
+  await expect(tarjeta.locator('.tarjeta-publico')).toHaveText(' · Dama');
+  await tarjeta.getByRole('button', { name: /^Ver detalles de/ }).click();
+  await expect(tienda.pagina.locator('#modal-producto .detalle-publico')).toHaveText(' · Dama');
+  expect(await tienda.pagina.locator('#modal-producto .muestra-unica').evaluate((n) => n.style.getPropertyValue('--muestra'))).toBe('#e8dcc8');
+  await tienda.pagina.screenshot({ path: path.join(CAPTURAS, `tienda-publico-dama-${browserName}.png`) });
+  await tienda.contexto.close();
+
+  // Hombre → «Caballero»; luego, sin asignar.
+  await radioPublico(page, 'Hombre').check();
+  await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  tienda = await abrirTienda(browser);
+  await expect(tienda.pagina.locator('article', { hasText: NOMBRE }).locator('.tarjeta-publico')).toHaveText(' · Caballero');
+  await tienda.contexto.close();
+  await editor(page).getByRole('button', { name: 'Dejar sin asignar' }).click();
+  await expect(radioPublico(page, 'Hombre')).not.toBeChecked();
+  await editor(page).getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  [fila] = await servicio('GET', `/rest/v1/productos?select=publico&id=eq.${p.id}`);
+  expect(fila.publico).toBeNull();
+});
+
+test('esquema anterior a 16.3: opciones bloqueadas con aviso, y nada se presenta como guardado', async ({ page, browser, browserName }) => {
+  // (a) Falta la migración: la columna «publico» no existe.
+  const sinColumna = (url) => url.pathname.endsWith('/rest/v1/productos') && url.searchParams.get('select') === 'publico';
+  await page.route(sinColumna, (r) => r.fulfill({ status: 400, contentType: 'application/json',
+    body: JSON.stringify({ code: '42703', message: 'column productos.publico does not exist', details: null, hint: null }) }));
+  await page.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
+    const respuesta = await r.fetch();
+    const json = await respuesta.json();
+    if (json && typeof json === 'object') delete json.publico_y_muestras;
+    await r.fulfill({ response: respuesta, json });
+  });
+  await abrirPanel(page);
+  await page.getByRole('button', { name: 'Agregar zapatilla' }).first().click();
+  await expect(page.locator('#ed-publico-aviso')).toBeVisible();
+  await expect(page.locator('#ed-publico-aviso')).toContainText('falta aplicar la migración 20261108040000');
+  await expect(radioPublico(page, 'Dama')).toBeDisabled();
+  await expect(campoMuestra(page, 0)).toHaveJSProperty('readOnly', true);
+  const cuerpos = [];
+  page.on('request', (r) => { if (r.url().includes('/rpc/fn_admin_guardar_producto')) cuerpos.push(JSON.parse(r.postData())); });
+  await rellenarModelo(page, { nombre: `Esquema 163 ${sufijo}` });
+  await rellenarColor(page, 0, { nombre: 'Negro', precio: '100000' });
+  await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  expect(cuerpos.at(-1).p_datos, 'sin «publico» en la petición').not.toHaveProperty('publico');
+  expect(cuerpos.at(-1).p_datos.variantes[0]).not.toHaveProperty('muestra_color');
+  await page.screenshot({ path: path.join(CAPTURAS, `editor-publico-esquema-anterior-${browserName}.png`) });
+  const [p] = (await productosDePrueba()).filter((x) => x.nombre === `Esquema 163 ${sufijo}`.toUpperCase());
+
+  // (b) Una función de guardado antigua que IGNORA los campos nuevos: el panel lo detecta al releer.
+  const contexto = await browser.newContext({ locale: 'es-CO', viewport: { width: 1280, height: 900 } });
+  const otra = await contexto.newPage();
+  await otra.route('**/rpc/fn_admin_guardar_producto*', async (r) => {
+    const cuerpo = JSON.parse(r.request().postData());
+    delete cuerpo.p_datos.publico;
+    for (const x of cuerpo.p_datos.variantes || []) delete x.muestra_color;
+    const respuesta = await r.fetch({ postData: JSON.stringify(cuerpo) });
+    const json = await respuesta.json();
+    delete json.publico_y_muestras;
+    await r.fulfill({ response: respuesta, json });
+  });
+  await abrirPanel(otra);
+  await otra.locator('.producto', { hasText: `Esquema 163 ${sufijo}` }).getByRole('button', { name: /^Editar/ }).click();
+  await radioPublico(otra, 'Dama').check();
+  await otra.locator('#editor').getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(otra.locator('#editor-resultado')).toContainText('Atención: el público y las muestras de color no se guardaron');
+  await expect(otra.locator('#ed-publico-aviso')).toBeVisible();
+  await expect(radioPublico(otra, 'Dama')).toBeDisabled();
+  const [fila] = await servicio('GET', `/rest/v1/productos?select=publico&id=eq.${p.id}`);
+  expect(fila.publico).toBeNull();
+  await contexto.close();
+});
+
+test('panel en celular: cabecera, filtros y guía plegables, selección de tallas y edición completa en pantalla baja', async ({ page, browserName }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await abrirPanel(page);
+  // Con el catálogo vacío, «Agregar zapatilla» ya está a la vista.
+  await expect(page.locator('#boton-nuevo')).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const p = await crearCompleta(page, `Celular ${sufijo}`, { conFotos: false });
+  await editor(page).getByRole('button', { name: 'Cerrar el editor' }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Orden: título y resumen; «Agregar zapatilla» a lo ancho; Historial y Actualizar juntos debajo.
+  const caja = await page.evaluate(() => {
+    const r = (s) => document.querySelector(s).getBoundingClientRect();
+    return { titulo: r('.tablero-titulo'), resumen: r('#tablero-resumen'), nuevo: r('#boton-nuevo'), historial: r('#boton-historial'), actualizar: r('#boton-actualizar'),
+             buscador: r('#buscar'), cabecera: r('.tablero-cabecera'), ancho: document.documentElement.clientWidth, desborde: document.documentElement.scrollWidth - innerWidth };
+  });
+  expect(caja.resumen.top).toBeGreaterThan(caja.titulo.top);
+  expect(caja.nuevo.top).toBeGreaterThan(caja.resumen.top);
+  expect(Math.round(caja.nuevo.width)).toBe(Math.round(caja.cabecera.width));
+  expect(Math.abs(caja.historial.top - caja.actualizar.top)).toBeLessThan(2);
+  expect(caja.historial.top).toBeGreaterThan(caja.nuevo.top);
+  expect(Math.round(caja.buscador.width)).toBe(Math.round(caja.cabecera.width));
+  expect(caja.desborde).toBe(0);
+  await expect(page.getByLabel('Buscar por código interno, referencia, marca o modelo'), 'el nombre accesible sigue completo').toBeVisible();
+  // Filtros plegables, con el estado del filtro elegido en su resumen.
+  await expect(page.locator('#filtros')).toBeHidden();
+  await expect(page.locator('#filtros-estado')).toHaveText('Todas (1)');
+  await page.locator('#plegable-filtros > summary').click();
+  // La zapatilla está oculta (sin publicar): la encuentra «Con elementos ocultos».
+  await page.locator('#filtros').getByRole('button', { name: /^Con elementos ocultos/ }).click();
+  await expect(page.locator('#filtros-estado')).toHaveText('Con elementos ocultos (1)');
+  // Guía de estados plegable.
+  await expect(page.locator('#leyenda')).toBeHidden();
+  await page.locator('#plegable-leyenda > summary').click();
+  await expect(page.locator('#leyenda')).toBeVisible();
+  await page.screenshot({ path: path.join(CAPTURAS, `tablero-celular-${browserName}-390.png`), fullPage: true });
+  // Selección de tallas: sigue funcionando y aparece la barra de acciones.
+  const t40 = (await tallasDe(p.variantes.map((v) => v.id))).find((t) => t.talla === '40');
+  await page.locator(`.talla[data-talla-id="${t40.id}"]`).click();
+  await expect(page.locator('#barra-acciones')).toBeVisible();
+  await page.locator('#barra-acciones').getByRole('button', { name: 'Quitar selección' }).click();
+  await expect(page.locator('#barra-acciones')).toBeHidden();
+  // Edición completa en una pantalla estrecha y baja.
+  await page.setViewportSize({ width: 360, height: 560 });
+  await page.locator('.producto', { hasText: `Celular ${sufijo}` }).getByRole('button', { name: /^Editar/ }).click();
+  await radioPublico(page, 'Hombre').check();
+  await campoMuestra(page, 0).fill('#141414');
+  await color(page, 0).getByLabel('Precio actual (COP)').fill('275000');
+  await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill('Casual');
+  const r = await revisarEditor(page);
+  expect(r.desborde, '360×560: sin desplazamiento horizontal').toBe(0);
+  expect(r.fuera).toBe(0);
+  const guardar = editor(page).getByRole('button', { name: 'Guardar cambios' });
+  const caja2 = await guardar.boundingBox();
+  expect(caja2.y + caja2.height, 'el botón de guardar queda a la vista').toBeLessThanOrEqual(560);
+  await page.screenshot({ path: path.join(CAPTURAS, `editor-celular-bajo-${browserName}-360x560.png`) });
+  await guardar.click();
+  await expect(resultado(page)).toContainText('Guardado.');
+  const [fila] = await servicio('GET', `/rest/v1/productos?select=publico,categoria,variantes(precio,muestra_color)&id=eq.${p.id}`);
+  expect(fila).toEqual({ publico: 'hombre', categoria: 'CASUAL', variantes: [{ precio: 275000, muestra_color: '#141414' }] });
+  await editor(page).getByRole('button', { name: 'Cerrar el editor' }).click();
+  // En escritorio, los plegables se abren solos y su resumen no se ve (el tablero queda como antes).
+  for (const ancho of [360, 390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width: ancho, height: 900 });
+    await page.waitForTimeout(100);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `${ancho}px sin desborde`).toBe(true);
+    await page.screenshot({ path: path.join(CAPTURAS, `tablero-${browserName}-${ancho}-16-3.png`) });
+  }
+  await expect(page.locator('#plegable-filtros > summary')).toBeHidden();
+  await expect(page.locator('#filtros')).toBeVisible();
+  await expect(page.locator('#leyenda')).toBeVisible();
 });

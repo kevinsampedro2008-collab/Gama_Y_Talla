@@ -102,7 +102,8 @@ test('filtros: un producto puede estar en varios estados a la vez', async ({ pag
   await expect(page.locator('#lista-productos > li')).toHaveCount(1);
   await filtros.getByRole('button', { name: /Con tallas por revisar/ }).click();
   await expect(page.locator('#lista-productos > li')).toHaveCount(1);
-  await expect(page.locator('#lista-productos > li').first()).toContainText(`Disponibilidad ${sufijo}`);
+  // Etapa 16.2: el modelo y el color se guardan en mayúsculas.
+  await expect(page.locator('#lista-productos > li').first()).toContainText(`Disponibilidad ${sufijo}`.toUpperCase());
   await filtros.getByRole('button', { name: /Con elementos ocultos/ }).click();
   await expect(page.locator('#lista-productos > li')).toHaveCount(2);
   await expect(filtros.getByRole('button', { name: /Con elementos ocultos/ })).toHaveAttribute('aria-pressed', 'true');
@@ -221,8 +222,8 @@ test('agotada y por revisar: confirmación, nota, transiciones y sin borrar nada
   await talla(page, 'negro', '38').click();
   await talla(page, 'negro', '39').click();
   await accion(page, 'Marcar agotada').click();
-  await expect(dialogo(page)).toContainText(`Disponibilidad ${sufijo}`);
-  await expect(dialogo(page)).toContainText('Negro');
+  await expect(dialogo(page)).toContainText(`Disponibilidad ${sufijo}`.toUpperCase());
+  await expect(dialogo(page)).toContainText('NEGRO');
   await expect(dialogo(page)).toContainText('38 (por revisar), 39 (por revisar)');
   await dialogo(page).getByLabel('Nota interna (opcional)').fill('Sin existencias según el proveedor');
   await confirmar(page, 'Marcar agotada').click();
@@ -561,7 +562,7 @@ test('historial reciente: autor y cambios comprensibles', async ({ page }) => {
   await expect(resultado(page)).toContainText('marcada agotada');
   await page.getByRole('button', { name: 'Historial' }).click();
   const primero = page.locator('.historial-item').first();
-  await expect(primero).toContainText(`Disponibilidad ${sufijo} · Negro · talla 38`);
+  await expect(primero).toContainText(`${`Disponibilidad ${sufijo}`.toUpperCase()} · NEGRO · talla 38`);
   await expect(primero).toContainText('Por revisar → Agotada');
   await expect(primero).toContainText('nota: «Confirmado por teléfono»');
   await expect(primero.locator('.historial-quien')).toHaveText('Tú');
@@ -580,7 +581,8 @@ test('la vista pública refleja los cambios (configuración inyectada solo en la
   await confirmar(page, 'Confirmar disponibilidad').click();
   await expect(resultado(page)).toContainText('confirmada por el proveedor');
   const e = entorno();
-  const r = await fetch(`${e.api}/rest/v1/catalogo_publico?id=eq.${encodeURIComponent(cat.productos[0].codigo_interno)}`, { headers: { apikey: e.publicable } });
+  // Etapa 16.2: el «id» público es la clave inmutable (el UUID para un producto nuevo), no el código.
+  const r = await fetch(`${e.api}/rest/v1/catalogo_publico?id=eq.${encodeURIComponent(cat.productos[0].id)}`, { headers: { apikey: e.publicable } });
   const vista = await r.json();
   expect(r.status).toBe(200);
   expect(vista[0].variantes[0].tallasDisponibles).toEqual(['38']);
@@ -591,7 +593,8 @@ test('la vista pública refleja los cambios (configuración inyectada solo en la
     [`${e.api}/rest/v1/catalogo_publico?select=*&order=orden`, e.publicable]);
   await tienda.goto(`${SITIO}/?intro=no`);
   await tienda.waitForFunction("typeof estado !== 'undefined' && estado.catalogoListo === true", null, { timeout: 30000 });
-  const enTienda = await tienda.evaluate((codigo) => estado.productos.find((p) => p.id === codigo)?.tallasDisponibles, cat.productos[0].codigo_interno);
+  // Etapa 16.2: la tienda identifica el producto por su clave; el código comercial va aparte.
+  const enTienda = await tienda.evaluate((codigo) => estado.productos.find((p) => p.codigo === codigo)?.tallasDisponibles, cat.productos[0].codigo_interno);
   expect(enTienda).toEqual(['38']);
   await tienda.close();
 });

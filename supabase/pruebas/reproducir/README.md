@@ -23,6 +23,41 @@ al stack local. No se guardan capturas, volcados ni resultados en el repositorio
 El validador **no** cubre la atomicidad por `db push`, la prueba HTTP ni las mutaciones ni el humo:
 usa un PostgreSQL corriente, sin Supabase CLI, Kong, PostgREST ni Auth.
 
+## Etapa 16.2 · Migrar desde las 12 anteriores con datos previos
+
+`20261108030000_codigos_editables_y_mayusculas.sql` se prueba sobre un stack local que todavía
+tiene solo las 12 migraciones anteriores, con datos FICTICIOS previos (claves heredadas con `~`,
+un producto creado por el panel, nombres en minúsculas con tildes y Ñ, tallas con vigencias y
+fotos):
+
+```bash
+# La CLI admite «db reset --version 20261108020000»; en 16.2 se usó un stack creado antes de añadir
+# la migración nueva, que ya tenía solo las 12 anteriores.
+npx --yes supabase@3.0.0 db reset --local --version 20261108020000
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/datos_previos_16_2.sql
+npx --yes supabase@3.0.0 migration up --local
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/verificar_migracion_16_2.sql
+npx --yes supabase@3.0.0 db reset --local   # deja la base local limpia para las pruebas del panel
+```
+
+`verificar_migracion_16_2.sql` comprueba que los identificadores públicos no cambian al migrar
+ni al renombrar, las mayúsculas, las versiones, las tallas, las fotos y el historial, y lo
+deshace todo al terminar. Después: `supabase/pruebas/90_codigos_editables.sql`.
+
+## Etapa 16.3 · Migrar desde las 13 anteriores con datos previos
+
+```bash
+npx --yes supabase@3.0.0 db reset --local --version 20261108030000
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/datos_previos_16_3.sql
+npx --yes supabase@3.0.0 migration up --local
+docker exec -i supabase_db_Yeny_Oficial psql -X -q -v ON_ERROR_STOP=1 -U postgres -d postgres < supabase/pruebas/reproducir/verificar_migracion_16_3.sql
+npx --yes supabase@3.0.0 db reset --local
+```
+
+Comprueba que la vista conserva cada campo e identificador anterior, que lo existente queda sin
+clasificar y sin muestra, y que un cliente anterior no borra lo guardado. Después:
+`supabase/pruebas/91_publico_y_muestras.sql` (también la ejecuta `scripts/validar-esquema.sh`).
+
 ## Orden
 
 Desde la raíz del proyecto:

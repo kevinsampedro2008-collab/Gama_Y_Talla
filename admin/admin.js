@@ -491,6 +491,13 @@
     return `${partes.join(" · ")}. En la tienda: ${tallas.join(", ")}.`;
   }
 
+  // 16.3: el resumen del plegable «Filtros» (celular) dice qué filtro está elegido.
+  function pintarEstadoFiltros() {
+    const elegido = FILTROS.find((f) => f.id === filtro) || FILTROS[0];
+    const estadoFiltros = $("#filtros-estado");
+    if (estadoFiltros) estadoFiltros.textContent = `${elegido.texto} (${catalogo.filter(elegido.cumple).length})`;
+  }
+
   function pintarFiltros() {
     const caja = $("#filtros");
     caja.replaceChildren(...FILTROS.map((f) => {
@@ -503,6 +510,7 @@
       return boton;
     }));
     caja.hidden = false;
+    pintarEstadoFiltros();
   }
 
   function pintarCatalogo() {
@@ -632,6 +640,10 @@
     const cabecera = nodo("div", "variante-cabecera");
     cabecera.append(nodo("span", "variante-color", v.color));
     cabecera.append(nodo("span", "codigo codigo-suave", v.codigo_variante));
+    // Referencia que ve el cliente (16.1): la propia si se escribió; si no, es el mismo código.
+    const referencia = String(v.referencia_variante || "").trim();
+    // Etapa 16.2: el código del color es la referencia que ve el cliente; la del proveedor es aparte.
+    if (referencia && referencia !== v.codigo_variante) cabecera.append(nodo("span", "variante-referencia", `Ref. proveedor: ${referencia}`));
     const precio = nodo("span", "variante-precio");
     if (v.precio > 0) {
       precio.append(nodo("span", "", pesos.format(v.precio)));
@@ -1407,5 +1419,14 @@
     await entrar();
   }
 
-  document.addEventListener("DOMContentLoaded", arrancar);
+  /* 16.3: filtros y leyenda plegables solo en celular. Desde 768 px se abren y su resumen se oculta
+     (CSS), así el escritorio se ve como antes. En celular empiezan plegados. */
+  function prepararPlegables() {
+    const escritorio = window.matchMedia("(min-width: 768px)");
+    const aplicar = () => document.querySelectorAll("[data-plegable]").forEach((d) => { d.open = escritorio.matches; });
+    aplicar();
+    escritorio.addEventListener("change", aplicar);
+  }
+
+  document.addEventListener("DOMContentLoaded", () => { prepararPlegables(); arrancar(); });
 })();

@@ -51,8 +51,9 @@ test.describe('Ficha abierta y catálogo que cambia por detrás', () => {
         const agregar = dialogo.locator('.detalle-acciones [data-accion="agregar"]');
         await agregar.scrollIntoViewIfNeeded();
         await expect(agregar).toHaveAttribute('aria-disabled', 'true');
-        await expect(dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' }))
-          .toHaveAttribute('aria-disabled', 'true');
+        // Etapa 16.1: el botón de WhatsApp pasa a consulta en el acto (operativo, sin comprar).
+        await expect(dialogo.getByRole('button', { name: 'Consultar esta talla por WhatsApp' }))
+          .not.toHaveAttribute('aria-disabled', 'true');
         await agregar.click({ force: true });
         await expect(dialogo.locator('#detalle-aviso')).toContainText('está por revisar');
         expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_CARRITO)).toBeNull();

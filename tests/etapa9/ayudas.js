@@ -62,6 +62,49 @@ export async function enTienda({ browser, browserName }, vista, cuerpo, { url = 
   }
 }
 
+/* Etapa 16.1: un pedido por WhatsApp exige datos de envío (solo en la memoria de la página).
+   Datos FICTICIOS para las pruebas y ayudas para completarlos y enviar. */
+export const DATOS_ENVIO = Object.freeze({ nombre: 'Camila Rodríguez', telefono: '300 123 4567', ciudad: 'Barranquilla', direccion: 'Calle 84 # 51B-20, apto 302', nota: '' });
+export const lineasDatosEnvio = (d = DATOS_ENVIO) => [
+  '─────────────────', 'Mis datos:', `Nombre: ${d.nombre}`, `Teléfono: ${d.telefono}`, `Ciudad: ${d.ciudad}`, `Dirección: ${d.direccion}`, ...(d.nota ? [`Nota: ${d.nota}`] : []),
+];
+
+// Con la ventana de datos de envío abierta: rellena y guarda.
+export async function guardarDatosEnvio(pagina, datos = DATOS_ENVIO) {
+  await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', true);
+  for (const [campo, valor] of Object.entries(datos)) await pagina.locator(`#envio-${campo}`).fill(valor);
+  await pagina.locator('#envio-guardar').click();
+}
+
+// Con el carrito abierto: completa los datos si faltan y pulsa «Enviar pedido». Devuelve la URL abierta.
+export async function enviarDesdeCarrito(pagina, datos = DATOS_ENVIO) {
+  if ((await pagina.locator('#carrito-enviar').getAttribute('aria-disabled')) === 'true') {
+    await pagina.locator('#carrito-datos').click();
+    await guardarDatosEnvio(pagina, datos);
+    await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
+  }
+  const antes = await pagina.evaluate(() => window.__abiertas.length);
+  const enviar = pagina.locator('#carrito-enviar');
+  await enviar.scrollIntoViewIfNeeded();
+  await enviar.click();
+  await expect.poll(() => pagina.evaluate(() => window.__abiertas.length)).toBe(antes + 1);
+  return pagina.evaluate(() => window.__abiertas.at(-1));
+}
+
+// Con la ficha abierta y una talla disponible elegida: «Pedir este par», datos si faltan y envío explícito.
+export async function pedirParDesdeFicha(pagina, dialogo, { datos = DATOS_ENVIO, tocar = false } = {}) {
+  const pedir = dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' });
+  await pedir.scrollIntoViewIfNeeded();
+  if (tocar) await pedir.tap(); else await pedir.click();
+  await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', true);
+  if (await pagina.locator('#envio-formulario').isVisible()) await guardarDatosEnvio(pagina, datos);
+  await expect(pagina.locator('#envio-revision')).toBeVisible();
+  const antes = await pagina.evaluate(() => window.__abiertas.length);
+  await pagina.locator('#envio-enviar').click();
+  await expect.poll(() => pagina.evaluate(() => window.__abiertas.length)).toBe(antes + 1);
+  return pagina.evaluate(() => window.__abiertas.at(-1));
+}
+
 // Proporción de píxeles oscuros que se ven realmente en pantalla dentro de un elemento:
 // comprueba el resultado visual, no un atributo. El elemento debe estar en la ventana.
 export async function proporcionTinta(pagina, localizador) {

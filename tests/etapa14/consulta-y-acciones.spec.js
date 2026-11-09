@@ -1,7 +1,7 @@
 // Etapa 14d · Consulta de disponibilidad por WhatsApp, carrito con tres distribuciones,
 // rótulo de la ficha y protección FUNCIONAL de los botones inertes.
 import { test, expect } from '@playwright/test';
-import { VISTAS, CELULAR, ESCRITORIO, abrirDetalle, detalleQuieto, sinDesborde } from '../etapa9/ayudas.js';
+import { VISTAS, CELULAR, ESCRITORIO, abrirDetalle, detalleQuieto, sinDesborde, enviarDesdeCarrito } from '../etapa9/ayudas.js';
 import {
   CATALOGO_MIGRADO, conEstados, tiendaConSupabase, guardadoV3, abrirCarritoDesdeCabecera,
   textoDe, CLAVE_CARRITO, URL_SUPABASE, cacheReal, CLAVE_PUBLICABLE_FICTICIA
@@ -44,7 +44,8 @@ test.describe('Mensaje de consulta de WhatsApp', () => {
         '1. SAMBA',
         '* Marca: Adidas',
         '* Color: Rosa / blanco / beigh',
-        '* Referencia: ADD-SAM',
+        // Etapa 16.2: la referencia visible es el código actual del color (no la del proveedor).
+        '* Referencia: GT-00001-A',
         '* Talla EU: 41',
         '* Cantidad: 1',
         '* Precio publicado: $120.000',
@@ -103,13 +104,13 @@ test.describe('Mensaje de consulta de WhatsApp', () => {
     let sinRevisar = '';
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await abrirCarritoDesdeCabecera(pagina);
-      sinRevisar = textoDe(await href(pagina, '#carrito-enviar'));
+      sinRevisar = textoDe(await enviarDesdeCarrito(pagina));
       await expect(pagina.locator('#carrito-consultar'), 'sin nada por revisar no hay consulta').toBeHidden();
     }, { respuesta: CON_40, carrito: soloDisponible });
 
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await abrirCarritoDesdeCabecera(pagina);
-      const pedido = textoDe(await href(pagina, '#carrito-enviar'));
+      const pedido = textoDe(await enviarDesdeCarrito(pagina));
       const consulta = textoDe(await href(pagina, '#carrito-consultar'));
       expect(pedido, 'NUEVO PEDIDO es idéntico con o sin productos por revisar').toBe(sinRevisar);
       expect(pedido.startsWith('*GAMA & TALLA — NUEVO PEDIDO*')).toBe(true);
@@ -127,19 +128,22 @@ test.describe('Mensaje de consulta de WhatsApp', () => {
 
 test.describe('Carrito: las tres distribuciones', () => {
   for (const vista of VISTAS) {
-    test(`${vista.nombre}px: carrito mixto — enviar, consultar y copiar, en ese orden`, async ({ browser, browserName }) => {
+    test(`${vista.nombre}px: carrito mixto — datos de envío, enviar y consultar, en ese orden`, async ({ browser, browserName }) => {
       const carrito = carritoV3([lineaV3(CON_40, SAMBA, '40', 2), lineaV3(CON_40, SAMBA, '41', 1)]);
       await tiendaConSupabase({ browser, browserName }, vista, async (pagina) => {
         await abrirCarritoDesdeCabecera(pagina);
+        const datos = pagina.locator('#carrito-datos');
         const enviar = pagina.locator('#carrito-enviar');
         const consultar = pagina.locator('#carrito-consultar');
-        const copiar = pagina.locator('#carrito-copiar');
+        await expect(datos).toBeVisible();
         await expect(enviar).toBeVisible();
+        await expect(enviar, 'sin datos de envío no se puede enviar').toHaveAttribute('aria-disabled', 'true');
+        await expect(pagina.locator('#carrito-envio-aviso')).toBeVisible();
         await expect(consultar).toBeVisible();
-        await expect(copiar).toBeVisible();
+        await expect(pagina.locator('#carrito-copiar')).toHaveCount(0);
         await expect(consultar).toHaveText('Consultar disponibilidad');
         await expect(pagina.locator('#carrito-unidades')).toHaveText('2');
-        const cajas = await Promise.all([enviar, consultar, copiar].map((b) => b.boundingBox()));
+        const cajas = await Promise.all([datos, enviar, consultar].map((b) => b.boundingBox()));
         expect(cajas[0].y).toBeLessThan(cajas[1].y);
         expect(cajas[1].y).toBeLessThan(cajas[2].y);
         for (const caja of cajas) {
@@ -155,7 +159,8 @@ test.describe('Carrito: las tres distribuciones', () => {
       await tiendaConSupabase({ browser, browserName }, vista, async (pagina) => {
         await abrirCarritoDesdeCabecera(pagina);
         await expect(pagina.locator('#carrito-enviar')).toBeHidden();
-        await expect(pagina.locator('#carrito-copiar')).toBeHidden();
+        await expect(pagina.locator('#carrito-datos'), 'sin pedido no se piden datos de envío').toBeHidden();
+        await expect(pagina.locator('#carrito-envio-aviso')).toBeHidden();
         await expect(pagina.locator('#carrito-consultar')).toBeVisible();
         await expect(pagina.locator('#carrito-unidades')).toBeHidden();
         await expect(pagina.locator('#carrito-subtotal')).toBeHidden();
@@ -174,7 +179,7 @@ test.describe('Carrito: las tres distribuciones', () => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await abrirCarritoDesdeCabecera(pagina);
       await expect(pagina.locator('#carrito-enviar')).toBeVisible();
-      await expect(pagina.locator('#carrito-copiar')).toBeVisible();
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
       await expect(pagina.locator('#carrito-consultar')).toBeHidden();
       await expect(pagina.locator('#carrito-unidades')).toBeVisible();
       await expect(pagina.locator('#carrito-subtotal')).toBeVisible();
@@ -184,7 +189,7 @@ test.describe('Carrito: las tres distribuciones', () => {
 });
 
 test.describe('Generar un mensaje nunca vacía el carrito', () => {
-  test('mixto: enviar, consultar y copiar dejan los productos guardados', async ({ browser, browserName }) => {
+  test('mixto: enviar y consultar dejan los productos guardados', async ({ browser, browserName }) => {
     const carrito = carritoV3([lineaV3(CON_40, SAMBA, '40', 2), lineaV3(CON_40, SAMBA, '41', 1)]);
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       await sinSalirAWhatsApp(pagina);
@@ -192,13 +197,11 @@ test.describe('Generar un mensaje nunca vacía el carrito', () => {
       const antes = await guardadoV3(pagina);
       expect(antes.lineas).toHaveLength(2);
 
-      for (const id of ['#carrito-consultar', '#carrito-enviar']) {
-        const [abierta] = await Promise.all([pagina.context().waitForEvent('page'), pagina.locator(id).click()]);
-        await abierta.waitForLoadState('domcontentloaded').catch(() => {});
-        expect(abierta.url(), `${id} abre WhatsApp`).toContain('api.whatsapp.com/send');
-        await abierta.close();
-      }
-      await pagina.locator('#carrito-copiar').click();
+      const [abierta] = await Promise.all([pagina.context().waitForEvent('page'), pagina.locator('#carrito-consultar').click()]);
+      await abierta.waitForLoadState('domcontentloaded').catch(() => {});
+      expect(abierta.url(), 'consultar abre WhatsApp').toContain('api.whatsapp.com/send');
+      await abierta.close();
+      expect(await enviarDesdeCarrito(pagina), 'enviar abre WhatsApp').toContain('api.whatsapp.com/send');
 
       expect(await guardadoV3(pagina), 'el carrito guardado no cambió').toEqual(antes);
       await expect(pagina.locator('#carrito .linea')).toHaveCount(2);
@@ -294,8 +297,7 @@ test.describe('Ficha: el rótulo general de disponibilidad ya no confunde', () =
 
 test.describe('Acciones con talla por revisar: protección funcional, no solo visual', () => {
   const ACCIONES = [
-    ['AÑADIR AL CARRITO', (dialogo) => dialogo.locator('.detalle-acciones [data-accion="agregar"]')],
-    ['Pedir este par por WhatsApp', (dialogo) => dialogo.locator('.detalle-acciones [data-accion="pedir-ahora"]')]
+    ['AÑADIR AL CARRITO', (dialogo) => dialogo.locator('.detalle-acciones [data-accion="agregar"]')]
   ];
 
   // Ninguna vía debe abrir WhatsApp, tocar el carrito ni sacar al cliente de la ficha.
@@ -350,6 +352,40 @@ test.describe('Acciones con talla por revisar: protección funcional, no solo vi
     }
   }
 
+  // Etapa 16.1: con una talla por revisar, el botón de WhatsApp CONSULTA esa talla. No compra,
+  // no toca el carrito ni cierra la ficha; por cualquier vía produce una consulta, nunca un pedido.
+  for (const vista of [CELULAR, ESCRITORIO]) {
+    test(`${vista.nombre}px · Consultar esta talla por WhatsApp: clic, Enter y Espacio consultan; nada se compra`, async ({ browser, browserName }) => {
+      await tiendaConSupabase({ browser, browserName }, vista, async (pagina) => {
+        const dialogo = await abrirDetalle(pagina, SAMBA);
+        await dialogo.locator('.talla[data-talla="40"]').click();      // 40 está POR REVISAR
+        const boton = dialogo.locator('.detalle-acciones [data-accion="pedir-ahora"]');
+        await boton.scrollIntoViewIfNeeded();
+        await expect(boton).toHaveText('Consultar esta talla por WhatsApp');
+        await expect(boton).not.toHaveAttribute('aria-disabled', 'true');
+        await expect(boton).toHaveAccessibleDescription(/necesita confirmación/);
+        const comprobar = async (via, cuantas) => {
+          const abiertas = await pagina.evaluate(() => window.__abiertas);
+          expect(abiertas, `${via}: una consulta más`).toHaveLength(cuantas);
+          const texto = textoDe(abiertas.at(-1));
+          expect(texto, `${via}: es una consulta`).toContain('CONSULTA DE DISPONIBILIDAD');
+          expect(texto, `${via}: nunca un pedido`).not.toContain('NUEVO PEDIDO');
+          expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_CARRITO), `${via}: el carrito no se modifica`).toBeNull();
+          await expect(pagina.locator('#confirmacion-carrito')).toHaveJSProperty('open', false);
+          await expect(pagina.locator('#datos-envio'), `${via}: no pide datos de envío`).toHaveJSProperty('open', false);
+          await expect(dialogo, `${via}: la ficha sigue abierta`).toHaveJSProperty('open', true);
+        };
+        await boton.click();
+        await comprobar('clic', 1);
+        await boton.focus();
+        await pagina.keyboard.press('Enter');
+        await comprobar('Enter', 2);
+        await pagina.keyboard.press('Space');
+        await comprobar('Espacio', 3);
+      });
+    });
+  }
+
   test('navegación con Tab: los botones inertes siguen en el orden de foco', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, ESCRITORIO, async (pagina) => {
       const dialogo = await abrirDetalle(pagina, SAMBA);
@@ -362,11 +398,15 @@ test.describe('Acciones con talla por revisar: protección funcional, no solo vi
           const a = document.activeElement;
           return { accion: a?.dataset?.accion || '', inerte: a?.getAttribute?.('aria-disabled') === 'true' };
         });
-        if (info.accion === 'agregar' || info.accion === 'pedir-ahora') {
+        if (info.accion === 'agregar') {
           visitados.push(info.accion);
-          expect(info.inerte, `${info.accion} enfocado y marcado inerte`).toBe(true);
+          expect(info.inerte, 'agregar enfocado y marcado inerte').toBe(true);
           await pagina.keyboard.press('Enter');
-          await nadaOcurrio(pagina, dialogo, `Tab + Enter sobre ${info.accion}`);
+          await nadaOcurrio(pagina, dialogo, 'Tab + Enter sobre agregar');
+        }
+        if (info.accion === 'pedir-ahora') {
+          visitados.push(info.accion);
+          expect(info.inerte, 'la consulta por WhatsApp está operativa').toBe(false);
         }
         if (visitados.includes('agregar') && visitados.includes('pedir-ahora')) break;
       }

@@ -14,6 +14,10 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
+  /* Etapa 16.2: estas pruebas contactan servicios y sitios externos REALES (api.whatsapp.com y las
+     páginas de guías de tallas de las marcas). La batería normal es local y no las ejecuta; solo
+     con GT_PRUEBAS_EXTERNAS=1, a propósito. */
+  testIgnore: process.env.GT_PRUEBAS_EXTERNAS === '1' ? [] : ['**/externo/**', '**/etapa11/fuentes-en-vivo.spec.js'],
   /* Run tests in files in parallel */
   fullyParallel: true,
   /* Fail the build on CI if you accidentally left test.only in the source code. */

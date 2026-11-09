@@ -239,6 +239,48 @@ try {
   x = await rpc('fn_admin_estado_producto', { p_id: P, p_accion: 'publicar', p_version: version, p_operacion: crypto.randomUUID() }, admin.token);
   esperar('D con un color visible que tiene foto y talla activa, se publica', x.s === 200 && x.d?.activo === true, breve(x));
   creadas.push(V2, V3);
+  version = x.d?.version ?? version;
+
+  // ==================================================================== E
+  titulo('E · Etapa 16.2: códigos editables, clave pública inmutable y mayúsculas');
+  // El formulario tal como lo leería el panel ahora (todos los colores y tallas).
+  const formulario = async () => {
+    const p = (await servicio('GET', `/rest/v1/productos?select=nombre,marca,categoria,variantes(id,color,precio,precio_anterior,activa,orden,fotos(ruta,orden))&id=eq.${P}`)).d[0];
+    const tallas = (await servicio('GET', `/rest/v1/tallas?select=id,variante_id,talla,activa&variante_id=in.(${p.variantes.map((v) => v.id).join(',')})`)).d;
+    return { id: P, nombre: p.nombre, marca: p.marca, categoria: p.categoria,
+      variantes: p.variantes.sort((a, b) => a.orden - b.orden).map((v) => ({ id: v.id, color: v.color, precio: v.precio, precio_anterior: v.precio_anterior, activa: v.activa, orden: v.orden,
+        tallas: tallas.filter((t) => t.variante_id === v.id).map((t) => ({ id: t.id, talla: t.talla, activa: t.activa, activa_original: t.activa })),
+        fotos: v.fotos.sort((a, b) => a.orden - b.orden).map((f) => ({ ruta: f.ruta })) })) };
+  };
+  x = await pedir('PATCH', `/rest/v1/productos?id=eq.${P}`, { token: admin.token, cuerpo: { clave_catalogo: 'otra-clave' } });
+  esperar('E el administrador no puede cambiar la clave pública: 422', x.s === 422 && /no se puede cambiar/.test(x.d?.message), breve(x));
+  x = await pedir('PATCH', `/rest/v1/productos?id=eq.${P}`, { cuerpo: { codigo_interno: 'DEL-VISITANTE' } });
+  esperar('E el visitante no puede cambiar códigos', [401, 403].includes(x.s), breve(x));
+  let form = await formulario();
+  form.codigo_interno = ' sonda-80-x ';
+  form.nombre = 'sonda 80';
+  form.marca = 'marca ochenta';
+  form.variantes[0].codigo_variante = 'sonda-80-negro';
+  x = await rpc('fn_admin_guardar_producto', { p_datos: form, p_version: version, p_operacion: crypto.randomUUID() }, admin.token);
+  esperar('E renombrar ambos códigos: 200 con los códigos normalizados', x.s === 200 && x.d?.codigo_interno === 'SONDA-80-X' && x.d?.codigos_editables === true
+    && x.d?.variantes?.find((v) => v.id === V)?.codigo_variante === 'SONDA-80-NEGRO', breve(x));
+  version = x.d?.version ?? version;
+  x = await pedir('GET', `/rest/v1/catalogo_publico?id=eq.${P}`);
+  const pub = x.d?.[0];
+  esperar('E la tienda ve el mismo id (UUID), los códigos nuevos y los nombres en mayúsculas',
+    x.s === 200 && pub?.codigoInterno === 'SONDA-80-X' && pub?.nombre === 'SONDA 80' && pub?.marca === 'MARCA OCHENTA'
+    && pub?.variantes?.some((v) => v.id === V && v.codigoVariante === 'SONDA-80-NEGRO' && v.color === 'NEGRO'), breve(x));
+  form = await formulario();
+  form.variantes[0].codigo_variante = 'MISMO-80';
+  form.variantes[1].codigo_variante = 'mismo-80';
+  x = await rpc('fn_admin_guardar_producto', { p_datos: form, p_version: version, p_operacion: crypto.randomUUID() }, admin.token);
+  esperar('E dos colores con el mismo código: 422 y mensaje claro', x.s === 422 && /mismo código/.test(x.d?.message), breve(x));
+  form = await formulario();
+  form.codigo_interno = '';
+  x = await rpc('fn_admin_guardar_producto', { p_datos: form, p_version: version, p_operacion: crypto.randomUUID() }, admin.token);
+  esperar('E vaciar el código al editar: 422', x.s === 422 && /no puede quedar vacío/.test(x.d?.message), breve(x));
+  x = await servicio('GET', `/rest/v1/productos?select=codigo_interno,version&id=eq.${P}`);
+  esperar('E los rechazos no cambiaron nada', x.d?.[0]?.codigo_interno === 'SONDA-80-X' && x.d?.[0]?.version === version, breve(x));
 } finally {
   titulo('Limpieza (service_role)');
   const nombres = [...subidos];

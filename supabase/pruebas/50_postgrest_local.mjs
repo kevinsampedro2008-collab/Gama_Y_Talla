@@ -32,7 +32,7 @@ const CENTINELA = `NOTA-INTERNA-CENTINELA-${sufijo}`;
 const MIGRADO = `MIGRADO-CENTINELA-${sufijo}`;
 const INTERNAS = ['publicado_en', 'registrado_en', 'confirmado_en', 'vigencia_horas', 'origen', 'nota', 'estado_migrado', 'creado_en', 'actualizado_en'];
 const PUBLICAS = 'id,variante_id,talla,estado,vigencia_desde,vence_en,activa';
-const COLUMNAS_VISTA = ['id', 'codigoInterno', 'referencia', 'nombre', 'marca', 'categoria', 'descripcion', 'segmento', 'destacado', 'nuevoIngreso', 'orden', 'variantes'];
+const COLUMNAS_VISTA = ['id', 'codigoInterno', 'referencia', 'nombre', 'marca', 'categoria', 'descripcion', 'segmento', 'destacado', 'nuevoIngreso', 'orden', 'variantes', 'publico'];
 
 let correctas = 0;
 let fallidas = 0;
@@ -122,7 +122,7 @@ try {
   titulo('A · Visitante (anon): solo la clave publicable, como la tienda');
   const catalogo = await pedir('GET', `${REST}/catalogo_publico?order=orden`);
   esperar('A lee catalogo_publico', catalogo.s === 200 && catalogo.d.length === activos, breve(catalogo));
-  esperar('A la vista tiene exactamente las 12 columnas, en orden', JSON.stringify(Object.keys(catalogo.d[0] || {})) === JSON.stringify(COLUMNAS_VISTA), Object.keys(catalogo.d[0] || {}).join(','));
+  esperar('A la vista tiene exactamente sus 13 columnas, en orden (16.3: publico al final)', JSON.stringify(Object.keys(catalogo.d[0] || {})) === JSON.stringify(COLUMNAS_VISTA), Object.keys(catalogo.d[0] || {}).join(','));
   esperar('A la vista no contiene ningún dato interno', !catalogo.texto.includes(CENTINELA) && !catalogo.texto.includes(MIGRADO) && !/"(nota|estado_migrado|publicado_en|confirmado_en|registrado_en|vigencia_horas|origen)"/.test(catalogo.texto));
   for (const [t, c] of [['productos', 'id,nombre'], ['variantes', 'id,color'], ['tallas', PUBLICAS], ['fotos', 'id,ruta']]) {
     const x = await pedir('GET', `${REST}/${t}?select=${c}&limit=1`);
@@ -256,7 +256,9 @@ try {
 
   const p1 = await pedir('POST', `${REST}/rpc/fn_confirmar_por_proveedor`, { ...ta, cuerpo: { p_talla_id: TALLA } });
   esperar('C confirma disponibilidad (proveedor), 48 h', p1.s === 200 && p1.d.estado === 'CONFIRMADA' && (new Date(p1.d.vence_en) - new Date(p1.d.vigencia_desde)) / 36e5 === 48, breve(p1));
-  const vistaTrasConfirmar = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(prod.d[0].codigo_interno)}`);
+  // Etapa 16.2: el «id» público es la clave inmutable (para un producto nuevo, su UUID); el código
+  // comercial va en «codigoInterno» y se puede editar sin romper carritos.
+  const vistaTrasConfirmar = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(prod.d[0].id)}`);
   esperar('C el visitante ve la talla DISPONIBLE', vistaTrasConfirmar.d?.[0]?.variantes?.[0]?.tallasDisponibles?.includes('40'), breve(vistaTrasConfirmar));
   const p2 = await pedir('POST', `${REST}/rpc/fn_confirmar_por_publicacion`, { ...ta, cuerpo: { p_talla_id: TALLA, p_publicado_en: new Date(Date.now() - 36e5).toISOString() } });
   esperar('C confirma disponibilidad (publicación)', p2.s === 200 && p2.d.origen === 'publicacion' && p2.d.vigencia_desde === p2.d.publicado_en, breve(p2));
@@ -292,7 +294,7 @@ try {
   esperar('C desactiva la talla (activa = false)', desactivar.s === 200 && desactivar.d.length === 1 && desactivar.d[0].activa === false, breve(desactivar));
   const histDes = await pedir('GET', `${REST}/historial?select=operacion,cambios,autor&fila_id=eq.${T42}&order=id.desc&limit=1`, ta);
   esperar('C el historial registra la desactivación y su autor', histDes.d?.[0]?.operacion === 'UPDATE' && JSON.stringify(histDes.d?.[0]?.cambios) === '["activa"]' && histDes.d?.[0]?.autor === admin.id, breve(histDes));
-  const vistaSin = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].codigo_interno)}`);
+  const vistaSin = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].id)}`);
   esperar('C la talla desactivada desaparece de la vista', vistaSin.s === 200 && vistaSin.d?.[0]?.variantes?.[0]?.tallas?.length === 0, breve(vistaSin));
   const reactivar = await pedir('PATCH', `${REST}/tallas?id=eq.${T42}&select=id,activa`, { ...ta, cuerpo: { activa: true }, prefer: 'return=representation' });
   esperar('C reactiva la MISMA fila', reactivar.s === 200 && reactivar.d?.[0]?.id === T42 && reactivar.d?.[0]?.activa === true, breve(reactivar));
@@ -319,7 +321,7 @@ try {
     valores.push(`${talla}=${x.s === 200 ? x.d : breve(x)}`);
   }
   esperar('G rpc fn_valor_talla: las seis formas de 40,5 valen 40.5', valores.every((v) => v.endsWith('=40.5')), valores.join(' '));
-  const vistaEquiv = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].codigo_interno)}`);
+  const vistaEquiv = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(nuevo.d[0].id)}`);
   const ordenEquiv = vistaEquiv.d?.[0]?.variantes?.[0]?.tallas?.map((t) => t.talla) || [];
   esperar('G la vista entrega las etiquetas equivalentes intactas, juntas y antes de 42',
     ordenEquiv.length === 3 && ordenEquiv[2] === '42' && ordenEquiv.slice(0, 2).sort().join('|') === ['40 2/4', '40,50'].sort().join('|'), JSON.stringify(ordenEquiv));
@@ -332,7 +334,7 @@ try {
   const vistaComa = await pedir('GET', `${REST}/catalogo_publico?order=orden`);
   const activosAhora = (await servicio('GET', `${REST}/productos?select=id&activo=is.true`)).d.length;
   esperar('G el visitante lee el catálogo entero con tallas 40,5 y 40 1/3 (antes: error)', vistaComa.s === 200 && vistaComa.d.length === activosAhora, `${breve(vistaComa)} de ${activosAhora}`);
-  const ordenG = vistaComa.d.find((p) => p.id === prod.d[0].codigo_interno)?.variantes?.[0]?.tallas?.map((t) => t.talla);
+  const ordenG = vistaComa.d.find((p) => p.id === prod.d[0].id && p.codigoInterno === prod.d[0].codigo_interno)?.variantes?.[0]?.tallas?.map((t) => t.talla);
   esperar('G la vista ordena 40 < 40 1/3 < 40,5 < 41', JSON.stringify(ordenG) === '["40","40 1/3","40,5","41"]', JSON.stringify(ordenG));
   const adminComa = await pedir('POST', `${REST}/rpc/fn_admin_tallas?select=talla`, { ...ta, cuerpo: { p_variante_id: variG } });
   esperar('G fn_admin_tallas responde y ordena con coma', adminComa.s === 200 && JSON.stringify(adminComa.d) === '[{"talla":"40"},{"talla":"40 1/3"},{"talla":"40,5"},{"talla":"41"}]', breve(adminComa));
@@ -351,7 +353,7 @@ try {
   esperar('G con fecha pasada se acepta y vence a las 48 h de la publicación', pasadaRpc.s === 200 && (new Date(pasadaRpc.d.vence_en) - new Date(pasado)) / 36e5 === 48, breve(pasadaRpc));
   const proveedor = await pedir('POST', `${REST}/rpc/fn_confirmar_por_proveedor?select=vigencia_desde,vence_en`, { ...ta, cuerpo: { p_talla_id: TALLA } });
   esperar('G la confirmación del proveedor (hora del servidor) nunca se rechaza', proveedor.s === 200 && Math.abs(new Date(proveedor.d.vigencia_desde) - Date.now()) < 120000, breve(proveedor));
-  const tras = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(prod.d[0].codigo_interno)}`);
+  const tras = await pedir('GET', `${REST}/catalogo_publico?id=eq.${encodeURIComponent(prod.d[0].id)}`);
   esperar('G el visitante ve DISPONIBLE la talla recién confirmada', tras.d?.[0]?.variantes?.[0]?.tallasDisponibles?.includes('40'), breve(tras));
 
   // ==================================================================== F

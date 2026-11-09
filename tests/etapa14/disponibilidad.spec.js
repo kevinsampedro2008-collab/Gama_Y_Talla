@@ -1,7 +1,7 @@
 // Etapa 14 · La tienda interpreta los tres estados de disponibilidad.
 // El catálogo que se sirve es el REAL migrado en la etapa 13 (supabase/local/vista-publica.json).
 import { test, expect } from '@playwright/test';
-import { VISTAS, CELULAR, ESCRITORIO, enTienda, abrirDetalle, mostrarTodo, sinDesborde } from '../etapa9/ayudas.js';
+import { VISTAS, CELULAR, ESCRITORIO, enTienda, abrirDetalle, mostrarTodo, sinDesborde, enviarDesdeCarrito } from '../etapa9/ayudas.js';
 import {
   CATALOGO_MIGRADO, conEstados, sinTalla, tiendaConSupabase, estadosDeTallas,
   lineasDelCarrito, guardadoV3, abrirCarritoDesdeCabecera, textoDe, CLAVE_CARRITO, CLAVE_CACHE,
@@ -105,17 +105,21 @@ test.describe('Ficha: una talla por revisar se elige pero no se compra', () => {
     });
   });
 
-  test('«Pedir este par» no manda un pedido de una talla por revisar', async ({ browser, browserName }) => {
+  // Etapa 16.1: el mismo botón pasa a «Consultar esta talla» y manda una CONSULTA, nunca un pedido.
+  test('con una talla por revisar, el botón de WhatsApp consulta y no manda un pedido', async ({ browser, browserName }) => {
     await tiendaConSupabase({ browser, browserName }, CELULAR, async (pagina) => {
       const dialogo = await abrirDetalle(pagina, SAMBA);
       await dialogo.locator('.talla[data-talla="40"]').click();
-      const pedir = dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' });
-      await pedir.scrollIntoViewIfNeeded();
-      // Pedir el par es una compra directa: también debe quedar inerte.
-      await expect(pedir).toHaveAttribute('aria-disabled', 'true');
-      await pedir.click({ force: true });
-      await expect(dialogo.locator('#detalle-aviso')).toContainText('por revisar');
-      expect(await pagina.evaluate(() => window.__abiertas)).toEqual([]);
+      await expect(dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' })).toHaveCount(0);
+      const consultar = dialogo.getByRole('button', { name: 'Consultar esta talla por WhatsApp' });
+      await consultar.scrollIntoViewIfNeeded();
+      await consultar.click();
+      const abiertas = await pagina.evaluate(() => window.__abiertas);
+      expect(abiertas).toHaveLength(1);
+      const texto = textoDe(abiertas[0]);
+      expect(texto).toContain('CONSULTA DE DISPONIBILIDAD');
+      expect(texto).not.toContain('NUEVO PEDIDO');
+      expect(texto).toContain('* Talla EU: 40');
     });
   });
 
@@ -196,7 +200,7 @@ test.describe('Carrito: conservar, excluir y retirar', () => {
       await expect(pagina.locator('#carrito-nota')).toContainText('por revisar');
       await expect(pagina.locator('#carrito-unidades'), 'el resumen cuenta lo pedible').toHaveText('2');
 
-      const mensaje = textoDe(await pagina.locator('#carrito-enviar').getAttribute('href'));
+      const mensaje = textoDe(await enviarDesdeCarrito(pagina));
       expect(mensaje).toContain('Talla EU: 40');
       expect(mensaje, 'la talla por revisar no entra en NUEVO PEDIDO').not.toContain('Talla EU: 41');
       expect(mensaje.match(/^\d+\. /gm), 'una sola entrada').toHaveLength(1);

@@ -7,7 +7,7 @@
  * «Reintentar»), además de las dos funciones de carga, cargarProductos() y refrescarCatalogo().
  */
 import { test, expect } from '@playwright/test';
-import { CELULAR, nuevaPagina, irATienda, URL_REAL, abrirDetalle } from '../etapa9/ayudas.js';
+import { CELULAR, nuevaPagina, irATienda, URL_REAL, abrirDetalle, guardarDatosEnvio } from '../etapa9/ayudas.js';
 import { CATALOGO_MIGRADO, conEstados, URL_SUPABASE, CLAVE_CARRITO, CLAVE_CACHE, guardadoV3 } from '../etapa14/ayudas-etapa14.js';
 
 const SAMBA = 'SAMBA';
@@ -65,6 +65,10 @@ test('fallo de actualización sin caché persistida: modo consulta sin recargar,
     await expect(pagina.locator('#carrito')).toHaveJSProperty('open', true);
     await pagina.locator('#carrito .linea [data-paso="1"]').first().click();
     await expect(pagina.locator('#carrito-enviar')).toBeVisible();
+    // Etapa 16.1: el pedido exige datos de envío, que se guardan solo en memoria.
+    await pagina.locator('#carrito-datos').click();
+    await guardarDatosEnvio(pagina);
+    await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
     const guardadoAntes = await guardadoV3(pagina);
     expect(guardadoAntes.lineas).toHaveLength(1);
     expect(guardadoAntes.lineas[0]).toMatchObject({ talla: '40', cantidad: 2 });
@@ -81,8 +85,12 @@ test('fallo de actualización sin caché persistida: modo consulta sin recargar,
     // e) Nada se puede pedir con la disponibilidad antigua; el carrito sigue igual.
     await expect(pagina.locator('#aviso-respaldo')).toContainText('Modo consulta');
     await expect(pagina.locator('#carrito-enviar')).toBeHidden();
-    await expect(pagina.locator('#carrito-copiar')).toBeHidden();
+    await expect(pagina.locator('#carrito-datos'), 'sin pedido posible no se piden datos').toBeHidden();
     await expect(pagina.locator('#carrito-consultar')).toBeVisible();
+    // Ni la función de envío arma un pedido con disponibilidad antigua (aunque haya datos).
+    const abiertasAntes = await pagina.evaluate(() => window.__abiertas.length);
+    await pagina.evaluate(() => enviarPedidoCarrito());
+    expect(await pagina.evaluate(() => window.__abiertas.length)).toBe(abiertasAntes);
     await expect(pagina.locator('#carrito .linea')).toHaveCount(1);
     r = await leer(pagina);
     expect(r.respaldo, 'el último catálogo real queda en modo consulta').toBe('memoria');
@@ -120,9 +128,11 @@ test('fallo de actualización sin caché persistida: modo consulta sin recargar,
     await pagina.locator('#boton-carrito').click();
     await expect(pagina.locator('#aviso-respaldo')).toHaveCount(0);
     await expect(pagina.locator('#carrito-enviar')).toBeVisible();
+    await expect(pagina.locator('#carrito-enviar'), 'los datos de envío siguen en memoria').toHaveAttribute('aria-disabled', 'false');
     r = await leer(pagina);
     expect(r).toMatchObject({ respaldo: null, estado40: 'DISPONIBLE', comprables: ['SAMBA|40|2'] });
-    const pedido = new URL(await pagina.locator('#carrito-enviar').getAttribute('href')).searchParams.get('text');
+    await pagina.locator('#carrito-enviar').click();
+    const pedido = new URL(await pagina.evaluate(() => window.__abiertas.at(-1))).searchParams.get('text');
     expect(pedido).toContain('NUEVO PEDIDO');
     expect(pedido).toContain('* Cantidad: 2');
     expect(await guardadoV3(pagina)).toEqual(guardadoAntes);

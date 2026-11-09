@@ -187,6 +187,9 @@ export async function configurarPanel(page, { url, clave } = {}) {
   const e = entorno();
   const cuerpo = `window.GAMA_TALLA_ADMIN_CONFIG = ${JSON.stringify({ supabaseUrl: url ?? e.api, clavePublicable: clave ?? e.publicable })};`;
   await page.route('**/admin/config.js', (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body: cuerpo }));
+  // Etapa 16.1: puede existir un config.js REAL de la tienda en la raíz. Las pruebas nunca lo
+  // usan: en todo el contexto se sirve vacío (las que abren la tienda inyectan el entorno local).
+  await page.context().route(`${SITIO}/config.js`, (r) => r.fulfill({ status: 200, contentType: 'text/javascript; charset=utf-8', body: '/* sin configuración en las pruebas */' }));
 }
 
 export async function ingresar(page, usuario) {

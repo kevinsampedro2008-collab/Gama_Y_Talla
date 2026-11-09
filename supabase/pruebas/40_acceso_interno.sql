@@ -167,6 +167,8 @@ begin
       ('fn_admin_tallas',              'authenticated'),
       ('fn_admin_guardar_producto',    'authenticated'),
       ('fn_admin_estado_producto',     'authenticated'),
+      ('fn_productos_antes_de_escribir', ''),
+      ('fn_variantes_antes_de_escribir', ''),
       ('fn_asignar_codigo_interno',    ''),
       ('fn_asignar_codigo_variante',   ''),
       ('fn_registrar_historial',       ''),
@@ -186,16 +188,16 @@ begin
          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = f.nombre));
   end loop;
-  perform pg_temp.exigir('D en public hay exactamente esas 16 funciones',
-    (select count(*) = 16 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
+  perform pg_temp.exigir('D en public hay exactamente esas 18 funciones',
+    (select count(*) = 18 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
   perform pg_temp.exigir('D ninguna función de public da EXECUTE a PUBLIC',
     not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace,
                        aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
                  where n.nspname = 'public' and a.grantee = 0 and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
-  perform pg_temp.exigir('D las 16 funciones tienen search_path vacío',
+  perform pg_temp.exigir('D las 18 funciones tienen search_path vacío',
     (select bool_and(coalesce(p.proconfig, '{}') @> array['search_path=""']) from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
-  perform pg_temp.exigir('D las 8 DEFINER siguen siéndolo y las 8 invoker también',
-    (select count(*) filter (where p.prosecdef) = 8 and count(*) filter (where not p.prosecdef) = 8
+  perform pg_temp.exigir('D las 8 DEFINER siguen siéndolo y las 10 invoker también',
+    (select count(*) filter (where p.prosecdef) = 8 and count(*) filter (where not p.prosecdef) = 10
        from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and not exists (select 1 from pg_depend e where e.classid = 'pg_proc'::regclass and e.objid = p.oid and e.deptype = 'e')));
   perform pg_temp.exigir('D las DEFINER accesibles comprueban fn_es_administrador por dentro',
     not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -208,8 +210,9 @@ begin
     (select 'security_invoker=true' = any (reloptions) from pg_class where oid = 'public.catalogo_publico'::regclass));
   select array_agg(a.attname::text order by a.attnum) into v_columnas
     from pg_attribute a where a.attrelid = 'public.catalogo_publico'::regclass and a.attnum > 0 and not a.attisdropped;
-  perform pg_temp.exigir('E la vista tiene sus 12 columnas, en orden',
-    v_columnas = array['id', 'codigoInterno', 'referencia', 'nombre', 'marca', 'categoria', 'descripcion', 'segmento', 'destacado', 'nuevoIngreso', 'orden', 'variantes'],
+  -- 16.3 añade «publico» al final; las 12 anteriores conservan nombre y orden.
+  perform pg_temp.exigir('E la vista tiene sus 13 columnas, en orden (16.3: publico al final)',
+    v_columnas = array['id', 'codigoInterno', 'referencia', 'nombre', 'marca', 'categoria', 'descripcion', 'segmento', 'destacado', 'nuevoIngreso', 'orden', 'variantes', 'publico'],
     v_columnas::text);
   perform pg_temp.exigir('E la definición de la vista no nombra columnas internas',
     pg_get_viewdef('public.catalogo_publico'::regclass) !~ '\m(nota|estado_migrado|publicado_en|confirmado_en|registrado_en|vigencia_horas|origen)\M');

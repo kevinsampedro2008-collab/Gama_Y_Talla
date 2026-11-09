@@ -23,7 +23,12 @@ const comillas = (v) =>
 async function catalogoDeLaTienda(url) {
   const navegador = await chromium.launch();
   try {
-    const pagina = await navegador.newPage();
+    // Etapa 16.2: este guion REESCRIBE archivos versionados con los 28 ejemplos de data/productos.json.
+    // Si el sitio tiene un config.js REAL (no versionado), la tienda leería el catálogo remoto y esos
+    // archivos quedarían con productos reales: el config.js se sirve vacío, como en verificar-migracion.mjs.
+    const contexto = await navegador.newContext();
+    await contexto.route(new URL('/config.js', url).href, (r) => r.fulfill({ status: 200, contentType: 'text/javascript', body: '' }));
+    const pagina = await contexto.newPage();
     const fallos = [];
     pagina.on('pageerror', (e) => fallos.push(e.message));
     await pagina.goto(url, { waitUntil: 'load' });

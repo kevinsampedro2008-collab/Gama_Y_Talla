@@ -196,6 +196,17 @@
               <span class="campo-etiqueta">Novedades</span>
               <span class="campo-valor"><span class="casilla" aria-hidden="true"></span>Solo nuevos</span>
             </button>
+            <!-- 16.3: público de la tienda, junto a Novedades. Visible cuando hay productos clasificados. -->
+            <div class="desplegable" id="campo-publico" data-desplegable hidden>
+              <button class="campo" type="button" aria-expanded="false" aria-controls="panel-publico" data-campo="publico">
+                <span class="campo-etiqueta">Público</span>
+                <span class="campo-valor" data-valor-campo="publico">Todos</span>
+                <svg class="icono campo-icono" aria-hidden="true"><use href="#icono-flecha-abajo"></use></svg>
+              </button>
+              <div class="desplegable-panel" id="panel-publico">
+                <div class="opciones" role="group" aria-label="Filtrar por público" id="filtro-publico"></div>
+              </div>
+            </div>
 
             <div class="campo campo-orden">
               <label class="campo-etiqueta" for="orden">Ordenar</label>
@@ -331,7 +342,77 @@
 
   <dialog class="modal modal-producto" id="modal-producto" aria-label="Detalles del producto"><div class="modal-caja"><button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar detalles"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button><div class="detalle" id="detalle-contenido"></div></div></dialog>
 
-  <dialog class="modal modal-lateral" id="carrito" aria-labelledby="carrito-titulo"><div class="carrito"><header class="carrito-cabecera"><div><p class="etiqueta-mono">Tu selección</p><h2 id="carrito-titulo" tabindex="-1">Mi carrito</h2></div><button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar carrito"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button></header><p class="carrito-notificacion" id="carrito-notificacion" role="status" hidden></p><div class="carrito-cuerpo" id="carrito-cuerpo"></div><footer class="carrito-pie" id="carrito-pie" hidden><dl class="carrito-resumen"><div><dt>Unidades</dt><dd id="carrito-unidades">0</dd></div><div><dt>Subtotal estimado</dt><dd id="carrito-subtotal">$0</dd></div><div><dt>Envío</dt><dd>Por confirmar</dd></div></dl><p class="carrito-nota" id="carrito-nota">El subtotal es estimado y no incluye el envío.</p><a class="boton boton-whatsapp boton-ancho" id="carrito-enviar" href="#carrito" target="_blank" rel="noopener noreferrer"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar pedido por WhatsApp</a><div class="carrito-respaldo" id="carrito-respaldo" hidden><p>El pedido es largo. Copia el detalle y pégalo en el chat de WhatsApp.</p></div><button class="boton boton-secundario boton-ancho" id="carrito-copiar" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-copiar"></use></svg>Copiar pedido</button></footer></div></dialog>
+  <dialog class="modal modal-lateral" id="carrito" aria-labelledby="carrito-titulo"><div class="carrito"><header class="carrito-cabecera"><div><p class="etiqueta-mono">Tu selección</p><h2 id="carrito-titulo" tabindex="-1">Mi carrito</h2></div><button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar carrito"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button></header><p class="carrito-notificacion" id="carrito-notificacion" role="status" hidden></p><div class="carrito-cuerpo" id="carrito-cuerpo"></div><footer class="carrito-pie" id="carrito-pie" hidden><dl class="carrito-resumen"><div><dt>Unidades</dt><dd id="carrito-unidades">0</dd></div><div><dt>Subtotal estimado</dt><dd id="carrito-subtotal">$0</dd></div><div><dt>Envío</dt><dd>Por confirmar</dd></div></dl><p class="carrito-nota" id="carrito-nota">El subtotal es estimado y no incluye el envío.</p><section class="carrito-envio" id="carrito-envio" aria-labelledby="carrito-envio-titulo" hidden><h3 id="carrito-envio-titulo">Datos de envío</h3><dl class="carrito-envio-datos" id="carrito-envio-datos"></dl></section><p class="carrito-envio-aviso" id="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-info"></use></svg>Completa tus datos de envío para continuar.</p><button class="boton boton-secundario boton-ancho" id="carrito-datos" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg><span class="carrito-datos-texto">Agregar datos de envío</span></button><button class="boton boton-whatsapp boton-ancho" id="carrito-enviar" type="button" aria-describedby="carrito-envio-aviso"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar pedido por WhatsApp</button><div class="carrito-respaldo" id="carrito-respaldo" hidden><p>El pedido es largo: WhatsApp se abre con un resumen y el mensaje completo se pega en el chat.</p><button class="boton boton-claro boton-ancho" id="carrito-copiar-completo" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-copiar"></use></svg>Copiar mensaje completo</button><textarea class="carrito-mensaje-completo" id="carrito-mensaje-completo" readonly rows="8" aria-label="Mensaje completo del pedido" hidden></textarea></div></footer></div></dialog>
+
+  <!-- Datos de envío (etapa 16.2): libreta de direcciones guardada solo en este navegador (LocalStorage), nunca en el servidor. -->
+  <dialog class="modal modal-envio" id="datos-envio" aria-labelledby="envio-titulo">
+    <div class="envio">
+      <header class="envio-cabecera">
+        <div><p class="etiqueta-mono">Pedido por WhatsApp</p><h2 id="envio-titulo" tabindex="-1">Datos de envío</h2></div>
+        <button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar datos de envío"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button>
+      </header>
+      <form class="envio-formulario" id="envio-formulario" novalidate>
+        <p class="envio-intro">Los usamos solo para preparar tu mensaje de WhatsApp. Guardamos tus direcciones únicamente en este navegador, para tus próximos pedidos: puedes editarlas o eliminarlas cuando quieras. No se envían a nuestros servidores ni pasan a otros dispositivos, y se pierden si borras los datos de este navegador.</p>
+        <p class="envio-aviso envio-aviso-libreta" id="envio-formulario-aviso" role="status" aria-live="polite" hidden></p>
+        <div class="envio-campo">
+          <label for="envio-nombre">Nombre completo</label>
+          <input id="envio-nombre" name="nombre" type="text" autocomplete="name" maxlength="80" required aria-describedby="envio-nombre-error">
+          <p class="envio-error" id="envio-nombre-error" hidden></p>
+        </div>
+        <div class="envio-campo">
+          <label for="envio-telefono">Teléfono</label>
+          <input id="envio-telefono" name="telefono" type="tel" inputmode="tel" autocomplete="tel" maxlength="20" required aria-describedby="envio-telefono-ayuda envio-telefono-error">
+          <p class="envio-ayuda" id="envio-telefono-ayuda">Con o sin prefijo, por ejemplo +57 300 123 4567.</p>
+          <p class="envio-error" id="envio-telefono-error" hidden></p>
+        </div>
+        <div class="envio-campo">
+          <label for="envio-ciudad">Ciudad</label>
+          <input id="envio-ciudad" name="ciudad" type="text" autocomplete="address-level2" maxlength="60" required aria-describedby="envio-ciudad-error">
+          <p class="envio-error" id="envio-ciudad-error" hidden></p>
+        </div>
+        <div class="envio-campo">
+          <label for="envio-direccion">Dirección</label>
+          <input id="envio-direccion" name="direccion" type="text" autocomplete="street-address" maxlength="120" required aria-describedby="envio-direccion-error">
+          <p class="envio-error" id="envio-direccion-error" hidden></p>
+        </div>
+        <div class="envio-campo">
+          <label for="envio-nota">Nota <span class="envio-opcional">(opcional)</span></label>
+          <textarea id="envio-nota" name="nota" rows="2" maxlength="200" aria-describedby="envio-nota-error" placeholder="Ej.: portería, horario o punto de referencia"></textarea>
+          <p class="envio-error" id="envio-nota-error" hidden></p>
+        </div>
+        <div class="envio-acciones">
+          <button class="boton boton-claro" type="button" data-envio-cancelar>Cancelar</button>
+          <button class="boton boton-principal" id="envio-guardar" type="submit">Guardar dirección</button>
+        </div>
+      </form>
+      <section class="envio-libreta" id="envio-libreta" aria-labelledby="envio-libreta-titulo" hidden>
+        <p class="envio-intro">Elige la dirección para este pedido. Están guardadas solo en este navegador: puedes editarlas, añadir otra o eliminarlas.</p>
+        <p class="envio-aviso envio-aviso-libreta" id="envio-libreta-aviso" role="status" aria-live="polite"></p>
+        <fieldset class="envio-direcciones">
+          <legend id="envio-libreta-titulo">Direcciones guardadas</legend>
+          <ul class="envio-direcciones-lista" id="envio-direcciones"></ul>
+        </fieldset>
+        <button class="boton boton-secundario boton-ancho" id="envio-nueva" type="button" data-envio-nueva><svg class="icono" aria-hidden="true"><use href="#icono-caja"></use></svg>Añadir nueva dirección</button>
+        <div class="envio-acciones">
+          <button class="boton boton-claro" type="button" data-cerrar>Cerrar</button>
+          <button class="boton boton-principal" id="envio-usar" type="button">Usar esta dirección</button>
+        </div>
+      </section>
+      <section class="envio-revision" id="envio-revision" aria-labelledby="envio-revision-titulo" hidden>
+        <h3 id="envio-revision-titulo" tabindex="-1">Este par</h3>
+        <dl class="envio-lista" id="envio-revision-par"></dl>
+        <h3>Tus datos de envío</h3>
+        <dl class="envio-lista" id="envio-revision-datos"></dl>
+        <p class="envio-nota-envio">Solo se envía este par; tu carrito no cambia. El envío y el precio final se confirman por WhatsApp.</p>
+        <p class="envio-aviso" id="envio-aviso" role="status" aria-live="polite"></p>
+        <textarea class="carrito-mensaje-completo" id="envio-respaldo" readonly rows="8" aria-label="Mensaje completo del pedido" hidden></textarea>
+        <div class="envio-acciones">
+          <button class="boton boton-claro" type="button" data-envio-editar>Cambiar dirección de envío</button>
+          <button class="boton boton-whatsapp" id="envio-enviar" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar este par por WhatsApp</button>
+        </div>
+      </section>
+    </div>
+  </dialog>
 
   <dialog class="modal modal-confirmacion" id="confirmacion-carrito" aria-labelledby="confirmacion-titulo">
     <div class="confirmacion">
@@ -377,6 +458,10 @@
         <section class="hoja-grupo" aria-labelledby="hoja-titulo-talla">
           <h3 class="filtro-titulo" id="hoja-titulo-talla">Talla EU</h3>
           <div class="opciones-tallas" role="group" aria-labelledby="hoja-titulo-talla" id="hoja-talla"></div>
+        </section>
+        <section class="hoja-grupo" id="hoja-grupo-publico" aria-labelledby="hoja-titulo-publico" hidden>
+          <h3 class="filtro-titulo" id="hoja-titulo-publico">Público</h3>
+          <div class="opciones" role="group" aria-labelledby="hoja-titulo-publico" id="hoja-publico"></div>
         </section>
         <section class="hoja-grupo" id="hoja-grupo-nuevos" aria-labelledby="hoja-titulo-nuevos" hidden>
           <h3 class="filtro-titulo" id="hoja-titulo-nuevos">Novedades</h3>

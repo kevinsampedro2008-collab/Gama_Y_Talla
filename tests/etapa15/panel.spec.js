@@ -162,9 +162,10 @@ test('administrador: presentación y búsqueda con datos ficticios', async ({ pa
   await expect(page.locator('#tablero-resumen')).toHaveText('3 zapatillas · 4 colores. En la tienda: 2 tallas disponibles, 2 por revisar, 1 agotada.');
 
   const primero = lista.filter({ hasText: p1.codigo_interno });
-  await expect(primero.getByRole('heading', { level: 2 })).toHaveText(`Corredora Ficticia ${sufijo}`);
+  // Etapa 16.2: el modelo se guarda en mayúsculas.
+  await expect(primero.getByRole('heading', { level: 2 })).toHaveText(`Corredora Ficticia ${sufijo}`.toUpperCase());
   await expect(primero).toContainText(`Ref. REF-PANEL-${sufijo}`);
-  await expect(primero).toContainText('Marca Norte · Running');
+  await expect(primero).toContainText('MARCA NORTE · RUNNING');
   await expect(primero).toContainText('Publicado en la tienda');
   await expect(primero).toContainText('$ 289.000');
   await expect(primero.locator('s')).toHaveText('$ 329.000');

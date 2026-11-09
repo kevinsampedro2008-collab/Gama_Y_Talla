@@ -151,18 +151,25 @@
       </section>
 
       <form class="buscador" role="search" id="formulario-buscar">
-        <label class="buscador-etiqueta" for="buscar">Buscar por código interno, referencia, marca o modelo</label>
+        <label class="buscador-etiqueta" for="buscar">Buscar<span class="buscador-etiqueta-detalle"> por código interno, referencia, marca o modelo</span></label>
         <input class="buscador-campo" id="buscar" type="search" autocomplete="off" spellcheck="false" placeholder="Ej.: GT-00012, Samba o Nike">
       </form>
 
-      <div class="filtros" id="filtros" role="group" aria-label="Mostrar zapatillas según el estado de sus tallas" hidden></div>
+      <!-- 16.3: en celular, filtros y leyenda son bloques plegables; desde 768 px siempre abiertos. -->
+      <details class="plegable plegable-filtros" id="plegable-filtros" data-plegable>
+        <summary class="plegable-resumen"><span class="plegable-titulo">Filtros</span><span class="plegable-estado" id="filtros-estado"></span></summary>
+        <div class="filtros" id="filtros" role="group" aria-label="Mostrar zapatillas según el estado de sus tallas" hidden></div>
+      </details>
 
-      <dl class="leyenda" id="leyenda" aria-label="Estados de las tallas" hidden>
-        <div><dt><span class="talla talla-disponible" aria-hidden="true">40</span></dt><dd>Disponible</dd></div>
-        <div><dt><span class="talla talla-revisar" aria-hidden="true">40</span></dt><dd>Por revisar</dd></div>
-        <div><dt><span class="talla talla-agotada" aria-hidden="true">40</span></dt><dd>Agotada</dd></div>
-        <div><dt><span class="talla talla-oculta" aria-hidden="true">40</span></dt><dd>No visible en la tienda</dd></div>
-      </dl>
+      <details class="plegable plegable-leyenda" id="plegable-leyenda" data-plegable>
+        <summary class="plegable-resumen"><span class="plegable-titulo">Guía de estados</span></summary>
+        <dl class="leyenda" id="leyenda" aria-label="Estados de las tallas" hidden>
+          <div><dt><span class="talla talla-disponible" aria-hidden="true">40</span></dt><dd>Disponible</dd></div>
+          <div><dt><span class="talla talla-revisar" aria-hidden="true">40</span></dt><dd>Por revisar</dd></div>
+          <div><dt><span class="talla talla-agotada" aria-hidden="true">40</span></dt><dd>Agotada</dd></div>
+          <div><dt><span class="talla talla-oculta" aria-hidden="true">40</span></dt><dd>No visible en la tienda</dd></div>
+        </dl>
+      </details>
 
       <p class="tablero-estado" id="tablero-estado" role="status" aria-live="polite"></p>
       <div class="tablero-aviso" id="tablero-aviso" hidden></div>

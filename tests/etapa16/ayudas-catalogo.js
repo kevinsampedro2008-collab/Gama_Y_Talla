@@ -13,7 +13,8 @@ import { entorno, servicio, borrarCatalogo } from '../etapa15/ayudas-panel.js';
 
 export * from '../etapa15/ayudas-panel.js';
 
-export const MARCA = 'Marca Dieciséis';
+// Etapa 16.2: marca, modelo, categoría y color se guardan en MAYÚSCULAS (el servidor normaliza).
+export const MARCA = 'MARCA DIECISÉIS';
 export const BUCKET = 'fotos-catalogo';
 export const CAPTURAS = path.join(os.tmpdir(), 'gama-talla-16-capturas');
 export const FOTOS = path.join(os.tmpdir(), 'gama-talla-16-fotos');

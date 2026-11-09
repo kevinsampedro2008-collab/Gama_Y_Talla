@@ -33,6 +33,9 @@ with aprobadas(firma, ejecutan, definer, volatilidad) as (
     -- Etapa 16 (20261108020000): invoker; deciden el RLS del administrador y su comprobación interna.
     ('public.fn_admin_guardar_producto(pg_catalog.jsonb, pg_catalog.int4, pg_catalog.uuid)',  'authenticated',      false, 'v'),
     ('public.fn_admin_estado_producto(pg_catalog.uuid, pg_catalog.text, pg_catalog.int4, pg_catalog.uuid)', 'authenticated', false, 'v'),
+    -- Etapa 16.2 (20261108030000): disparadores invoker de normalización y protección de la clave pública.
+    ('public.fn_productos_antes_de_escribir()',                                               '',                   false, 'v'),
+    ('public.fn_variantes_antes_de_escribir()',                                               '',                   false, 'v'),
     ('public.fn_asignar_codigo_interno()',                                                    '',                   true,  'v'),
     ('public.fn_asignar_codigo_variante()',                                                   '',                   true,  'v'),
     ('public.fn_registrar_historial()',                                                       '',                   true,  'v'),

@@ -134,6 +134,43 @@ const $$ = (selector, raiz = document) => [...raiz.querySelectorAll(selector)];
 const formatoNumero = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const formatoMoneda = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
 const normalizarTexto = (valor) => String(valor ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+/* ---------- Público y muestras de color (etapa 16.3) ----------
+   «publico» clasifica el producto para la tienda (hombre → «Caballero», dama → «Dama»); vacío =
+   sin clasificar: no lleva etiqueta y solo aparece en «Todos». Es independiente de «segmento», que
+   elige la tabla de la guía de tallas. La muestra de un color es un hexadecimal validado; sin ella,
+   un nombre INEQUÍVOCO se resuelve con esta paleta y uno compuesto o desconocido usa un círculo
+   neutro identificable, siempre con el nombre real del color. */
+const PUBLICOS = Object.freeze({ hombre: "Caballero", dama: "Dama" });
+const etiquetaPublico = (publico) => (Object.hasOwn(PUBLICOS, publico) ? PUBLICOS[publico] : "");
+const MUESTRA_VALIDA = /^#[0-9a-f]{6}$/i;
+const PALETA_COLORES = new Map(Object.entries({
+  negro: "#141414", blanco: "#ffffff", gris: "#8c8c88", "gris claro": "#c9c9c4", "gris oscuro": "#4a4a47",
+  rojo: "#c62828", azul: "#1f4fd1", "azul marino": "#1b2a4a", "azul claro": "#8ecae6", celeste: "#8ecae6",
+  verde: "#2e7d32", "verde oliva": "#6b7136", amarillo: "#f2c94c", naranja: "#ef7d22", rosa: "#f4a7b9",
+  fucsia: "#d81b78", morado: "#6a3fa0", lila: "#b39ddb", violeta: "#7e57c2", beige: "#e8dcc8", beis: "#e8dcc8",
+  crema: "#f3ead6", hueso: "#efe8da", cafe: "#6d4c41", marron: "#6d4c41", camel: "#c19a6b", vino: "#6d1a2a",
+  burdeos: "#6d1a2a", dorado: "#c9a227", plateado: "#c0c0c0", turquesa: "#1fb5ad"
+}));
+function luminanciaDe(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+// { css: "#rrggbb" validado o "" (círculo neutro), clara: necesita borde para verse sobre el papel }
+function muestraDeColor(variante) {
+  const propia = MUESTRA_VALIDA.test(variante?.muestra || "") ? variante.muestra.toLowerCase() : "";
+  const css = propia || PALETA_COLORES.get(normalizarTexto(variante?.color).replace(/\s+/g, " ")) || "";
+  return { css: MUESTRA_VALIDA.test(css) ? css : "", clara: Boolean(css) && luminanciaDe(css) > 0.6 };
+}
+function crearMuestra(variante, clase = "muestra-circulo") {
+  const { css, clara } = muestraDeColor(variante);
+  const circulo = crearElemento("span", `${clase}${css ? "" : " muestra-neutra"}${clara ? " muestra-clara" : ""}`);
+  // Solo un hexadecimal validado llega a CSS, y como propiedad personalizada (nunca como texto de estilo).
+  if (css) circulo.style.setProperty("--muestra", css);
+  circulo.setAttribute("aria-hidden", "true");
+  return circulo;
+}
 const limpiarTexto = (valor, respaldo = "") => {
   const texto = typeof valor === "string" || typeof valor === "number" ? String(valor).trim() : "";
   return texto || respaldo;
@@ -219,7 +256,19 @@ function totalPedido(resumen) {
 // El total y el envío van juntos, sin línea vacía entre ellos.
 const cierreTotales = (resumen) => [SEPARADOR_PEDIDO, `💰TOTAL: ${totalPedido(resumen)}`, "🚚 Envío: Por confirmar."];
 
-function crearMensajePedido(lineas) {
+// Datos de envío ya validados (etapa 16.1). La nota solo aparece si se escribió.
+function bloqueDatosEnvio(envio) {
+  if (!envio) return [];
+  return [
+    SEPARADOR_PEDIDO, "Mis datos:",
+    `Nombre: ${envio.nombre}`, `Teléfono: ${envio.telefono}`, `Ciudad: ${envio.ciudad}`, `Dirección: ${envio.direccion}`,
+    ...(envio.nota ? [`Nota: ${envio.nota}`] : [])
+  ];
+}
+
+/* Un pedido siempre lleva datos de envío válidos: quien lo arma (carrito o ficha) los comprueba
+   antes, y aquí se exige otra vez. Los importes salen del estado ACTUAL de las líneas. */
+function crearMensajePedido(lineas, envio) {
   const resumen = resumenCarrito(lineas);
   const partes = [ENCABEZADO_PEDIDO, SEPARADOR_PEDIDO, ""];
   if (lineas.some((linea) => linea.producto.prueba)) partes.push("Nota: pedido de prueba con productos ficticios.", "");
@@ -236,16 +285,206 @@ function crearMensajePedido(lineas) {
     // Campos consecutivos; una sola línea vacía separa un producto del siguiente.
     partes.push(`${indice + 1}. ${producto.nombre.toLocaleUpperCase("es-CO")}`, ...campos.filter(([, valor]) => limpiarTexto(valor)).map(([rotulo, valor]) => `* ${rotulo}: ${valor}`), "");
   });
-  partes.push(...cierreTotales(resumen));
+  partes.push(...bloqueDatosEnvio(envio), ...cierreTotales(resumen));
   if (resumen.hayPorConfirmar && !resumen.todosPorConfirmar) partes.push("No incluye los productos con precio por confirmar.");
   partes.push("", "Quedo a la espera de confirmación. ¡Gracias!");
   return partes.join("\n");
 }
 
-// Cuando el pedido no cabe en el enlace: abre el chat con lo esencial y el detalle se pega aparte.
-function crearMensajeAlternativo(lineas) {
+// Cuando el pedido no cabe en el enlace: abre el chat con lo esencial (también los datos de
+// envío) y el detalle completo se pega aparte.
+function crearMensajeAlternativo(lineas, envio) {
   const resumen = resumenCarrito(lineas);
-  return [ENCABEZADO_PEDIDO, SEPARADOR_PEDIDO, "", textoUnidades(resumen.unidades), "", ...cierreTotales(resumen), "", "Te envío el detalle completo en el siguiente mensaje."].join("\n");
+  return [ENCABEZADO_PEDIDO, SEPARADOR_PEDIDO, "", textoUnidades(resumen.unidades), "", ...bloqueDatosEnvio(envio), ...cierreTotales(resumen), "", "Te envío el detalle completo en el siguiente mensaje."].join("\n");
+}
+
+/* ---------- Datos de envío: libreta de direcciones (etapa 16.2) ----------
+   Varias direcciones guardadas en ESTE navegador (LocalStorage), con su propia clave y formato
+   versionado, aparte del carrito V3, la caché del catálogo y la sesión del panel. Nunca van a
+   Supabase, a URLs internas ni a la consola, y no hay cuentas de clientes. Se escribe solo al
+   confirmar un formulario válido, al elegir otra dirección o al eliminar una. Lo leído se valida
+   como lo escrito a mano. Si el navegador no deja guardar, se usan durante la visita y se dice. */
+const CLAVE_DIRECCIONES = "gama-talla-direcciones";
+const VERSION_DIRECCIONES = 1;
+const MAXIMO_DIRECCIONES = 10;
+const ID_DIRECCION = /^[A-Za-z0-9-]{8,64}$/;
+const libreta = {
+  direcciones: [],      // [{ id, nombre, telefono, ciudad, direccion, nota }] congeladas
+  seleccionada: null,   // id de la dirección del pedido, o null si hay que elegir una
+  persistente: true,    // false = el navegador no deja leer o escribir: solo esta visita
+  intacta: false,       // true = hay datos de un formato más nuevo: no se sobrescriben
+  aviso: ""             // explicación para la persona (lectura o escritura fallida)
+};
+
+const CAMPOS_ENVIO = [
+  { id: "nombre", maximo: 80 },
+  { id: "telefono", maximo: 20 },
+  { id: "ciudad", maximo: 60 },
+  { id: "direccion", maximo: 120 },
+  { id: "nota", maximo: 200 }
+];
+
+// Un solo renglón por campo: sin saltos ni caracteres de control, espacios repetidos reducidos.
+const limpiarCampoEnvio = (valor) => String(valor ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+
+function validarEnvio(bruto = {}) {
+  const datos = Object.fromEntries(CAMPOS_ENVIO.map(({ id }) => [id, limpiarCampoEnvio(bruto[id])]));
+  const errores = {};
+  const largo = (id) => datos[id].length > CAMPOS_ENVIO.find((c) => c.id === id).maximo;
+  if (!datos.nombre) errores.nombre = "Escribe tu nombre completo.";
+  else if (datos.nombre.length < 3 || !/\p{L}/u.test(datos.nombre)) errores.nombre = "Escribe tu nombre completo, con letras.";
+  else if (largo("nombre")) errores.nombre = "El nombre admite hasta 80 caracteres.";
+  const digitos = datos.telefono.replace(/\D/g, "");
+  if (!datos.telefono) errores.telefono = "Escribe un teléfono de contacto.";
+  else if (!/^\+?[0-9\s().-]+$/.test(datos.telefono)) errores.telefono = "Usa solo números, espacios y, si quieres, el prefijo (por ejemplo +57).";
+  else if (digitos.length < 7 || digitos.length > 15 || largo("telefono")) errores.telefono = "Revisa el teléfono: debe tener entre 7 y 15 dígitos.";
+  if (!datos.ciudad) errores.ciudad = "Escribe la ciudad.";
+  else if (datos.ciudad.length < 2 || !/\p{L}/u.test(datos.ciudad)) errores.ciudad = "Escribe el nombre de la ciudad.";
+  else if (largo("ciudad")) errores.ciudad = "La ciudad admite hasta 60 caracteres.";
+  if (!datos.direccion) errores.direccion = "Escribe la dirección de entrega.";
+  else if (datos.direccion.length < 5) errores.direccion = "Escribe la dirección completa (calle, número y, si aplica, apartamento).";
+  else if (largo("direccion")) errores.direccion = "La dirección admite hasta 120 caracteres.";
+  if (largo("nota")) errores.nota = "La nota admite hasta 200 caracteres.";
+  return { valido: Object.keys(errores).length === 0, datos, errores };
+}
+
+const direccionPorId = (id) => libreta.direcciones.find((d) => d.id === id) || null;
+
+// La dirección SELECCIONADA, solo si sigue siendo válida. Es la condición para cualquier pedido:
+// nunca se usa otra en su lugar.
+function datosEnvioValidos() {
+  const elegida = direccionPorId(libreta.seleccionada);
+  return elegida && validarEnvio(elegida).valido ? elegida : null;
+}
+
+const congelarDireccion = (id, datos) => Object.freeze({ id, ...Object.fromEntries(CAMPOS_ENVIO.map(({ id: campo }) => [campo, datos[campo]])) });
+
+function nuevoIdDireccion() {
+  if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+  return `d-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+const AVISO_SIN_ALMACENAMIENTO = "Este navegador no nos deja guardar direcciones: las que escribas servirán durante esta visita, pero no se recordarán.";
+const AVISO_ILEGIBLE = "No pudimos leer las direcciones guardadas en este navegador. Puedes volver a añadirlas.";
+const AVISO_FORMATO_NUEVO = "Hay direcciones guardadas en un formato que esta versión de la tienda no reconoce; no las modificamos. Las que escribas ahora servirán durante esta visita.";
+const CAMPOS_OBLIGATORIOS_ENVIO = ["nombre", "telefono", "ciudad", "direccion"];
+
+// Una dirección LEÍDA del almacenamiento. Los tipos se comprueban ANTES de normalizar: los campos
+// obligatorios deben ser texto y la nota, texto o ausente. Un objeto, número o lista (por un fallo o
+// a propósito) se descarta en vez de convertirse en «[object Object]».
+function direccionGuardadaValida(bruta) {
+  if (!bruta || typeof bruta !== "object" || Array.isArray(bruta)) return null;
+  if (typeof bruta.id !== "string" || !ID_DIRECCION.test(bruta.id)) return null;
+  if (CAMPOS_OBLIGATORIOS_ENVIO.some((campo) => typeof bruta[campo] !== "string")) return null;
+  if (bruta.nota !== undefined && typeof bruta.nota !== "string") return null;
+  const { valido, datos } = validarEnvio(bruta);
+  return valido ? congelarDireccion(bruta.id, datos) : null;
+}
+
+/* Lee la libreta GUARDADA en este momento, sin tocar la copia en memoria.
+   estado: «vacia», «valida», «ilegible» (JSON roto o formato desconocido), «nueva» (formato de
+   una versión posterior: no se interpreta ni se toca) o «bloqueada» (el navegador no deja leer). */
+function leerLibretaGuardada() {
+  let texto;
+  try {
+    texto = localStorage.getItem(CLAVE_DIRECCIONES);
+  } catch {
+    return { estado: "bloqueada" };
+  }
+  if (texto === null) return { estado: "vacia", direcciones: [], seleccionada: null, descartadas: 0 };
+  let datos;
+  try { datos = JSON.parse(texto); } catch { datos = null; }
+  if (!datos || typeof datos !== "object" || Array.isArray(datos)) return { estado: "ilegible" };
+  if (datos.version !== VERSION_DIRECCIONES) {
+    return { estado: Number.isInteger(datos.version) && datos.version > VERSION_DIRECCIONES ? "nueva" : "ilegible" };
+  }
+  const direcciones = [];
+  const vistas = new Set();
+  let descartadas = 0;
+  for (const bruta of Array.isArray(datos.direcciones) ? datos.direcciones : []) {
+    const direccion = direccionGuardadaValida(bruta);
+    if (!direccion || vistas.has(direccion.id) || direcciones.length >= MAXIMO_DIRECCIONES) { descartadas += 1; continue; }
+    vistas.add(direccion.id);
+    direcciones.push(direccion);
+  }
+  const seleccionada = typeof datos.seleccionada === "string" && vistas.has(datos.seleccionada) ? datos.seleccionada : null;
+  return { estado: "valida", direcciones, seleccionada, descartadas };
+}
+
+// Lleva a la memoria lo leído, con el aviso que corresponda.
+function aplicarLecturaLibreta(lectura) {
+  libreta.direcciones = lectura.direcciones || [];
+  libreta.seleccionada = lectura.seleccionada || null;
+  libreta.persistente = lectura.estado !== "bloqueada" && lectura.estado !== "nueva";
+  libreta.intacta = lectura.estado === "nueva";
+  libreta.aviso = lectura.estado === "bloqueada" ? AVISO_SIN_ALMACENAMIENTO
+    : lectura.estado === "nueva" ? AVISO_FORMATO_NUEVO
+      : lectura.estado === "ilegible" ? AVISO_ILEGIBLE
+        : lectura.descartadas === 1 ? "Una dirección guardada no era válida y no se muestra."
+          : lectura.descartadas > 1 ? `${lectura.descartadas} direcciones guardadas no eran válidas y no se muestran.` : "";
+}
+
+function leerLibreta() {
+  aplicarLecturaLibreta(leerLibretaGuardada());
+}
+
+// Escribe una libreta v1 completa. Devuelve true solo si quedó guardada de verdad.
+function escribirLibretaGuardada({ direcciones, seleccionada }) {
+  const texto = JSON.stringify({ version: VERSION_DIRECCIONES, direcciones: direcciones.map((d) => ({ ...d })), seleccionada });
+  try {
+    localStorage.setItem(CLAVE_DIRECCIONES, texto);
+    return localStorage.getItem(CLAVE_DIRECCIONES) === texto;
+  } catch {
+    return false;
+  }
+}
+
+/* Toda modificación (añadir, editar, elegir, eliminar) parte de la ÚLTIMA libreta GUARDADA, no de
+   la copia en memoria: si otra pestaña guardó algo y esta aún no recibió el aviso, su cambio se
+   conserva. La lectura, el cambio y la escritura van juntos y, donde el navegador lo admite, bajo un
+   bloqueo compartido entre pestañas (Web Locks), así dos guardados solapados no se pisan. La versión
+   se comprueba dentro de cada operación: un formato posterior nunca se sobrescribe y el cambio vale
+   solo para esta visita. `cambio` recibe una copia y devuelve { direcciones, seleccionada, ... } o
+   { error }. Devuelve lo que devolvió `cambio` más { guardada }. */
+let colaLibreta = Promise.resolve();
+function operarLibreta(cambio) {
+  const ejecutar = () => {
+    const lectura = leerLibretaGuardada();
+    const memoria = { direcciones: libreta.direcciones, seleccionada: libreta.seleccionada };
+    // Lo ilegible se reemplaza por una libreta válida; lo bloqueado o de formato posterior, no se toca.
+    // Si el almacenamiento falla, la libreta en memoria dura toda esta visita.
+    const temporal = !libreta.persistente;
+    const usable = !temporal && (lectura.estado === "valida" || lectura.estado === "vacia");
+    const escribir = usable || (!temporal && lectura.estado === "ilegible");
+    const base = usable ? lectura : memoria;
+    const resultado = cambio({ direcciones: [...base.direcciones], seleccionada: base.seleccionada });
+    if (resultado.error) {
+      if (usable) aplicarLecturaLibreta(lectura);   // al menos se muestra lo último guardado
+      return { ...resultado, guardada: false };
+    }
+    const guardada = escribir && escribirLibretaGuardada(resultado);
+    libreta.direcciones = resultado.direcciones;
+    libreta.seleccionada = resultado.seleccionada;
+    if (lectura.estado === "nueva" || (temporal && libreta.intacta)) {
+      libreta.intacta = true;
+      libreta.persistente = false;
+      libreta.aviso = AVISO_FORMATO_NUEVO;
+    } else if (!guardada) {
+      libreta.intacta = false;
+      libreta.persistente = false;
+      libreta.aviso = AVISO_SIN_ALMACENAMIENTO;
+    } else {
+      // Lo guardado ya es esta libreta válida: los avisos anteriores sobran.
+      libreta.intacta = false;
+      libreta.persistente = true;
+      libreta.aviso = "";
+    }
+    return { ...resultado, guardada };
+  };
+  const conBloqueo = () => (navigator.locks?.request ? navigator.locks.request(CLAVE_DIRECCIONES, ejecutar) : ejecutar());
+  const enCurso = colaLibreta.then(conBloqueo, conBloqueo);
+  colaLibreta = enCurso.catch(() => undefined);
+  return enCurso;
 }
 
 /* ---------- Mensaje de consulta de disponibilidad ----------
@@ -309,6 +548,7 @@ const estado = {
   marca: TODOS,
   categoria: TODOS,
   soloNuevos: false,
+  publico: TODOS,
   talla: TODOS,
   orden: "destacados",
   productosVisibles: 12,
@@ -438,7 +678,14 @@ function normalizarVariante(bruto, base, idsUsados) {
     id,
     heredada: base.heredada,
     color,
-    referencia: base.heredada ? base.id : limpiarTexto(bruto.referencia, id),
+    // Referencia que ve el cliente (ficha, carrito, WhatsApp): el código ACTUAL del color
+    // (codigoVariante, editable en el panel). Datos sin código (JSON local o antiguo): la
+    // referencia que traigan o su identificador. «id» es la clave técnica y nunca se muestra.
+    referencia: limpiarTexto(bruto.codigoVariante) || (base.heredada ? base.id : limpiarTexto(bruto.referencia, id)),
+    // Referencia del proveedor para este color: informativa, aparte del código.
+    referenciaProveedor: base.heredada ? "" : limpiarTexto(bruto.referencia),
+    // 16.3: muestra del color, solo si es un hexadecimal #rrggbb (cualquier otra cosa se ignora).
+    muestra: typeof bruto.muestra === "string" && MUESTRA_VALIDA.test(bruto.muestra) ? bruto.muestra.toLowerCase() : "",
     fotoPrincipal: imagenes[0],
     imagenes: imagenes.map(rutaImagen),
     tallasDisponibles: disponibles,
@@ -489,6 +736,8 @@ function normalizarProducto(bruto, indice) {
   const producto = {
     id,
     clave: id,
+    // Código comercial (editable en el panel). La clave técnica («id») no se muestra ni se busca.
+    codigo: limpiarTexto(bruto.codigoInterno) || id,
     firma: slug(String(principal.fotoPrincipal).split("/").pop().replace(/\.[a-z0-9]+$/i, "")) || "sin-foto",
     nombre,
     marca,
@@ -511,13 +760,18 @@ function normalizarProducto(bruto, indice) {
     ofrecida: bruto.disponible !== false && ofrecidas.length > 0,
     destacado: bruto.destacado === true,
     nuevoIngreso: bruto.nuevoIngreso === true,
+    // 16.3: «hombre», «dama» o "" (sin clasificar).
+    publico: Object.hasOwn(PUBLICOS, bruto.publico) ? bruto.publico : "",
     prueba: MODO_PRUEBA,
     referenciaRepetida: false,
     indice
   };
   // Evita mostrar reclamos comerciales no confirmados. Solo mostramos «Nuevo» si el campo lo indica.
   producto.badge = producto.nuevoIngreso ? "Nuevo" : "";
-  producto.textoBusqueda = normalizarTexto([producto.nombre, producto.marca, producto.categoria, producto.id, ...variantes.flatMap((variante) => [variante.color, variante.referencia])].join(" "));
+  // Búsqueda por los códigos comerciales ACTUALES (zapatilla y colores) y las referencias del
+  // proveedor; nunca por la clave técnica, que para lo nuevo es un UUID.
+  producto.textoBusqueda = normalizarTexto([producto.nombre, producto.marca, producto.categoria, producto.codigo, limpiarTexto(bruto.referencia),
+    ...variantes.flatMap((variante) => [variante.color, variante.referencia, variante.referenciaProveedor])].join(" "));
   return producto;
 }
 
@@ -1038,6 +1292,13 @@ function construirFiltros() {
   $("#hoja-categoria")?.replaceChildren(...opcionesCategoria());
   $("#filtro-talla")?.replaceChildren(...opcionesTalla());
   $("#hoja-talla")?.replaceChildren(...opcionesTalla());
+  // Público (16.3): solo aparece cuando al menos un producto está clasificado.
+  const opcionesPublico = () => [[TODOS, "Todos"], ["hombre", PUBLICOS.hombre], ["dama", PUBLICOS.dama]].map(([valor, texto]) => crearOpcion("publico", valor, texto));
+  $("#filtro-publico")?.replaceChildren(...opcionesPublico());
+  $("#hoja-publico")?.replaceChildren(...opcionesPublico());
+  const hayPublico = estado.productos.some((producto) => producto.publico);
+  for (const id of ["#campo-publico", "#hoja-grupo-publico"]) { const nodo = $(id); if (nodo) nodo.hidden = !hayPublico; }
+  if (!hayPublico) estado.publico = TODOS;
 
   const hayNuevos = estado.productos.some((producto) => producto.nuevoIngreso);
   const chipNuevos = $("#chip-nuevos");
@@ -1108,11 +1369,12 @@ function sincronizarFiltros() {
     const activo = tipo === "marca" ? valor === estado.marca
       : tipo === "categoria" ? valor === estado.categoria
         : tipo === "talla" ? valor === estado.talla
-          : tipo === "nuevos" ? estado.soloNuevos : false;
+          : tipo === "publico" ? valor === estado.publico
+            : tipo === "nuevos" ? estado.soloNuevos : false;
     boton.setAttribute("aria-pressed", String(activo));
     boton.classList.toggle("activo", activo);
   });
-  const hayFiltros = Boolean(estado.busqueda.trim()) || estado.marca !== TODOS || estado.categoria !== TODOS || estado.talla !== TODOS || estado.soloNuevos;
+  const hayFiltros = Boolean(estado.busqueda.trim()) || estado.marca !== TODOS || estado.categoria !== TODOS || estado.talla !== TODOS || estado.publico !== TODOS || estado.soloNuevos;
   const limpiar = $("#limpiar-filtros");
   if (limpiar) limpiar.hidden = !hayFiltros;
 
@@ -1120,7 +1382,8 @@ function sincronizarFiltros() {
   const valores = {
     marca: estado.marca === TODOS ? "Todas" : estado.marca,
     categoria: estado.categoria === TODOS ? "Todas" : estado.categoria,
-    talla: estado.talla === TODOS ? "Todas" : `EU ${estado.talla}`
+    talla: estado.talla === TODOS ? "Todas" : `EU ${estado.talla}`,
+    publico: estado.publico === TODOS ? "Todos" : etiquetaPublico(estado.publico)
   };
   $$("[data-valor-campo]").forEach((nodo) => { nodo.textContent = valores[nodo.dataset.valorCampo]; });
   $$(".campo[data-campo]").forEach((campo) => campo.toggleAttribute("data-activo", estado[campo.dataset.campo] !== TODOS));
@@ -1135,7 +1398,7 @@ function sincronizarFiltros() {
   });
 
   // Resumen del acceso móvil y botón de la hoja con el total en vivo.
-  const activos = [estado.marca !== TODOS, estado.categoria !== TODOS, estado.talla !== TODOS, estado.soloNuevos].filter(Boolean).length;
+  const activos = [estado.marca !== TODOS, estado.categoria !== TODOS, estado.talla !== TODOS, estado.publico !== TODOS, estado.soloNuevos].filter(Boolean).length;
   const resumen = $("#resumen-filtros");
   if (resumen) resumen.textContent = activos ? `${activos} ${activos === 1 ? "activo" : "activos"}` : "Ninguno";
   $("#abrir-filtros")?.toggleAttribute("data-activo", activos > 0);
@@ -1157,6 +1420,7 @@ function renderizarFiltrosActivos() {
     estado.marca !== TODOS && ["marca", "Marca", estado.marca],
     estado.categoria !== TODOS && ["categoria", "Categoría", estado.categoria],
     estado.talla !== TODOS && ["talla", "Talla", `EU ${estado.talla}`],
+    estado.publico !== TODOS && ["publico", "Público", etiquetaPublico(estado.publico)],
     estado.soloNuevos && ["nuevos", "Novedades", "Solo nuevos"]
   ].filter(Boolean);
   lista.replaceChildren(...activos.map(([tipo, etiqueta, valor]) => {
@@ -1176,6 +1440,7 @@ function filtrarProductos(criterios = estado) {
     (criterios.marca === TODOS || producto.marca === criterios.marca)
     && (criterios.categoria === TODOS || producto.categoria === criterios.categoria)
     && (!criterios.soloNuevos || producto.nuevoIngreso)
+    && (!criterios.publico || criterios.publico === TODOS || producto.publico === criterios.publico)
     && (criterios.talla === TODOS || (producto.ofrecida && producto.tallasOfrecidas.includes(criterios.talla)))
     && terminos.every((termino) => producto.textoBusqueda.includes(termino)));
 }
@@ -1194,6 +1459,7 @@ function limpiarFiltros({ conservarBusqueda = false } = {}) {
   estado.marca = TODOS;
   estado.categoria = TODOS;
   estado.talla = TODOS;
+  estado.publico = TODOS;
   estado.soloNuevos = false;
   renderizarCatalogo();
 }
@@ -1204,6 +1470,7 @@ function firmaFiltrosCatalogo() {
     estado.marca,
     estado.categoria,
     estado.talla,
+    estado.publico,
     estado.soloNuevos ? "1" : "0",
     estado.orden
   ].join("¦");
@@ -1399,8 +1666,14 @@ function crearTarjeta(producto, indiceVisible = 12) {
   const detalles = crearBoton("tarjeta-enlace", caja, { accion: "detalles" });
   detalles.setAttribute("aria-label", `Ver detalles de ${nombreCompleto(producto)}`);
   acciones.append(detalles);
-  const meta = crearElemento("p", "tarjeta-meta", `${producto.marca} · ${producto.categoria}`);
-  if (producto.variantes.length > 1) meta.append(crearElemento("span", "tarjeta-colores", ` · ${producto.variantes.length} colores`));
+  // 16.3: «Caballero» / «Dama» va justo después de la marca y nunca se recorta. Si la línea no
+  // cabe, se recorta primero la categoría (y los colores) y, solo si hace falta, la marca.
+  const meta = crearElemento("p", "tarjeta-meta");
+  const resto = crearElemento("span", "tarjeta-meta-resto", ` · ${producto.categoria}`);
+  if (producto.variantes.length > 1) resto.append(crearElemento("span", "tarjeta-colores", ` · ${producto.variantes.length} colores`));
+  meta.append(crearElemento("span", "tarjeta-meta-marca", producto.marca));
+  if (producto.publico) meta.append(crearElemento("span", "tarjeta-publico", ` · ${etiquetaPublico(producto.publico)}`));
+  meta.append(resto);
   cuerpo.append(meta, nombre, precio, crearTiraTallas(producto), acciones);
   if (producto.prueba) cuerpo.prepend(crearElemento("p", "sello sello-prueba", "Dato de prueba"));
 
@@ -1648,6 +1921,7 @@ function construirDetalle(producto) {
   const identidad = crearElemento("p", "detalle-marca");
   identidad.append(crearElemento("span", "detalle-marca-nombre", producto.marca));
   if (producto.categoria) identidad.append(` · ${producto.categoria}`);
+  if (producto.publico) identidad.append(crearElemento("span", "detalle-publico", ` · ${etiquetaPublico(producto.publico)}`));
   const titulo = crearElemento("h2", "detalle-nombre", producto.nombre);
   titulo.id = "detalle-nombre";
   const precio = crearElemento("div", "detalle-precio detalle-precio-oferta");
@@ -1665,12 +1939,14 @@ function construirDetalle(producto) {
   const variantes = crearElemento("div", "variantes");
   variantes.setAttribute("role", "group");
   variantes.setAttribute("aria-labelledby", "etiqueta-color");
-  // Con un solo color no hay nada que elegir: se nombra el color, sin miniaturas ni selector falso
-  // (la foto grande ya lo muestra).
+  /* 16.3: círculos de muestra (la galería grande sigue mostrando las fotos del color). Cada uno es
+     un botón con el nombre del color y su estado; conserva el identificador de su variante. Con un
+     solo color se nombra y se muestra su círculo, sin selector. */
   if (producto.variantes.length > 1) {
+    variantes.classList.add("variantes-muestras");
     producto.variantes.forEach((variante) => {
       const nombreColor = `${variante.color}${variante.ofrecida ? "" : ", agotado"}`;
-      const pieza = crearBoton("variante", crearImagenRuta(variante.imagenes[0], "", { perezosa: false }), { variante: variante.id });
+      const pieza = crearBoton("variante variante-muestra", crearMuestra(variante), { variante: variante.id });
       pieza.setAttribute("aria-label", nombreColor);
       pieza.title = nombreColor;
       pieza.classList.toggle("variante-agotada", !variante.ofrecida);
@@ -1679,6 +1955,7 @@ function construirDetalle(producto) {
     colores.append(tituloColor, variantes);
   } else {
     colores.classList.add("detalle-colores-unico");
+    tituloColor.prepend(crearMuestra(producto.variantes[0], "muestra-circulo muestra-unica"));
     tituloColor.append(crearElemento("span", "variante-unica", "Único color"));
     colores.append(tituloColor);
   }
@@ -1881,16 +2158,16 @@ function pintarTallaElegida(producto, variante) {
   const enBarra = enDetalle(".detalle-barra-talla");
   enBarra.textContent = talla ? `EU ${talla}` : "Sin talla";
   enBarra.classList.toggle("pendiente", !talla);
-  // Con una talla por revisar, la acción de compra no debe invitar a pulsarla:
-  // se puede elegir para consultarla, pero no es una compra.
+  // Con una talla por revisar, «Añadir al carrito» no debe invitar a pulsarlo: se puede elegir
+  // para consultarla, pero no es una compra.
   const porRevisar = estadoTalla(producto, variante, talla) === POR_REVISAR;
-  $$(".detalle-compra, .detalle-barra, [data-accion='pedir-ahora']", modalProducto())
+  $$(".detalle-compra, .detalle-barra", modalProducto())
     .forEach((nodo) => nodo.toggleAttribute("data-talla-por-revisar", porRevisar));
-  /* Apagarlas con color no basta. Un boton que parece pulsable y no hace nada deja al
+  /* Apagarlo con color no basta. Un boton que parece pulsable y no hace nada deja al
      cliente sin saber si fallo el o la tienda, y un lector de pantalla lo sigue
-     anunciando como disponible. Se marcan como inertes de verdad. No se usa `disabled`
+     anunciando como disponible. Se marca como inerte de verdad. No se usa `disabled`
      porque entonces el boton pierde el foco y la nota que lo explica nunca se lee. */
-  $$(".boton-comprar, [data-accion='pedir-ahora']", modalProducto()).forEach((nodo) => {
+  $$(".boton-comprar", modalProducto()).forEach((nodo) => {
     if (porRevisar) {
       nodo.setAttribute("aria-disabled", "true");
       nodo.setAttribute("aria-describedby", NOTA_POR_REVISAR);
@@ -1899,7 +2176,18 @@ function pintarTallaElegida(producto, variante) {
       nodo.removeAttribute("aria-describedby");
     }
   });
+  /* Un solo botón de WhatsApp que cambia con la talla (etapa 16.1): disponible = pedir este
+     par; por revisar = consultar esa talla (operativo: no es una compra). Sin talla, al
+     pulsarlo se pide elegirla. Se repinta también cuando una actualización cambia la
+     disponibilidad o la tienda pasa a modo consulta. */
+  const pedir = enDetalle("[data-accion='pedir-ahora']");
+  if (pedir) {
+    pedir.dataset.modo = porRevisar ? "consulta" : "pedido";
+    pedir.lastChild.textContent = porRevisar ? "Consultar esta talla por WhatsApp" : "Pedir este par por WhatsApp";
+    if (porRevisar) pedir.setAttribute("aria-describedby", NOTA_POR_REVISAR); else pedir.removeAttribute("aria-describedby");
+  }
   pintarNotaPorRevisar(porRevisar, talla);
+  actualizarRevisionEnvio();
   pintarEquivalencias(producto, talla);
 }
 
@@ -1918,7 +2206,7 @@ function pintarNotaPorRevisar(mostrar, talla) {
     nota.setAttribute("role", "note");
     acciones.after(nota);
   }
-  nota.textContent = `La talla EU ${talla} necesita confirmación: todavía no podemos venderla. Escríbenos y la comprobamos con el proveedor.`;
+  nota.textContent = `La talla EU ${talla} necesita confirmación: todavía no podemos venderla. Consúltala por WhatsApp y la comprobamos con el proveedor.`;
 }
 
 // Al elegir, el número se estampa en la etiqueta: confirma que la talla quedó impresa.
@@ -2287,17 +2575,34 @@ function confirmarAgregado() {
   }, 1500);
 }
 
-function pedirDesdeDetalle() {
+/* El botón de WhatsApp de la ficha. Talla por revisar: CONSULTA de esa talla, con el formato
+   de consulta de disponibilidad, sin datos de envío. Talla disponible: pedido de ESE par (no
+   del carrito), que exige datos de envío y una confirmación explícita en la ventana de envío. */
+function pedirDesdeDetalle(origen) {
   const actual = detalleActual();
   if (!actual) return;
   const { producto, variante } = actual;
-  // El mensaje de consulta para tallas por revisar se define y aprueba en la etapa 15.
-  if (estadoTalla(producto, variante, estado.detalle.talla) === POR_REVISAR) {
-    mostrarAvisoDetalle("Esta talla está por revisar. Escríbenos por WhatsApp para confirmar su disponibilidad.", "info");
+  const talla = estado.detalle.talla;
+  if (!talla || !tallaOfrecida(producto, variante, talla)) { pedirTalla(); return; }
+  if (!cantidadValida(estado.detalle.cantidad)) { mostrarAvisoDetalle(`Elige una cantidad entre 1 y ${CONFIG.cantidadMaxima}.`); return; }
+  const linea = { producto, variante, talla, cantidad: estado.detalle.cantidad };
+  if (estadoTalla(producto, variante, talla) === POR_REVISAR) { consultarDesdeDetalle(linea); return; }
+  if (!tallaValida(producto, variante, talla)) { pedirTalla(); return; }
+  abrirEnvio("directo", origen);
+}
+
+// Consultar no exige datos de envío, no toca existencias ni el carrito.
+async function consultarDesdeDetalle(linea) {
+  const mensaje = crearMensajeConsulta([linea]);
+  if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
+    if (abrirWhatsApp(mensaje)) mostrarAvisoDetalle("");
     return;
   }
-  if (!tallaValida(producto, variante, estado.detalle.talla)) { pedirTalla(); return; }
-  enviarPedidoWhatsApp([{ producto, variante, talla: estado.detalle.talla, cantidad: estado.detalle.cantidad }]);
+  const abierto = abrirWhatsApp(crearConsultaAlternativa([linea]));
+  const copiado = await copiarTexto(mensaje);
+  mostrarAvisoDetalle(copiado
+    ? "Copiamos la consulta completa. Pégala en el chat de WhatsApp que se abrió."
+    : (abierto ? "La consulta es larga y no pudimos copiarla. Escríbenos el modelo, el color y la talla en el chat." : "Abre WhatsApp y escríbenos el modelo, el color y la talla."), "info");
 }
 
 function alternarDescripcion(boton) {
@@ -2341,6 +2646,11 @@ function abrirDetalles(clave, origen) {
   // Foco inicial siempre en la ficha (no en «Cerrar», que mostraba su anillo al abrir con el
   // ratón). Con teclado, el primer Tab lleva a «Cerrar»; el lector anuncia «Detalles de…».
   const caja = $(".modal-caja", modalProducto());
+  /* 16.3: la ficha abre SIEMPRE desde arriba. .modal-caja es el contenedor que se desplaza y el
+     mismo diálogo se reutiliza entre productos: sin esto conservaba el desplazamiento de la ficha
+     anterior. Solo al abrir: cambiar de color, de talla o refrescar la disponibilidad dentro de una
+     ficha abierta no pasa por aquí y conserva la posición. El catálogo, detrás, no se mueve. */
+  caja.scrollTop = 0;
   caja.tabIndex = -1;
   caja.focus({ preventScroll: true });
   enDetalle(".galeria-pista").scrollLeft = 0;
@@ -2750,7 +3060,7 @@ function pintarResumenConfirmacion() {
 }
 
 function pintarProductoConfirmacion(anadido) {
-  const { foto: ruta, descripcionFoto, marca: nombreMarca, categoria, nombre, color, talla, anadida, enLinea, recortada } = anadido;
+  const { foto: ruta, descripcionFoto, marca: nombreMarca, categoria, nombre, color, referencia, talla, anadida, enLinea, recortada } = anadido;
   const foto = crearElemento("div", "confirmacion-foto");
   foto.append(crearImagenRuta(ruta, descripcionFoto, { perezosa: false }));
 
@@ -2759,7 +3069,7 @@ function pintarProductoConfirmacion(anadido) {
   const precio = crearElemento("p", "detalle-precio confirmacion-precio");
   pintarPrecio(precio, anadido);
   const identidad = crearElemento("div", "confirmacion-identidad");
-  identidad.append(marca, crearElemento("h3", "confirmacion-modelo", nombre), precio);
+  identidad.append(marca, crearElemento("h3", "confirmacion-modelo", nombre), crearElemento("p", "confirmacion-referencia", `Ref. ${referencia}`), precio);
 
   const datos = crearElemento("dl", "confirmacion-datos");
   [["Color", color, "color"], ["Talla EU", talla, "talla"], ["Cantidad", anadida, "cantidad"]].forEach(([rotulo, valor, tipo]) => {
@@ -2953,9 +3263,9 @@ function renderizarCarrito({ selectorFoco = "" } = {}) {
       : "El subtotal es estimado y no incluye envío. El vendedor confirmará precio final y disponibilidad.";
 
   const enviar = $("#carrito-enviar");
-  const copiar = $("#carrito-copiar");
   const consultar = botonConsultar();
   const sinPedido = comprables.length === 0;
+  const envio = datosEnvioValidos();
   /* Sin nada que pedir, «Unidades 0» y «Subtotal $0» junto a productos visibles
      confunden: esas dos filas se ocultan y la nota explica la situación.
      «Envío: Por confirmar» se queda, porque sigue siendo cierto. */
@@ -2964,21 +3274,14 @@ function renderizarCarrito({ selectorFoco = "" } = {}) {
     if (fila) fila.hidden = sinPedido;
   });
   enviar.dataset.sinPedido = String(sinPedido);
-  enviar.setAttribute("aria-disabled", String(sinPedido));
-  // Si no hay nada confirmado, no se ofrece ninguna acción de pedido normal.
+  // Sin datos de envío válidos y guardados, el pedido no se puede enviar (y la función que lo
+  // envía lo comprueba otra vez: el aspecto del botón no basta).
+  enviar.setAttribute("aria-disabled", String(sinPedido || !envio));
+  enviar.dataset.sinEnvio = String(!envio);
+  // Si no hay nada confirmado, no se ofrece ninguna acción de pedido normal ni se piden datos.
   enviar.hidden = sinPedido;
-  if (copiar) copiar.hidden = sinPedido;
-  if (sinPedido) {
-    enviar.removeAttribute("href");
-    enviar.dataset.largo = "false";
-    $("#carrito-respaldo").hidden = true;
-  } else {
-    const mensaje = crearMensajePedido(comprables);
-    const demasiadoLargo = enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp;
-    enviar.href = enlaceWhatsApp(demasiadoLargo ? crearMensajeAlternativo(comprables) : mensaje);
-    enviar.dataset.largo = String(demasiadoLargo);
-    $("#carrito-respaldo").hidden = !demasiadoLargo;
-  }
+  pintarEnvioCarrito(sinPedido ? null : envio, sinPedido);
+  sincronizarRespaldoCarrito(sinPedido ? null : pedidoCarritoActual());
   // CONSULTAR DISPONIBILIDAD: solo existe si hay algo por revisar, y solo lleva eso.
   consultar.hidden = porRevisar.length === 0;
   if (porRevisar.length) {
@@ -2994,8 +3297,8 @@ function renderizarCarrito({ selectorFoco = "" } = {}) {
   if (selectorFoco) $(selectorFoco, cuerpo)?.focus();
 }
 
-/* El pie del carrito viene de index.html, que no se modifica: la segunda acción se
-   crea aquí, una sola vez, justo antes de «Copiar pedido». */
+/* La acción de consulta se crea aquí, una sola vez, justo después de «Enviar pedido» (etapa
+   16.1: ya no hay «Copiar pedido»; el pie lleva los datos de envío). */
 function botonConsultar() {
   let boton = $("#carrito-consultar");
   if (boton) return boton;
@@ -3005,8 +3308,117 @@ function botonConsultar() {
   boton.rel = "noopener noreferrer";
   boton.hidden = true;
   boton.append(crearIcono("icono-whatsapp-solido"), document.createTextNode("Consultar disponibilidad"));
-  $("#carrito-copiar").before(boton);
+  $("#carrito-enviar").after(boton);
   return boton;
+}
+
+// Resumen, aviso y botón de los datos de envío en el pie del carrito.
+function pintarEnvioCarrito(envio, sinPedido) {
+  const bloque = $("#carrito-envio");
+  const aviso = $("#carrito-envio-aviso");
+  const boton = $("#carrito-datos");
+  if (!bloque || !aviso || !boton) return;
+  bloque.hidden = sinPedido || !envio;
+  aviso.hidden = sinPedido || Boolean(envio);
+  boton.hidden = sinPedido;
+  $(".carrito-datos-texto", boton).textContent = libreta.direcciones.length ? "Cambiar dirección de envío" : "Agregar datos de envío";
+  // Con direcciones guardadas pero ninguna elegida (por ejemplo, se eliminó la elegida) se pide
+  // elegir una: nunca se usa otra en su lugar.
+  aviso.lastChild.textContent = libreta.direcciones.length ? "Elige una dirección de envío para continuar." : "Completa tus datos de envío para continuar.";
+  if (envio) $("#carrito-envio-datos").replaceChildren(...filasDatosEnvio(envio));
+}
+
+function filasDatosEnvio(envio) {
+  return [["Nombre", envio.nombre], ["Teléfono", envio.telefono], ["Ciudad", envio.ciudad], ["Dirección", envio.direccion], ["Nota", envio.nota]]
+    .filter(([, valor]) => valor)
+    .map(([rotulo, valor]) => {
+      const fila = crearElemento("div");
+      fila.append(crearElemento("dt", "", rotulo), crearElemento("dd", "", valor));
+      return fila;
+    });
+}
+
+function ocultarRespaldoCarrito() {
+  const respaldo = $("#carrito-respaldo");
+  if (respaldo) respaldo.hidden = true;
+  const area = $("#carrito-mensaje-completo");
+  if (area) { area.hidden = true; area.value = ""; }
+}
+
+// El pedido del carrito tal como se enviaría AHORA, o null si no se puede pedir.
+function pedidoCarritoActual() {
+  const lineas = lineasComprables();
+  const envio = datosEnvioValidos();
+  if (!lineas.length || !envio) return null;
+  const mensaje = crearMensajePedido(lineas, envio);
+  return { lineas, envio, mensaje, largo: enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp };
+}
+
+// El respaldo nunca ofrece un texto viejo: si el mensaje completo está a la vista, se rehace
+// con el pedido y los datos de AHORA; si ya no hace falta (sin líneas, sin datos válidos o ya
+// no es largo), se oculta y se vacía. Largo o no se decide siempre con el mensaje actual.
+function sincronizarRespaldoCarrito(pedido) {
+  const area = $("#carrito-mensaje-completo");
+  if (!area) return;
+  const estabaVisible = !area.hidden;
+  if (!pedido?.largo) {
+    ocultarRespaldoCarrito();
+    if (estabaVisible && pedido) notificarCarrito("El pedido cambió. Revísalo y vuelve a enviarlo por WhatsApp.");
+    return;
+  }
+  $("#carrito-respaldo").hidden = false;
+  if (estabaVisible && area.value !== pedido.mensaje) {
+    area.value = pedido.mensaje;
+    notificarCarrito("El pedido cambió: actualizamos el mensaje completo de abajo.");
+  }
+}
+
+// Pedido largo: el chat se abre con lo esencial y el mensaje completo se copia. Si no se puede
+// copiar, se muestra entero para seleccionarlo: nunca se recorta en silencio.
+function mostrarMensajeCompleto(area, mensaje) {
+  area.value = mensaje;
+  area.hidden = false;
+  area.focus({ preventScroll: true });
+  area.select();
+  // El pie del carrito tiene desplazamiento propio: se lleva el mensaje a la vista.
+  area.scrollIntoView({ block: "nearest" });
+}
+
+async function enviarPedidoCarrito() {
+  const lineas = lineasComprables();
+  if (!lineas.length) {
+    notificarCarrito(lineasPorRevisar().length
+      ? "Todos los productos del carrito están por revisar. Consúltanos su disponibilidad antes de hacer el pedido."
+      : "Tu carrito está vacío. Añade al menos un producto.");
+    return;
+  }
+  const envio = datosEnvioValidos();
+  if (!envio) {
+    notificarCarrito(libreta.direcciones.length ? "Elige una dirección de envío para continuar." : "Completa tus datos de envío para continuar.");
+    $("#carrito-datos")?.focus();
+    return;
+  }
+  const mensaje = crearMensajePedido(lineas, envio);
+  if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
+    abrirWhatsApp(mensaje);
+    // No se vacía el carrito: abrir WhatsApp no confirma una compra.
+    return;
+  }
+  const abierto = abrirWhatsApp(crearMensajeAlternativo(lineas, envio));
+  const copiado = await copiarTexto(mensaje);
+  // Mientras se copiaba pudo cambiar el pedido o los datos: el mensaje de antes ya no se
+  // muestra ni se da por bueno; el respaldo ya quedó sincronizado con el pedido actual.
+  if (pedidoCarritoActual()?.mensaje !== mensaje) {
+    notificarCarrito("El pedido cambió mientras preparábamos el mensaje. Revísalo y vuelve a enviarlo por WhatsApp.");
+    return;
+  }
+  $("#carrito-respaldo").hidden = false;
+  if (copiado) {
+    notificarCarrito("El pedido es largo: copiamos el mensaje completo. Pégalo en el chat de WhatsApp que se abrió.");
+  } else {
+    mostrarMensajeCompleto($("#carrito-mensaje-completo"), mensaje);
+    notificarCarrito(abierto ? "No pudimos copiar automáticamente. Selecciona el mensaje completo de abajo y pégalo en WhatsApp." : "Copia el mensaje completo de abajo y pégalo en WhatsApp.");
+  }
 }
 
 async function abrirCarrito(origen) {
@@ -3043,17 +3455,455 @@ async function copiarTexto(texto) {
   }
 }
 
-// Pedido de un par desde el detalle. Si el enlace sería demasiado largo, se abre WhatsApp con el
-// mensaje alternativo y se copia el pedido completo (el mismo respaldo que usa el carrito).
-async function enviarPedidoWhatsApp(lineas) {
-  const mensaje = crearMensajePedido(lineas);
-  if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
-    abrirWhatsApp(mensaje);
+/* ---------- Ventana de datos de envío (etapas 16.1 y 16.2) ----------
+   La misma para el carrito y para «Pedir este par», con tres vistas: el gestor de direcciones
+   guardadas, el formulario (nueva dirección o editar una) y, desde la ficha, la revisión del par.
+   Guardar valida y guarda; NO abre WhatsApp. Cancelar (o Escape) no toca lo que estaba guardado.
+   Nunca se cambia de dirección en silencio: si falta la elegida, se pide elegir otra. */
+const ventanaEnvio = () => $("#datos-envio");
+let contextoEnvio = "carrito";
+let editandoDireccion = null;    // id de la dirección del formulario; null = dirección nueva
+let eliminandoDireccion = null;  // id con la confirmación de borrado a la vista
+
+const VISTAS_ENVIO = ["#envio-formulario", "#envio-libreta", "#envio-revision"];
+function mostrarVistaEnvio(selector) {
+  VISTAS_ENVIO.forEach((otra) => { const nodo = $(otra); if (nodo) nodo.hidden = otra !== selector; });
+}
+
+function abrirEnvio(contexto, origen) {
+  const dialogo = ventanaEnvio();
+  if (!dialogo) return;
+  contextoEnvio = contexto;
+  // Primero se abre: la revisión solo se pinta con la ventana abierta.
+  abrirDialogo(dialogo, origen);
+  if (contexto === "directo" && datosEnvioValidos()) {
+    mostrarRevisionEnvio();
+    $("#envio-revision-titulo")?.focus({ preventScroll: true });
     return;
   }
-  const abierto = abrirWhatsApp(crearMensajeAlternativo(lineas));
+  if (libreta.direcciones.length) {
+    mostrarGestorEnvio();
+    enfocarGestor();
+    return;
+  }
+  mostrarFormularioEnvio(null);
+  $("#envio-nombre")?.focus({ preventScroll: true });
+}
+
+function avisoFormularioEnvio(texto) {
+  const nodo = $("#envio-formulario-aviso");
+  if (!nodo) return;
+  nodo.textContent = texto || "";
+  nodo.hidden = !texto;
+}
+
+// Formulario de una dirección: la indicada (editar) o una nueva. Se rellena con lo GUARDADO: lo
+// que se escribió y se canceló no se conserva.
+function mostrarFormularioEnvio(id = null) {
+  const actual = id ? direccionPorId(id) : null;
+  editandoDireccion = actual ? actual.id : null;
+  CAMPOS_ENVIO.forEach(({ id: campo }) => {
+    $(`#envio-${campo}`).value = actual?.[campo] || "";
+    limpiarErrorEnvio(campo);
+  });
+  $("#envio-titulo").textContent = actual ? "Editar dirección de envío" : (libreta.direcciones.length ? "Nueva dirección de envío" : "Datos de envío");
+  $("#envio-guardar").textContent = actual ? "Guardar cambios" : (contextoEnvio === "directo" ? "Guardar y revisar el pedido" : "Guardar dirección");
+  avisoFormularioEnvio(libreta.aviso);
+  mostrarVistaEnvio("#envio-formulario");
+}
+
+function limpiarErrorEnvio(id) {
+  const campo = $(`#envio-${id}`);
+  const error = $(`#envio-${id}-error`);
+  campo?.removeAttribute("aria-invalid");
+  if (error) { error.textContent = ""; error.hidden = true; }
+}
+
+const notaSinGuardar = (guardada) => (guardada ? ""
+  : libreta.intacta ? " No la guardamos para no modificar las direcciones de una versión más nueva de la tienda: servirá durante esta visita."
+    : " Este navegador no nos deja guardarla: servirá durante esta visita, pero no se recordará.");
+
+// Mientras se guarda una dirección, otras pulsaciones (doble clic, Enter repetido) no hacen nada.
+let guardandoDireccion = false;
+
+async function guardarEnvio(evento) {
+  evento.preventDefault();
+  if (guardandoDireccion) return;
+  const bruto = Object.fromEntries(CAMPOS_ENVIO.map(({ id }) => [id, $(`#envio-${id}`).value]));
+  const { valido, datos, errores } = validarEnvio(bruto);
+  CAMPOS_ENVIO.forEach(({ id }) => {
+    limpiarErrorEnvio(id);
+    if (!errores[id]) return;
+    $(`#envio-${id}`).setAttribute("aria-invalid", "true");
+    const error = $(`#envio-${id}-error`);
+    error.textContent = errores[id];
+    error.hidden = false;
+  });
+  if (!valido) {
+    const primero = CAMPOS_ENVIO.find(({ id }) => errores[id]);
+    $(`#envio-${primero.id}`).focus();
+    return;
+  }
+  // Editar cambia SOLO esa dirección; añadir no toca las demás y elige la nueva. Ambas cosas se
+  // hacen sobre la última libreta guardada (otra pestaña pudo cambiarla).
+  const editadaId = editandoDireccion;
+  const idNueva = nuevoIdDireccion();
+  const guardar = $("#envio-guardar");
+  guardandoDireccion = true;
+  guardar.setAttribute("aria-busy", "true");
+  let r;
+  try {
+    r = await operarLibreta((base) => {
+      if (editadaId && base.direcciones.some((d) => d.id === editadaId)) {
+        return { direcciones: base.direcciones.map((d) => (d.id === editadaId ? congelarDireccion(d.id, datos) : d)), seleccionada: base.seleccionada, editada: true };
+      }
+      if (base.direcciones.length >= MAXIMO_DIRECCIONES) return { error: "llena" };
+      // Una edición de una dirección que otra pestaña eliminó se guarda como dirección nueva.
+      return { direcciones: [...base.direcciones, congelarDireccion(idNueva, datos)], seleccionada: idNueva, eliminadaEnOtra: Boolean(editadaId) };
+    });
+  } finally {
+    guardandoDireccion = false;
+    guardar.removeAttribute("aria-busy");
+  }
+  if (r.error === "llena") {
+    avisoFormularioEnvio(`Puedes guardar hasta ${MAXIMO_DIRECCIONES} direcciones. Elimina alguna para añadir otra.`);
+    return;
+  }
+  const nota = notaSinGuardar(r.guardada);
+  editandoDireccion = null;
+  // El resumen, el envío y los respaldos largos se rehacen con la dirección actual.
+  renderizarCarrito();
+  actualizarRevisionEnvio();
+  if (r.editada) {
+    mostrarGestorEnvio(`Dirección actualizada.${nota}`);
+    enfocarGestor(editadaId);
+    return;
+  }
+  const previa = r.eliminadaEnOtra ? " Esa dirección se había eliminado en otra pestaña: la guardamos como una dirección nueva." : "";
+  if (contextoEnvio === "directo") {
+    mostrarRevisionEnvio(`${previa}${nota}`.trim());
+    $("#envio-revision-titulo")?.focus({ preventScroll: true });
+    return;
+  }
+  cerrarDialogo(ventanaEnvio());
+  notificarCarrito(`Dirección guardada y elegida para el pedido. Revísala antes de enviarlo.${previa}${nota}`);
+}
+
+function cancelarFormularioEnvio() {
+  const editada = editandoDireccion;
+  editandoDireccion = null;
+  if (libreta.direcciones.length) {
+    mostrarGestorEnvio();
+    enfocarGestor(editada);
+  } else {
+    cerrarDialogo(ventanaEnvio());
+  }
+}
+
+// ---------- Gestor de direcciones guardadas
+function mostrarGestorEnvio(mensaje = "") {
+  eliminandoDireccion = null;
+  $("#envio-titulo").textContent = "Dirección de envío";
+  pintarGestorEnvio(mensaje);
+  mostrarVistaEnvio("#envio-libreta");
+}
+
+function avisoGestor(mensaje) {
+  const pedirEleccion = libreta.direcciones.length && !datosEnvioValidos() ? "Elige la dirección para el pedido antes de enviarlo." : "";
+  $("#envio-libreta-aviso").textContent = [mensaje || pedirEleccion, libreta.aviso].filter(Boolean).join(" ");
+}
+
+function pintarGestorEnvio(mensaje = "") {
+  const lista = $("#envio-direcciones");
+  if (!lista) return;
+  lista.replaceChildren(...(libreta.direcciones.length
+    ? libreta.direcciones.map(itemDireccion)
+    : [crearElemento("li", "envio-direcciones-vacia", "No hay direcciones guardadas en este navegador.")]));
+  avisoGestor(mensaje);
+  actualizarGestorSeleccion();
+  const nueva = $("#envio-nueva");
+  const llena = libreta.direcciones.length >= MAXIMO_DIRECCIONES;
+  nueva.setAttribute("aria-disabled", String(llena));
+  nueva.title = llena ? `Puedes guardar hasta ${MAXIMO_DIRECCIONES} direcciones.` : "";
+}
+
+// Sin repintar la lista (el foco sigue en la opción): marca la elegida y el botón de continuar.
+function actualizarGestorSeleccion() {
+  $$("#envio-direcciones .envio-direccion").forEach((item) => {
+    const elegida = item.dataset.direccion === libreta.seleccionada;
+    item.classList.toggle("es-seleccionada", elegida);
+    const radio = $("input[type='radio']", item);
+    if (radio) radio.checked = elegida;
+  });
+  const usar = $("#envio-usar");
+  if (usar) {
+    usar.textContent = contextoEnvio === "directo" ? "Revisar el pedido" : "Usar esta dirección";
+    usar.setAttribute("aria-disabled", String(!datosEnvioValidos()));
+  }
+}
+
+function itemDireccion(direccion) {
+  const item = crearElemento("li", "envio-direccion");
+  item.dataset.direccion = direccion.id;
+  const opcion = crearElemento("label", "envio-direccion-opcion");
+  const radio = document.createElement("input");
+  radio.type = "radio";
+  radio.name = "envio-direccion";
+  radio.value = direccion.id;
+  const texto = crearElemento("span", "envio-direccion-texto");
+  texto.append(crearElemento("strong", "", direccion.nombre),
+    crearElemento("span", "", `${direccion.direccion}, ${direccion.ciudad}`),
+    crearElemento("span", "", direccion.telefono));
+  if (direccion.nota) texto.append(crearElemento("span", "envio-direccion-nota", direccion.nota));
+  opcion.append(radio, texto);
+  const resumen = `${direccion.nombre}, ${direccion.direccion}, ${direccion.ciudad}`;
+  const editar = crearBoton("boton boton-texto envio-direccion-boton", "Editar", { envioEditarId: direccion.id });
+  editar.setAttribute("aria-label", `Editar la dirección: ${resumen}`);
+  const eliminar = crearBoton("boton boton-texto envio-direccion-boton", "Eliminar", { envioEliminar: direccion.id });
+  eliminar.setAttribute("aria-label", `Eliminar la dirección: ${resumen}`);
+  const acciones = crearElemento("div", "envio-direccion-acciones");
+  acciones.append(editar, eliminar);
+  item.append(opcion, acciones);
+  if (eliminandoDireccion === direccion.id) {
+    const confirmar = crearElemento("div", "envio-direccion-confirmar");
+    confirmar.setAttribute("role", "group");
+    confirmar.setAttribute("aria-label", `Confirmar: eliminar la dirección ${resumen}`);
+    confirmar.append(crearElemento("p", "", "¿Eliminar esta dirección de este navegador? No se puede deshacer."),
+      crearBoton("boton boton-secundario envio-direccion-boton", "Sí, eliminar", { envioConfirmarEliminar: direccion.id }),
+      crearBoton("boton boton-claro envio-direccion-boton", "Conservar", { envioConservar: direccion.id }));
+    item.append(confirmar);
+  }
+  return item;
+}
+
+function enfocarGestor(id = null) {
+  const objetivo = (id && $(`#envio-direcciones [data-direccion="${CSS.escape(id)}"] input`))
+    || $("#envio-direcciones input:checked") || $("#envio-direcciones input") || $("#envio-nueva");
+  objetivo?.focus({ preventScroll: true });
+}
+
+// ¿Cambió la lista (otra pestaña añadió o quitó algo)? Entonces hay que repintarla entera.
+const firmaDirecciones = () => libreta.direcciones.map((d) => JSON.stringify(d)).join("|");
+
+async function seleccionarDireccion(id) {
+  const antes = firmaDirecciones();
+  const r = await operarLibreta((base) => (base.direcciones.some((d) => d.id === id)
+    ? { direcciones: base.direcciones, seleccionada: id }
+    : { error: "no-existe" }));
+  renderizarCarrito();
+  actualizarRevisionEnvio();
+  if (r.error) {
+    pintarGestorEnvio("Esa dirección ya no está guardada: cambió en otra pestaña. Elige otra.");
+    enfocarGestor();
+    return;
+  }
+  const mensaje = r.guardada ? "Dirección elegida para el pedido." : "Dirección elegida para esta visita: este navegador no nos deja recordarla.";
+  if (firmaDirecciones() !== antes) { pintarGestorEnvio(mensaje); enfocarGestor(id); return; }
+  actualizarGestorSeleccion();
+  avisoGestor(mensaje);
+}
+
+async function eliminarDireccion(id) {
+  const r = await operarLibreta((base) => {
+    if (!base.direcciones.some((d) => d.id === id)) return { error: "no-existe" };
+    const eraLaElegida = base.seleccionada === id;
+    // Nunca se elige otra en silencio.
+    return { direcciones: base.direcciones.filter((d) => d.id !== id), seleccionada: eraLaElegida ? null : base.seleccionada, eraLaElegida };
+  });
+  eliminandoDireccion = null;
+  renderizarCarrito();
+  actualizarRevisionEnvio();
+  if (r.error) {
+    pintarGestorEnvio("Esa dirección ya se había eliminado en otra pestaña.");
+    enfocarGestor();
+    return;
+  }
+  const mensaje = !r.eraLaElegida ? "Dirección eliminada."
+    : libreta.direcciones.length ? "Eliminaste la dirección elegida. Elige otra antes de enviar el pedido."
+      : "Eliminaste la dirección. Añade una para poder enviar el pedido.";
+  pintarGestorEnvio(`${mensaje}${r.guardada ? "" : " El cambio vale solo para esta visita: este navegador no nos deja guardarlo."}`);
+  enfocarGestor();
+}
+
+function usarDireccionElegida() {
+  if (!datosEnvioValidos()) {
+    avisoGestor("Elige una dirección de la lista o añade una nueva.");
+    enfocarGestor();
+    return;
+  }
+  if (contextoEnvio === "directo") {
+    mostrarRevisionEnvio();
+    $("#envio-revision-titulo")?.focus({ preventScroll: true });
+    return;
+  }
+  cerrarDialogo(ventanaEnvio());
+  notificarCarrito("Usaremos esta dirección para el pedido. Revísala antes de enviarlo.");
+}
+
+// Otra pestaña cambió la libreta: se vuelve a leer y se actualizan selección, resumen, envío,
+// respaldos y lo que esté a la vista. No se escribe nada en respuesta.
+function alCambiarLibretaEnOtraPestana(evento) {
+  if (evento.storageArea !== localStorage || (evento.key !== CLAVE_DIRECCIONES && evento.key !== null)) return;
+  if (!libreta.persistente) return;   // esta pestaña trabaja solo en memoria
+  const editando = editandoDireccion;
+  leerLibreta();
+  renderizarCarrito();
+  actualizarRevisionEnvio();
+  const dialogo = ventanaEnvio();
+  if (!dialogo?.open) return;
+  if (!$("#envio-libreta").hidden) {
+    eliminandoDireccion = null;
+    pintarGestorEnvio("Tus direcciones cambiaron en otra pestaña.");
+  } else if (!$("#envio-formulario").hidden && editando && !direccionPorId(editando)) {
+    editandoDireccion = null;
+    $("#envio-titulo").textContent = "Nueva dirección de envío";
+    $("#envio-guardar").textContent = contextoEnvio === "directo" ? "Guardar y revisar el pedido" : "Guardar dirección";
+    avisoFormularioEnvio("Esta dirección se eliminó en otra pestaña. Si guardas, se añadirá como una dirección nueva.");
+  } else if (!$("#envio-revision").hidden && !datosEnvioValidos()) {
+    $("#envio-aviso").textContent = "La dirección elegida ya no está disponible (cambió en otra pestaña). Elige una antes de enviar.";
+  }
+}
+
+// El par que se pediría AHORA desde la ficha, o null si ya no se puede pedir.
+function lineaDirecta() {
+  const actual = detalleActual();
+  if (!actual || !estado.detalle) return null;
+  const { producto, variante } = actual;
+  const talla = estado.detalle.talla;
+  if (!talla || !tallaValida(producto, variante, talla) || !cantidadValida(estado.detalle.cantidad)) return null;
+  return { producto, variante, talla, cantidad: estado.detalle.cantidad };
+}
+
+function mostrarRevisionEnvio(aviso = "") {
+  mostrarVistaEnvio("#envio-revision");
+  $("#envio-titulo").textContent = "Revisa tu pedido";
+  $("#envio-respaldo").hidden = true;
+  $("#envio-respaldo").value = "";
+  $("#envio-aviso").textContent = aviso;
+  actualizarRevisionEnvio();
+}
+
+// Se repinta con el estado actual (talla, cantidad, disponibilidad y datos guardados).
+function actualizarRevisionEnvio() {
+  const dialogo = ventanaEnvio();
+  if (!dialogo?.open || contextoEnvio !== "directo" || $("#envio-revision").hidden) return;
+  const linea = lineaDirecta();
+  const envio = datosEnvioValidos();
+  const par = $("#envio-revision-par");
+  if (linea) {
+    const { producto, variante, talla, cantidad } = linea;
+    const filas = [["Modelo", producto.nombre], ["Marca", producto.marca], ["Color", variante.color], ["Referencia", variante.referencia],
+      ["Talla EU", talla], ["Cantidad", String(cantidad)],
+      ["Precio unit.", formatearPrecio(variante.precio)], ["Subtotal", variante.precio > 0 ? pesos(variante.precio * cantidad) : "Precio por confirmar"]];
+    par.replaceChildren(...filas.map(([rotulo, valor]) => { const fila = crearElemento("div"); fila.append(crearElemento("dt", "", rotulo), crearElemento("dd", "", valor)); return fila; }));
+  } else {
+    par.replaceChildren(crearElemento("p", "envio-sin-par", "Esta talla ya no se puede pedir. Vuelve a la ficha y elige otra, o consúltala por WhatsApp."));
+  }
+  $("#envio-revision-datos").replaceChildren(...(envio ? filasDatosEnvio(envio) : []));
+  const enviar = $("#envio-enviar");
+  enviar.setAttribute("aria-disabled", String(!linea || !envio));
+  // Mismo criterio que en el carrito: el respaldo visible sigue al par y a los datos actuales
+  // (precio, referencia, disponibilidad); si ya no hay pedido largo posible, se retira.
+  const respaldo = $("#envio-respaldo");
+  if (respaldo.hidden) return;
+  const pedido = pedidoDirectoActual();
+  if (pedido?.largo) {
+    if (respaldo.value !== pedido.mensaje) {
+      respaldo.value = pedido.mensaje;
+      $("#envio-aviso").textContent = "El pedido cambió: actualizamos el mensaje completo de abajo.";
+    }
+    return;
+  }
+  respaldo.hidden = true;
+  respaldo.value = "";
+  $("#envio-aviso").textContent = pedido ? "El pedido cambió. Revísalo y vuelve a enviarlo por WhatsApp." : "";
+}
+
+// El par de la ficha tal como se pediría AHORA, o null si no se puede pedir.
+function pedidoDirectoActual() {
+  const linea = lineaDirecta();
+  const envio = datosEnvioValidos();
+  if (!linea || !envio) return null;
+  const mensaje = crearMensajePedido([linea], envio);
+  return { linea, envio, mensaje, largo: enlaceWhatsApp(mensaje).length > CONFIG.limiteEnlaceWhatsApp };
+}
+
+// Pedido de UN par: solo esa línea y su cantidad; no toca el carrito.
+async function enviarPedidoDirecto() {
+  const linea = lineaDirecta();
+  const envio = datosEnvioValidos();
+  const aviso = $("#envio-aviso");
+  if (!envio) {
+    // Sin dirección elegida no se envía ni se usa otra: se pide elegir (o añadir) una.
+    if (libreta.direcciones.length) { mostrarGestorEnvio("Elige la dirección para este pedido."); enfocarGestor(); }
+    else { mostrarFormularioEnvio(null); $("#envio-nombre").focus(); }
+    return;
+  }
+  if (!linea) { aviso.textContent = "Esta talla ya no se puede pedir. Vuelve a la ficha y elige otra."; actualizarRevisionEnvio(); return; }
+  const mensaje = crearMensajePedido([linea], envio);
+  if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
+    if (abrirWhatsApp(mensaje)) aviso.textContent = "Abrimos WhatsApp con tu pedido. Tu carrito no cambió.";
+    return;
+  }
+  const abierto = abrirWhatsApp(crearMensajeAlternativo([linea], envio));
   const copiado = await copiarTexto(mensaje);
-  mostrarAvisoDetalle(copiado ? "Copiamos el pedido completo. Pégalo en el chat de WhatsApp que se abrió." : (abierto ? "El pedido es largo. Cópialo desde el carrito y pégalo en WhatsApp." : "El pedido es largo. Ábrelo desde el carrito para copiarlo."), "info");
+  // Si mientras se copiaba cambió el par, los datos o se cerró la revisión, no se muestra
+  // ni se da por copiado el mensaje de antes.
+  if (pedidoDirectoActual()?.mensaje !== mensaje || !ventanaEnvio()?.open || contextoEnvio !== "directo" || $("#envio-revision").hidden) {
+    aviso.textContent = "El pedido cambió mientras preparábamos el mensaje. Revísalo y vuelve a enviarlo por WhatsApp.";
+    return;
+  }
+  if (copiado) {
+    aviso.textContent = "El pedido es largo: copiamos el mensaje completo. Pégalo en el chat de WhatsApp que se abrió.";
+  } else {
+    mostrarMensajeCompleto($("#envio-respaldo"), mensaje);
+    aviso.textContent = abierto ? "No pudimos copiar automáticamente. Selecciona el mensaje completo de abajo y pégalo en WhatsApp." : "Copia el mensaje completo de abajo y pégalo en WhatsApp.";
+  }
+}
+
+function iniciarEnvio() {
+  leerLibreta();
+  window.addEventListener("storage", alCambiarLibretaEnOtraPestana);
+  const dialogo = ventanaEnvio();
+  if (!dialogo) return;
+  $("#envio-formulario").addEventListener("submit", guardarEnvio);
+  CAMPOS_ENVIO.forEach(({ id }) => $(`#envio-${id}`)?.addEventListener("input", () => limpiarErrorEnvio(id)));
+  dialogo.addEventListener("click", (evento) => {
+    const objetivo = evento.target;
+    const con = (selector) => objetivo.closest(selector);
+    if (con("[data-envio-editar]")) { mostrarGestorEnvio(); enfocarGestor(); return; }
+    if (con("#envio-enviar")) { enviarPedidoDirecto(); return; }
+    if (con("#envio-usar")) { usarDireccionElegida(); return; }
+    if (con("[data-envio-cancelar]")) { cancelarFormularioEnvio(); return; }
+    if (con("[data-envio-nueva]")) {
+      if (libreta.direcciones.length >= MAXIMO_DIRECCIONES) { avisoGestor(`Puedes guardar hasta ${MAXIMO_DIRECCIONES} direcciones. Elimina alguna para añadir otra.`); return; }
+      mostrarFormularioEnvio(null);
+      $("#envio-nombre").focus();
+      return;
+    }
+    const editar = con("[data-envio-editar-id]");
+    if (editar) { mostrarFormularioEnvio(editar.dataset.envioEditarId); $("#envio-nombre").focus(); return; }
+    const eliminar = con("[data-envio-eliminar]");
+    if (eliminar) {
+      eliminandoDireccion = eliminar.dataset.envioEliminar;
+      pintarGestorEnvio("");
+      $(`[data-envio-confirmar-eliminar="${CSS.escape(eliminandoDireccion)}"]`)?.focus();
+      return;
+    }
+    const conservar = con("[data-envio-conservar]");
+    if (conservar) {
+      const id = conservar.dataset.envioConservar;
+      eliminandoDireccion = null;
+      pintarGestorEnvio("");
+      $(`[data-envio-eliminar="${CSS.escape(id)}"]`)?.focus();
+      return;
+    }
+    const confirmar = con("[data-envio-confirmar-eliminar]");
+    if (confirmar) eliminarDireccion(confirmar.dataset.envioConfirmarEliminar);
+  });
+  dialogo.addEventListener("change", (evento) => {
+    if (evento.target.name === "envio-direccion" && evento.target.checked) seleccionarDireccion(evento.target.value);
+  });
 }
 
 function iniciarCarrito() {
@@ -3086,22 +3936,23 @@ function iniciarCarrito() {
     if (evento.target.closest("[data-reintentar-carrito]")) { await cargarProductos(); renderizarCarrito(); }
   });
 
-  $("#carrito-enviar")?.addEventListener("click", async (evento) => {
+  $("#carrito-enviar")?.addEventListener("click", () => enviarPedidoCarrito());
+  $("#carrito-datos")?.addEventListener("click", (evento) => abrirEnvio("carrito", evento.currentTarget));
+  $("#carrito-copiar-completo")?.addEventListener("click", async () => {
     const lineas = lineasComprables();
-    if (!lineas.length) {
-      evento.preventDefault();
-      notificarCarrito(lineasPorRevisar().length
-        ? "Todos los productos del carrito están por revisar. Consúltanos su disponibilidad antes de hacer el pedido."
-        : "Tu carrito está vacío. Añade al menos un producto.");
+    const envio = datosEnvioValidos();
+    if (!lineas.length || !envio) { ocultarRespaldoCarrito(); return; }
+    const mensaje = crearMensajePedido(lineas, envio);
+    const copiado = await copiarTexto(mensaje);
+    if (pedidoCarritoActual()?.mensaje !== mensaje) {
+      notificarCarrito("El pedido cambió mientras lo copiábamos. Revísalo y vuelve a copiar el mensaje completo.");
       return;
     }
-    if (evento.currentTarget.dataset.largo === "true") {
-      evento.preventDefault();
-      const ventana = window.open(enlaceWhatsApp(crearMensajeAlternativo(lineas)), "_blank", "noopener,noreferrer");
-      const copiado = await copiarTexto(crearMensajePedido(lineas));
-      notificarCarrito(copiado ? "Copiamos el pedido completo. Pégalo en el chat de WhatsApp que se abrió." : (ventana ? "El pedido es largo. Usa «Copiar pedido» y pégalo en WhatsApp." : "El pedido es largo. Copia el detalle y abre WhatsApp manualmente."));
+    if (copiado) notificarCarrito("Mensaje completo copiado. Pégalo en el chat de WhatsApp.");
+    else {
+      mostrarMensajeCompleto($("#carrito-mensaje-completo"), mensaje);
+      notificarCarrito("No pudimos copiar automáticamente. Selecciona el mensaje completo de abajo y cópialo.");
     }
-    // No se vacía el carrito: abrir WhatsApp no confirma una compra.
   });
 
   // Consultar no confirma nada ni vacía el carrito: los productos siguen guardados.
@@ -3118,15 +3969,6 @@ function iniciarCarrito() {
       const copiado = await copiarTexto(crearMensajeConsulta(lineas));
       notificarCarrito(copiado ? "Copiamos la consulta completa. Pégala en el chat de WhatsApp que se abrió." : (ventana ? "La consulta es larga y no pudimos copiarla. Inténtalo con menos productos." : "La consulta es larga. Abre WhatsApp manualmente y vuelve a intentarlo."));
     }
-  });
-
-  $("#carrito-copiar")?.addEventListener("click", async () => {
-    const lineas = lineasComprables();
-    if (!lineas.length) return notificarCarrito(lineasPorRevisar().length
-      ? "No hay productos confirmados que copiar: están todos por revisar."
-      : "Tu carrito está vacío.");
-    const copiado = await copiarTexto(crearMensajePedido(lineas));
-    notificarCarrito(copiado ? "Pedido copiado. Ya puedes pegarlo en WhatsApp." : "No pudimos copiar automáticamente. Selecciona y copia el pedido de nuevo.");
   });
 
   // Otra pestaña cambió el carrito V3: se adopta su versión (el V2 ya no manda tras la migración).
@@ -3232,6 +4074,7 @@ function iniciarCatalogo() {
     if (filtro === "categoria") estado.categoria = valor;
     if (filtro === "talla") estado.talla = desdePortada && estado.talla === valor ? TODOS : valor;
     if (filtro === "nuevos") estado.soloNuevos = !estado.soloNuevos;
+    if (filtro === "publico") estado.publico = valor === "hombre" || valor === "dama" ? valor : TODOS;
     renderizarCatalogo();
     // En escritorio cada panel es de selección única: se cierra y el foco vuelve a su campo.
     const desplegable = boton.closest("[data-desplegable]");
@@ -3250,7 +4093,7 @@ function iniciarCatalogo() {
       if ($("#buscar")) $("#buscar").value = "";
     }
     if (tipo === "nuevos") estado.soloNuevos = false;
-    if (tipo === "marca" || tipo === "categoria" || tipo === "talla") estado[tipo] = TODOS;
+    if (tipo === "marca" || tipo === "categoria" || tipo === "talla" || tipo === "publico") estado[tipo] = TODOS;
     renderizarCatalogo();
     const restantes = $$("#filtros-activos [data-quitar]");
     (restantes[Math.min(indice, restantes.length - 1)] || $("#titulo-catalogo"))?.focus({ preventScroll: true });
@@ -3304,7 +4147,7 @@ function iniciarCatalogo() {
     if (evento.target.closest("[data-tabla-completa]")) { alternarTablaCompleta(); return; }
     const tipo = evento.target.closest("[data-accion]")?.dataset.accion;
     if (tipo === "agregar") agregarDesdeDetalle();
-    if (tipo === "pedir-ahora") pedirDesdeDetalle();
+    if (tipo === "pedir-ahora") pedirDesdeDetalle(evento.target.closest("[data-accion]"));
   });
   // Si cambia el ancho, la galería se recoloca en la foto actual.
   window.addEventListener("resize", () => {
@@ -3500,6 +4343,7 @@ function iniciar() {
   iniciarDesplegables();
   iniciarCarrito();
   iniciarConfirmacion();
+  iniciarEnvio();
   iniciarGuia();
   cargarProductos();
 }

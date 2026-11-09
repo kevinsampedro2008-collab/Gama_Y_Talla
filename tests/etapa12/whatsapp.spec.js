@@ -1,6 +1,6 @@
 // Etapa 12 · Mensajes de WhatsApp: los esperados se escriben a mano, sin usar el código de la tienda.
 import { test, expect } from '@playwright/test';
-import { CELULAR, ESCRITORIO, URL_PRUEBA, enTienda, abrirDetalle } from '../etapa9/ayudas.js';
+import { CELULAR, ESCRITORIO, URL_PRUEBA, enTienda, abrirDetalle, DATOS_ENVIO, lineasDatosEnvio, enviarDesdeCarrito, pedirParDesdeFicha, guardarDatosEnvio } from '../etapa9/ayudas.js';
 import { anadirDesdeFicha, ventanaDe, volverAlCatalogo, textoDe, cifras, CLAVE_CARRITO, NUMERO } from './ayudas-etapa12.js';
 
 const ENCABEZADO = '*GAMA & TALLA — NUEVO PEDIDO*';
@@ -10,9 +10,9 @@ const DESPEDIDA = 'Quedo a la espera de confirmación. ¡Gracias!';
 const entrada = (n, nombre, marca, color, referencia, talla, cantidad, unitario, subtotal) => [
   `${n}. ${nombre}`, `* Marca: ${marca}`, `* Color: ${color}`, `* Referencia: ${referencia}`, `* Talla EU: ${talla}`, `* Cantidad: ${cantidad}`, `* Precio unit.: ${unitario}`, `* Subtotal: ${subtotal}`,
 ].join('\n');
-// Una línea vacía separa cada producto del siguiente y del separador del total.
-const pedido = (entradas, total, nota = '') => [
-  ENCABEZADO, SEPARADOR, '', ...(nota ? [nota, ''] : []), entradas.join('\n\n'), '', SEPARADOR, `💰TOTAL: ${total}`, '🚚 Envío: Por confirmar.', '', DESPEDIDA,
+// Una línea vacía separa cada producto del siguiente y del bloque de datos de envío (16.1).
+const pedido = (entradas, total, nota = '', datos = DATOS_ENVIO) => [
+  ENCABEZADO, SEPARADOR, '', ...(nota ? [nota, ''] : []), entradas.join('\n\n'), '', ...lineasDatosEnvio(datos), SEPARADOR, `💰TOTAL: ${total}`, '🚚 Envío: Por confirmar.', '', DESPEDIDA,
 ].join('\n');
 
 const NOTA_PRUEBA = 'Nota: pedido de prueba con productos ficticios.';
@@ -20,7 +20,7 @@ const NOTA_PRUEBA = 'Nota: pedido de prueba con productos ficticios.';
 function comprobarFormato(mensaje) {
   expect(mensaje).not.toContain('�');
   expect(mensaje).not.toMatch(/undefined|null|NaN|\[object/);
-  expect(mensaje, 'sin campos vacíos').not.toMatch(/^[ *]*[^:\n]+:\s*$/m);
+  expect(mensaje.replace('\nMis datos:\n', '\n'), 'sin campos vacíos').not.toMatch(/^[ *]*[^:\n]+:\s*$/m);
   for (const antiguo of ['Hola, quiero', '¿Me confirmas', 'Resumen del pedido', 'Producto 1', 'Total de unidades', 'Subtotal estimado', 'Precio unitario', 'Talla: EU', 'COP', 'Modelo:', '📦', 'PEDIDO GAMA', '*TOTAL', '   Marca']) {
     expect(mensaje, `sin el formato anterior: ${antiguo}`).not.toContain(antiguo);
   }
@@ -30,11 +30,14 @@ function comprobarFormato(mensaje) {
   expect(lineas[2]).toBe('');
   expect(lineas.at(-1)).toBe(DESPEDIDA);
   expect(lineas.at(-2), 'línea vacía antes de la despedida').toBe('');
-  expect(lineas.filter((l) => l === SEPARADOR), 'un separador al inicio y otro antes del total').toHaveLength(2);
+  expect(lineas.filter((l) => l === SEPARADOR), 'separadores: inicio, datos de envío y total').toHaveLength(3);
   const final = lineas.lastIndexOf(SEPARADOR);
   expect(lineas[final + 1], 'total justo bajo el separador').toMatch(/^💰TOTAL: (\$[\d.]+|Por confirmar)$/);
   expect(lineas[final + 2], 'envío justo bajo el total').toBe('🚚 Envío: Por confirmar.');
-  expect(lineas[final - 1], 'línea vacía tras el último producto').toBe('');
+  const datos = lineas.indexOf('Mis datos:');
+  expect(lineas[datos - 1], 'separador sobre los datos de envío').toBe(SEPARADOR);
+  expect(lineas[datos - 2], 'línea vacía tras el último producto').toBe('');
+  for (const rotulo of ['Nombre', 'Teléfono', 'Ciudad', 'Dirección']) expect(mensaje).toMatch(new RegExp(`^${rotulo}: \\S`, 'm'));
   // Cada producto: número y modelo, y siete campos seguidos que empiezan por «* ».
   const rotulos = ['Marca', 'Color', 'Referencia', 'Talla EU', 'Cantidad', 'Precio unit.', 'Subtotal'];
   const numeradas = lineas.map((l, i) => [l, i]).filter(([l]) => /^\d+\. \S/.test(l));
@@ -61,7 +64,8 @@ function comprobarEnlace(url, { conSeparador = true } = {}) {
   expect(url, 'asteriscos del encabezado conservados').toMatch(/^[^?]+\?[^#]*text=(\*|%2A)GAMA/);
 }
 
-const hrefCarrito = (pagina) => pagina.locator('#carrito-enviar').getAttribute('href');
+// Etapa 16.1: el envío ya no es un enlace preparado de antemano; se arma al pulsar, con datos de envío.
+const hrefCarrito = (pagina) => enviarDesdeCarrito(pagina);
 const anadirPorCodigo = (pagina, nombre, talla, cantidad = 1, variante = null) => pagina.evaluate(({ nombre, talla, cantidad, variante }) => {
   const p = estado.productos.find((x) => x.nombre === nombre);
   agregarAlCarrito(p.clave, variante || p.variantes[0].id, talla, cantidad);
@@ -78,10 +82,7 @@ test.describe('Desde el detalle: «Pedir este par»', () => {
       const dialogo = await abrirDetalle(pagina, 'SAMBA');
       await dialogo.locator('.talla[data-talla="40"]').tap();
       await dialogo.locator('.detalle-compra [data-cantidad-detalle][data-paso="1"]').tap();
-      const pedir = dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' });
-      await pedir.scrollIntoViewIfNeeded();
-      await pedir.tap();
-      const [url] = await pagina.evaluate(() => window.__abiertas);
+      const url = await pedirParDesdeFicha(pagina, dialogo, { tocar: true });
       comprobarEnlace(url);
       const mensaje = textoDe(url);
       expect(mensaje).toBe(pedido([entrada(1, 'SAMBA', 'Adidas', 'Rosa / blanco / beigh', 'ADD-SAM', '40', 2, '$120.000', '$240.000')], '$240.000'));
@@ -97,10 +98,7 @@ test.describe('Desde el detalle: «Pedir este par»', () => {
       const dialogo = await abrirDetalle(pagina, 'tres colores');
       await dialogo.locator('[data-variante="PRUEBA-TRES-NB"]').click();
       await dialogo.locator('.talla[data-talla="41"]').click();
-      const pedir = dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' });
-      await pedir.scrollIntoViewIfNeeded();
-      await pedir.click();
-      const [url] = await pagina.evaluate(() => window.__abiertas);
+      const url = await pedirParDesdeFicha(pagina, dialogo);
       expect(textoDe(url)).toBe(pedido([entrada(1, 'MODELO DE PRUEBA · TRES COLORES', 'Marca de prueba', 'Negro / blanco', 'PRUEBA-TRES-NB', '41', 1, '$320.000', '$320.000')], '$320.000', NOTA_PRUEBA));
     }, { url: URL_PRUEBA, reducido: true });
   });
@@ -121,11 +119,7 @@ test.describe('Desde el detalle: «Pedir este par»', () => {
       await anadirPorCodigo(pagina, 'LCS Retro Classic', '38', 3);
       const dialogo = await abrirDetalle(pagina, 'SAMBA');
       await dialogo.locator('.talla[data-talla="41"]').click();
-      const pedir = dialogo.getByRole('button', { name: 'Pedir este par por WhatsApp' });
-      await pedir.scrollIntoViewIfNeeded();
-      await pedir.click();
-      const [url] = await pagina.evaluate(() => window.__abiertas);
-      const mensaje = textoDe(url);
+      const mensaje = textoDe(await pedirParDesdeFicha(pagina, dialogo));
       expect(mensaje).not.toContain('LCS Retro Classic');
       expect(mensaje).toContain('💰TOTAL: $120.000');
     }, { reducido: true });
@@ -164,6 +158,12 @@ test.describe('Desde el carrito: «Enviar pedido»', () => {
         '* Precio unit.: $120.000',
         '* Subtotal: $120.000',
         '',
+        '─────────────────',
+        'Mis datos:',
+        'Nombre: Camila Rodríguez',
+        'Teléfono: 300 123 4567',
+        'Ciudad: Barranquilla',
+        'Dirección: Calle 84 # 51B-20, apto 302',
         '─────────────────',
         '💰TOTAL: $240.000',
         '🚚 Envío: Por confirmar.',
@@ -221,21 +221,21 @@ test.describe('Desde el carrito: «Enviar pedido»', () => {
       await abrirCarritoDesdeCabecera(pagina);
       const carrito = pagina.locator('#carrito');
       await carrito.locator('.linea').first().getByRole('button', { name: 'Aumentar cantidad' }).click();
-      await expect.poll(async () => textoDe(await hrefCarrito(pagina))).toContain('💰TOTAL: $360.000');
+      expect(textoDe(await hrefCarrito(pagina))).toContain('💰TOTAL: $360.000');
       await carrito.locator('.linea').nth(1).locator('[data-eliminar]').click();
-      await expect.poll(async () => textoDe(await hrefCarrito(pagina))).toContain('💰TOTAL: $240.000');
-      expect(textoDe(await hrefCarrito(pagina))).not.toContain('LCS Retro Classic');
+      const final = textoDe(await hrefCarrito(pagina));
+      expect(final).toContain('💰TOTAL: $240.000');
+      expect(final).not.toContain('LCS Retro Classic');
     }, { reducido: true });
   });
 
-  test('«Copiar pedido» copia exactamente el mismo mensaje', async ({ browser, browserName }) => {
+  test('sin «Copiar pedido» como acción principal: el pie pide los datos de envío', async ({ browser, browserName }) => {
     await enTienda({ browser, browserName }, ESCRITORIO, async (pagina) => {
-      await pagina.evaluate(() => { Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async (t) => { window.__copiado = t; } } }); });
       await anadirPorCodigo(pagina, 'SAMBA', '42');
       await abrirCarritoDesdeCabecera(pagina);
-      await pagina.locator('#carrito-copiar').click();
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('Pedido copiado');
-      expect(await pagina.evaluate(() => window.__copiado)).toBe(textoDe(await hrefCarrito(pagina)));
+      await expect(pagina.locator('#carrito-copiar')).toHaveCount(0);
+      await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar datos de envío');
+      await expect(pagina.locator('#carrito-respaldo'), 'la copia del mensaje completo solo aparece con pedidos largos').toBeHidden();
     }, { reducido: true });
   });
 });
@@ -253,8 +253,8 @@ test.describe('Carrito con muchas líneas: límite de 3000 caracteres', () => {
       });
       expect(lineas).toBeGreaterThanOrEqual(10);
       await abrirCarritoDesdeCabecera(pagina);
-      const enviar = pagina.locator('#carrito-enviar');
-      await expect(enviar).toHaveAttribute('data-largo', 'true');
+      await pagina.locator('#carrito-datos').click();
+      await guardarDatosEnvio(pagina);
       await expect(pagina.locator('#carrito-respaldo')).toBeVisible();
       const url = await hrefCarrito(pagina);
       expect(url.length, 'el enlace respeta el límite').toBeLessThanOrEqual(3000);
@@ -263,17 +263,18 @@ test.describe('Carrito con muchas líneas: límite de 3000 caracteres', () => {
       expect(alternativo).toContain(`${unidades} artículos`);
       expect(cifras(alternativo.match(/💰TOTAL: (.+)/)[1])).toBe(total);
       expect(alternativo).toContain('Te envío el detalle completo en el siguiente mensaje.');
+      expect(alternativo, 'el resumen también lleva los datos de envío').toContain(lineasDatosEnvio().join('\n'));
       expect(alternativo).not.toContain('�');
 
-      await enviar.scrollIntoViewIfNeeded();
-      await enviar.click();
-      await expect(pagina.locator('#carrito-notificacion')).toContainText('Copiamos el pedido completo');
+      await expect(pagina.locator('#carrito-notificacion')).toContainText('copiamos el mensaje completo');
       const copiado = await pagina.evaluate(() => window.__copiado);
       comprobarFormato(copiado);
       expect(copiado.match(/^\d+\. \S/gm)).toHaveLength(lineas);
       expect(cifras(copiado.match(/💰TOTAL: (.+)/)[1])).toBe(total);
-      const [abierto] = await pagina.evaluate(() => window.__abiertas);
-      expect(abierto).toBe(url);
+      // «Copiar mensaje completo» copia exactamente el mismo mensaje.
+      await pagina.evaluate(() => { window.__copiado = ''; });
+      await pagina.locator('#carrito-copiar-completo').click();
+      expect(await pagina.evaluate(() => window.__copiado)).toBe(copiado);
     }, { reducido: true });
   });
 
@@ -281,13 +282,13 @@ test.describe('Carrito con muchas líneas: límite de 3000 caracteres', () => {
     await enTienda({ browser, browserName }, ESCRITORIO, async (pagina) => {
       await pagina.evaluate(() => {
         const candidatos = estado.productos.filter((p) => p.variantes[0].tallasDisponibles.length);
+        const envio = { nombre: 'Camila Rodríguez', telefono: '300 123 4567', ciudad: 'Barranquilla', direccion: 'Calle 84 # 51B-20, apto 302', nota: '' };
         for (const p of candidatos) {
           agregarAlCarrito(p.clave, p.variantes[0].id, p.variantes[0].tallasDisponibles[0], 1);
-          if (enlaceWhatsApp(crearMensajePedido(lineasCarrito())).length > CONFIG.limiteEnlaceWhatsApp) { estado.carrito.pop(); guardarCarrito(); break; }
+          if (enlaceWhatsApp(crearMensajePedido(lineasCarrito(), envio)).length > CONFIG.limiteEnlaceWhatsApp) { estado.carrito.pop(); guardarCarrito(); break; }
         }
       });
       await abrirCarritoDesdeCabecera(pagina);
-      await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('data-largo', 'false');
       const url = await hrefCarrito(pagina);
       expect(url.length).toBeLessThanOrEqual(3000);
       expect(textoDe(url).endsWith('Quedo a la espera de confirmación. ¡Gracias!')).toBe(true);
@@ -338,17 +339,28 @@ test.describe('Coincidencia entre ventana, carrito y mensaje', () => {
   }
 });
 
-test.describe('En vivo', () => {
-  test('api.whatsapp.com conserva el emoji hasta el enlace de WhatsApp Web', async ({ request }, info) => {
-    test.skip(info.project.name !== 'chromium', 'Comprueba un servicio externo: basta una ejecución.');
-    const texto = '*GAMA%20%26%20TALLA%20%E2%80%94%20NUEVO%20PEDIDO*%0A%E2%94%80%E2%94%80%0A%F0%9F%92%B0TOTAL%3A%20%24120.000%0A%F0%9F%9A%9A%20Env%C3%ADo%3A%20Por%20confirmar.';
-    const r = await request.get(`https://api.whatsapp.com/send?phone=573000000000&text=${texto}`, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36' } });
-    expect(r.ok()).toBe(true);
-    const html = await r.text();
-    const enlace = html.match(/web\.whatsapp\.com\/send[^"' <]*/)?.[0] ?? '';
-    expect(enlace, 'emoji 💰 intacto').toContain('%F0%9F%92%B0');
-    expect(enlace, 'emoji 🚚 intacto').toContain('%F0%9F%9A%9A');
-    expect(enlace, 'guion largo intacto').toContain('%E2%80%94');
-    expect(html).not.toContain('%EF%BF%BD');
+/* Etapa 16.2: esta batería es LOCAL y no pide nada a WhatsApp. La comprobación del servicio real
+ * (api.whatsapp.com) está aparte, en tests/externo/whatsapp-en-vivo.spec.js, y solo se ejecuta con
+ * GT_PRUEBAS_EXTERNAS=1. Lo que sigue es SIMULADO: comprueba cómo construye y codifica la tienda el
+ * enlace, no que el servicio real lo acepte. */
+test.describe('Enlace de WhatsApp (simulado, sin red externa)', () => {
+  test('el enlace conserva emojis, guion largo, Ñ y signos al codificar; no se pide nada a WhatsApp', async ({ browser, browserName }) => {
+    await enTienda({ browser, browserName }, CELULAR, async (pagina) => {
+      const externas = [];
+      pagina.on('request', (r) => { if (/whatsapp\.(com|net)/.test(r.url())) externas.push(r.url()); });
+      const mensaje = ['*GAMA & TALLA — NUEVO PEDIDO*', '─────────────────', '💰TOTAL: $120.000', '🚚 Envío: Por confirmar.', 'Ñandú «comillas» #2 & 50% + más'].join('\n');
+      const enlace = await pagina.evaluate((m) => enlaceWhatsApp(m), mensaje);
+      const url = new URL(enlace);
+      expect(url.origin + url.pathname).toBe('https://api.whatsapp.com/send');
+      expect(url.searchParams.get('phone')).toBe(NUMERO);
+      expect(url.searchParams.get('text'), 'decodificado, es exactamente el mensaje').toBe(mensaje);
+      const crudo = enlace.split('&text=')[1];
+      for (const parte of ['%F0%9F%92%B0', '%F0%9F%9A%9A', '%E2%80%94', '%C3%91', '%C2%AB', '%26', '%23', '%25', '%2B', '%0A']) expect(crudo).toContain(parte);
+      expect(crudo, 'sin caracteres de reemplazo').not.toContain('%EF%BF%BD');
+      expect(crudo, 'sin espacios ni saltos sin codificar').not.toMatch(/[\s&#]/);
+      // Usar la tienda (aquí, abrir una ficha) no pide nada a WhatsApp: window.open está simulado.
+      await abrirDetalle(pagina, 'SAMBA');
+      expect(externas, 'ninguna petición a WhatsApp desde la batería local').toEqual([]);
+    });
   });
 });

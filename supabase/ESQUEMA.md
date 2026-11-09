@@ -35,14 +35,61 @@ Por eso no hay tareas programadas que puedan quedarse dormidas.
 | Campo | Ejemplo | Regla |
 |---|---|---|
 | `productos.id` | UUID | Técnico, interno |
-| `productos.codigo_interno` | `GT-00001` | Único, legible, permanente. Lo asigna un disparador |
+| `productos.clave_catalogo` | `ADD-SAM~zapatilla-01` o el UUID | **Identidad pública inmutable** (16.2): el `id` de `catalogo_publico` y de las claves del carrito |
+| `productos.codigo_interno` | `GT-00001` | Código comercial **editable** (16.2), único, en mayúsculas. Vacío al crear = automático |
 | `productos.referencia_proveedor` | `GT-005` | **Puede repetirse.** Sin restricción de unicidad |
-| `variantes.codigo_variante` | `GT-00001-A` | Derivado del producto |
-| `productos.clave_legado` | `ADD-SAM~zapatilla-01` | Compatibilidad con carritos V3 guardados |
+| `variantes.clave_catalogo` | `unica` o el UUID | Identidad pública inmutable del color dentro del producto |
+| `variantes.codigo_variante` | `GT-00001-A` | Código comercial del color, **editable** y único. Es la referencia que ve el cliente |
+| `variantes.referencia_variante` | `ref-prov-1` | Referencia opcional del proveedor para el color. Informativa |
+| `productos.clave_legado` | `ADD-SAM~zapatilla-01` | Compatibilidad con carritos V3 guardados (se conserva) |
 | `tallas (variante_id, talla)` | — | Único. Nunca se borra: se desactiva (`DELETE` revocado desde 14f.2) |
 
 El `codigo_interno` lo asigna un disparador `SECURITY DEFINER`, no un valor por omisión,
 para que **ningún rol de aplicación necesite permiso sobre la secuencia**.
+
+### Códigos editables e identidad inmutable (migración `20261108030000`, etapa 16.2)
+
+- La tienda identifica productos y colores por `clave_catalogo`, no por el código comercial.
+  Para los registros anteriores a la migración es **exactamente** el identificador público que
+  tenían (`coalesce(clave_legado, codigo_interno)` y `coalesce(id_legado, codigo_variante)`, sin
+  pasar a mayúsculas), así que los carritos V3 guardados siguen reconociendo sus líneas aunque se
+  cambien los códigos. Para lo nuevo es el UUID de la fila. Un disparador la fija al insertar e
+  impide cambiarla (`PT422`).
+- `fn_admin_guardar_producto` acepta `codigo_interno` y `variantes[].codigo_variante` opcionales:
+  ausentes = no se cambian (clientes antiguos); vacíos al crear = automáticos; vacíos al editar =
+  error. Mayúsculas, sin espacios exteriores, 2–30 caracteres (zapatilla) y 2–40 (color), con
+  letras, números y `- _ . /`. Un duplicado se rechaza con `PT422` y dice quién usa el código.
+  Cambiar el de la zapatilla no renombra los de sus colores. La respuesta lleva
+  `codigos_editables: true`; el panel lo usa (y comprueba la columna `clave_catalogo`) para no
+  presentar como guardado un cambio de código que un servidor antiguo ignoraría.
+- Los generadores automáticos saltan cualquier código ya usado (también uno personalizado que
+  coincida con el siguiente `GT-`). Las secuencias no se reinician ni retroceden.
+- Modelo, marca, categoría y nombre del color se guardan en **mayúsculas** (disparadores
+  `fn_productos_antes_de_escribir` y `fn_variantes_antes_de_escribir`, invoker, sin `EXECUTE` para
+  nadie). La migración normalizó lo existente y subió la `version` de los productos afectados
+  (un mismo lote en el historial). Descripciones, referencias del proveedor y datos de clientes
+  no se tocan.
+- Renombrar no cambia existencias, estados, fechas ni vigencias de las tallas, ni las rutas de
+  las fotos (dependen de los UUID). El historial registra los códigos anteriores.
+- **Solo aplicada y probada en local.** Su aplicación remota queda pendiente de revisión.
+
+### Público y muestras de color (migración `20261108040000`, etapa 16.3)
+
+- `productos.publico`: `hombre`, `dama` o `null` (sin clasificar; la tienda lo muestra solo en
+  «Todos» y sin etiqueta). Es **independiente** de `segmento`, que sigue eligiendo la tabla de la
+  guía de tallas. La tienda lo rotula «Caballero» / «Dama».
+- `variantes.muestra_color`: `#rrggbb` en minúsculas o `null` (restricción en la tabla). Sin
+  muestra, la tienda resuelve nombres de un solo color con su paleta y usa un círculo neutro para
+  los compuestos o desconocidos; el nombre real del color se conserva siempre.
+- `catalogo_publico` añade `publico` al final de la fila y `muestra` dentro de cada color; los
+  identificadores y los campos existentes no cambian. `anon` solo tiene `SELECT` de las dos columnas.
+- `fn_admin_guardar_producto` (misma firma): `publico` y `variantes[].muestra_color` opcionales.
+  Ausentes = se conservan (clientes anteriores); `null` o vacío = sin clasificar / sin muestra; un
+  valor no válido se rechaza con `PT422`. La respuesta lleva `publico_y_muestras: true`. El panel
+  comprueba la columna `publico` y, con un esquema anterior, bloquea esas opciones y lo avisa.
+- Los productos existentes quedan sin clasificar y sin muestra. No toca existencias, vigencias,
+  fotos, códigos ni claves del carrito.
+- **Solo aplicada y probada en local.** Su aplicación remota queda pendiente de revisión.
 
 ## Formato de las tallas (migración `20261107030000`)
 
