@@ -396,7 +396,7 @@ test.describe('Recorrido: Inicio → Cómo comprar → Catálogo → Pagos → C
       expect(await pagina.locator('.menu-enlaces a').evaluateAll((a) => a.map((x) => x.getAttribute('href')))).toEqual(['#como-comprar', '#catalogo', '#pagos', '#contacto']);
       expect(await pagina.locator('.menu-enlaces a').allTextContents()).toEqual(['Cómo comprar', 'Catálogo', 'Pagos', 'Contacto']);
       expect(await pagina.locator('.seccion-numero').evaluateAll((n) => n.map((x) => x.textContent.trim()))).toEqual(['01Cómo comprar', '02Catálogo', '03Pagos', '04Contacto']);
-      expect(await pagina.locator('footer .pie-columna').first().locator('a').evaluateAll((a) => a.map((x) => x.getAttribute('href')))).toEqual(['#como-comprar', '#catalogo', '#pagos']);
+      expect(await pagina.locator('footer .pie-columna').first().locator('a').evaluateAll((a) => a.map((x) => x.getAttribute('href')))).toEqual(['#como-comprar', '#catalogo', '#pagos', 'privacidad/']);
       // Anclas conservadas.
       for (const id of ['inicio', 'como-comprar', 'catalogo']) await expect(pagina.locator(`#${id}`)).toHaveCount(1);
       // Fondo oscuro y ancho de contenido de la tienda; un título breve y cinco pasos numerados.

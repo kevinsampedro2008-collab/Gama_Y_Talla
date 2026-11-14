@@ -321,6 +321,7 @@
           <li><a href="#como-comprar">Cómo comprar</a></li>
           <li><a href="#catalogo">Catálogo</a></li>
           <li><a href="#pagos">Medios de pago</a></li>
+          <li><a href="privacidad/">Política de privacidad</a></li>
           <li><button class="boton-texto" type="button" data-abrir-guia aria-haspopup="dialog" aria-controls="guia-tallas">Guía de tallas</button></li>
         </ul>
       </nav>
@@ -366,7 +367,8 @@
               <button class="boton boton-secundario carrito-entrega-boton" id="carrito-datos" type="button"><span class="carrito-datos-texto">Agregar dirección</span></button>
             </div>
             <p class="carrito-envio-confirmacion" id="carrito-envio-confirmacion" role="status" hidden></p>
-            <section class="carrito-envio" id="carrito-envio" aria-label="Datos de envío" hidden>
+            <div class="carrito-autorizo" id="carrito-autorizo-fila" hidden><label class="casilla-autorizo"><input type="checkbox" autocomplete="off" id="carrito-autorizo"><span>Autorizo que Gama &amp; Talla trate mis datos para preparar este pedido, según la <a href="privacidad/" target="_blank" rel="noopener" data-privacidad="Volver al carrito">política de privacidad</a>. Al abrir WhatsApp, esos datos pasan a WhatsApp.</span></label></div>
+  <section class="carrito-envio" id="carrito-envio" aria-label="Datos de envío" hidden>
               <dl class="carrito-envio-datos" id="carrito-envio-datos"></dl>
             </section>
           </section>
@@ -397,7 +399,7 @@
         <button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar datos de envío"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button>
       </header>
       <form class="envio-formulario" id="envio-formulario" novalidate>
-        <p class="envio-intro">Los usamos solo para preparar tu mensaje de WhatsApp. Guardamos tus direcciones únicamente en este navegador, para tus próximos pedidos: puedes editarlas o eliminarlas cuando quieras. No se envían a nuestros servidores ni pasan a otros dispositivos, y se pierden si borras los datos de este navegador.</p>
+        <p class="envio-privacidad">Usaremos tus datos solo para preparar tu pedido por WhatsApp. <a href="privacidad/" target="_blank" rel="noopener" data-privacidad="Volver a datos de envío">Cómo usamos tus datos</a></p>
         <p class="envio-aviso envio-aviso-libreta" id="envio-formulario-aviso" role="status" aria-live="polite" hidden></p>
         <div class="envio-campo">
           <label for="envio-nombre">Nombre completo</label>
@@ -425,6 +427,11 @@
           <textarea id="envio-nota" name="nota" rows="2" maxlength="200" aria-describedby="envio-nota-error" placeholder="Ej.: portería, horario o punto de referencia"></textarea>
           <p class="envio-error" id="envio-nota-error" hidden></p>
         </div>
+        <p class="envio-aviso-datos" id="envio-aviso-datos">Tu dirección se guarda solo en este navegador y puedes eliminarla cuando quieras desde la libreta de direcciones. Al abrir WhatsApp se comparten los datos del envío con ese servicio para preparar el mensaje.</p>
+        <div class="envio-campo envio-autorizo">
+          <label class="casilla-autorizo"><input type="checkbox" autocomplete="off" id="envio-autorizo" aria-describedby="envio-autorizo-error"><span>Autorizo que Gama &amp; Talla trate mis datos para preparar este pedido, según la <a href="privacidad/" target="_blank" rel="noopener" data-privacidad="Volver a datos de envío">política de privacidad</a>. Al abrir WhatsApp, esos datos pasan a WhatsApp.</span></label>
+          <p class="envio-error" id="envio-autorizo-error" hidden></p>
+        </div>
         <div class="envio-acciones">
           <button class="boton boton-claro" type="button" data-envio-cancelar>Cancelar</button>
           <button class="boton boton-principal" id="envio-guardar" type="submit">Guardar dirección</button>
@@ -450,12 +457,25 @@
         <dl class="envio-lista" id="envio-revision-datos"></dl>
         <p class="envio-nota-envio">Solo se envía este par; tu carrito no cambia. El envío y el precio final se confirman por WhatsApp.</p>
         <p class="envio-aviso" id="envio-aviso" role="status" aria-live="polite"></p>
+        <div class="envio-autorizo-revision"><label class="casilla-autorizo"><input type="checkbox" autocomplete="off" id="envio-autorizo-revision"><span>Autorizo que Gama &amp; Talla trate mis datos para preparar este pedido, según la <a href="privacidad/" target="_blank" rel="noopener" data-privacidad="Volver al pedido">política de privacidad</a>. Al abrir WhatsApp, esos datos pasan a WhatsApp.</span></label></div>
         <textarea class="carrito-mensaje-completo" id="envio-respaldo" readonly rows="8" aria-label="Mensaje completo del pedido" hidden></textarea>
         <div class="envio-acciones">
           <button class="boton boton-claro" type="button" data-envio-editar>Cambiar dirección de envío</button>
           <button class="boton boton-whatsapp" id="envio-enviar" type="button"><svg class="icono" aria-hidden="true"><use href="#icono-whatsapp-solido"></use></svg>Enviar este par por WhatsApp</button>
         </div>
       </section>
+    </div>
+  </dialog>
+
+  <!-- Política de privacidad (17.7): el texto se lee de privacidad/ (fuente única) y se muestra encima del pedido. -->
+  <dialog class="modal modal-privacidad" id="dialogo-privacidad" aria-labelledby="privacidad-dialogo-titulo">
+    <div class="privacidad-dialogo">
+      <header class="envio-cabecera">
+        <div><p class="etiqueta-mono">Política de tratamiento de datos personales</p><h2 id="privacidad-dialogo-titulo" tabindex="-1">Política de privacidad</h2></div>
+        <button class="boton-cerrar" type="button" data-cerrar aria-label="Cerrar política de privacidad"><svg class="icono" aria-hidden="true"><use href="#icono-cerrar"></use></svg></button>
+      </header>
+      <div class="privacidad-dialogo-cuerpo privacidad-texto" id="privacidad-dialogo-cuerpo" aria-live="polite"></div>
+      <div class="privacidad-dialogo-pie"><button class="boton boton-principal" type="button" data-cerrar id="privacidad-dialogo-volver">Volver</button></div>
     </div>
   </dialog>
 

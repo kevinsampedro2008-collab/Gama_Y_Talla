@@ -42,8 +42,12 @@ const ultimoMensaje = (pagina) => pagina.evaluate(() => {
 });
 const abiertas = (pagina) => pagina.evaluate(() => window.__abiertas.length);
 
+// 17.6: la autorización nace desmarcada; guardar una dirección la exige.
+const guardarEnvio = async (p) => { await p.locator('#envio-autorizo').check(); await p.locator('#envio-guardar').click(); };
+
 async function rellenarEnvio(pagina, datos = DATOS) {
   for (const [campo, valor] of Object.entries(datos)) await pagina.locator(`#envio-${campo}`).fill(valor);
+  await pagina.locator('#envio-autorizo').check(); // 17.6: la autorización nace desmarcada y se pide para guardar
 }
 
 async function anadir(pagina, nombre, talla, cantidad = 1) {
@@ -186,7 +190,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       // Datos inválidos: errores junto al campo y foco en el primero.
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina, { nombre: '    ', telefono: 'abc 123', ciudad: ' ', direccion: '12', nota: '' });
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-nombre')).toBeFocused();
       await expect(pagina.locator('#envio-nombre')).toHaveAttribute('aria-invalid', 'true');
       await expect(pagina.locator('#envio-nombre-error')).toHaveText('Escribe tu nombre completo.');
@@ -194,7 +198,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       await expect(pagina.locator('#envio-ciudad-error')).toHaveText('Escribe la ciudad.');
       await expect(pagina.locator('#envio-direccion-error')).toContainText('dirección completa');
       await pagina.locator('#envio-telefono').fill('300 12');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-telefono-error')).toContainText('entre 7 y 15 dígitos');
       await pagina.keyboard.press('Escape');
       await expect(enviar).toHaveAttribute('aria-disabled', 'true');
@@ -202,7 +206,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       // Guardar: no abre WhatsApp; aparece el resumen y el botón cambia.
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
       expect(await abiertas(pagina)).toBe(0);
       // Etapa 17.1: la dirección es una fila breve con la ciudad; los datos completos están en el detalle plegado.
@@ -242,7 +246,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       await pagina.locator('#carrito-datos').click();
       await pagina.locator('#envio-direcciones').getByRole('button', { name: /^Editar la dirección/ }).click();
       await pagina.locator('#envio-nota').fill('   ');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-libreta-aviso')).toContainText('Dirección actualizada.');
       await pagina.keyboard.press('Escape');
       await pagina.locator('#carrito .linea [data-paso="1"]').first().click();
@@ -274,7 +278,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       expect(consulta).not.toContain('Mis datos');
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await pagina.locator('#carrito-enviar').click();
       const pedido = await ultimoMensaje(pagina);
       expect(pedido).toContain('* Talla EU: 40');
@@ -301,7 +305,7 @@ test.describe('Carrito: datos de envío obligatorios para el pedido', () => {
       await abrirCarrito(pagina);
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#carrito-respaldo')).toBeVisible();
       await expect(pagina.locator('#carrito-copiar-completo')).toBeVisible();
       await pagina.locator('#carrito-enviar').click();
@@ -357,7 +361,7 @@ async function pedidoLargoSinCopia(pagina) {
   await abrirCarrito(pagina);
   await pagina.locator('#carrito-datos').click();
   await rellenarEnvio(pagina);
-  await pagina.locator('#envio-guardar').click();
+  await guardarEnvio(pagina);
   await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
   await pagina.evaluate(() => {
     const envio = datosEnvioValidos();
@@ -404,7 +408,7 @@ test.describe('Respaldo del mensaje completo: siempre el pedido actual', () => {
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', true);
       await pagina.locator('#envio-direcciones').getByRole('button', { name: /^Editar la dirección/ }).click();
       await pagina.locator('#envio-direccion').fill('Carrera 50 # 70-15, casa 4');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-libreta-aviso')).toContainText('Dirección actualizada.');
       await pagina.keyboard.press('Escape');
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
@@ -464,7 +468,7 @@ test.describe('Respaldo del mensaje completo: siempre el pedido actual', () => {
       await ficha.locator('.talla[data-talla="40"]').click();
       await ficha.locator('[data-accion="pedir-ahora"]').click();
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-revision')).toBeVisible();
       await pagina.locator('#envio-enviar').click();
       const area = pagina.locator('#envio-respaldo');
@@ -494,7 +498,7 @@ test.describe('Respaldo del mensaje completo: siempre el pedido actual', () => {
       await pagina.locator('[data-envio-editar]').click();
       await pagina.locator('#envio-direcciones').getByRole('button', { name: /^Editar la dirección/ }).click();
       await pagina.locator('#envio-ciudad').fill('Santa Marta');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await pagina.locator('#envio-usar').click();
       await expect(pagina.locator('#envio-revision-datos')).toContainText('Santa Marta');
       sinMensajeAntiguo(await respaldoDirecto(pagina), conDatos);
@@ -526,7 +530,7 @@ test.describe('«Pedir este par» desde la ficha', () => {
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', true);
       await expect(pagina.locator('#envio-guardar')).toHaveText('Guardar y revisar el pedido');
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       // Guardar no envía: hay una acción explícita.
       expect(await abiertas(pagina)).toBe(0);
       await expect(pagina.locator('#envio-revision')).toBeVisible();
@@ -557,17 +561,18 @@ for (const vista of VISTAS) {
       await anadir(pagina, SAMBA, '40', 1);
       await abrirCarrito(pagina);
       await pagina.locator('#carrito-datos').click();
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await pagina.screenshot({ path: path.join(CAPTURAS, `envio-errores-${browserName}-${vista.nombre}.png`) });
       const medida = await pagina.evaluate(() => {
         const caja = document.querySelector('#datos-envio .envio');
         const r = caja.getBoundingClientRect();
-        const controles = [...caja.querySelectorAll('input, textarea, button')].filter((n) => n.offsetParent).map((n) => n.getBoundingClientRect());
+        // La casilla de autorización mide 20 px por diseño; su zona táctil es toda la etiqueta (≥ 40 px).
+        const controles = [...caja.querySelectorAll('input:not([type="checkbox"]), textarea, button, label.casilla-autorizo')].filter((n) => n.offsetParent).map((n) => n.getBoundingClientRect());
         return { dentro: r.left >= -1 && r.right <= innerWidth + 1, desborde: caja.scrollWidth - caja.clientWidth, pequeno: controles.filter((c) => c.height < 40).length };
       });
       expect(medida).toEqual({ dentro: true, desborde: 0, pequeno: 0 });
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       // Con datos válidos el botón de envío recupera su color (tras su transición).
       await pagina.mouse.move(1, 1);
       await expect.poll(() => pagina.locator('#carrito-enviar').evaluate((b) => getComputedStyle(b).backgroundColor)).toBe('rgb(15, 122, 65)');
@@ -632,7 +637,7 @@ async function anadirDireccion(pagina, datos) {
   if (await pagina.locator('#envio-libreta').isVisible()) await pagina.locator('#envio-nueva').click();
   await expect(pagina.locator('#envio-formulario')).toBeVisible();
   await rellenarEnvio(pagina, datos);
-  await pagina.locator('#envio-guardar').click();
+  await guardarEnvio(pagina);
   await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
 }
 
@@ -646,11 +651,11 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await expect(pagina.locator('#carrito-datos')).toHaveText('Agregar dirección');
       // Escribir no guarda nada: solo confirmar un formulario válido.
       await pagina.locator('#carrito-datos').click();
-      await expect(pagina.locator('#envio-formulario .envio-intro')).toContainText('únicamente en este navegador');
-      await expect(pagina.locator('#envio-formulario .envio-intro')).toContainText('editarlas o eliminarlas');
+      await expect(pagina.locator('#envio-formulario .envio-aviso-datos')).toContainText('solo en este navegador');
+      await expect(pagina.locator('#envio-formulario .envio-aviso-datos')).toContainText('eliminarla cuando quieras desde la libreta');
       await rellenarEnvio(pagina);
       expect(await libretaGuardada(pagina), 'nada se guarda mientras se escribe').toBeNull();
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
       await expect(pagina.locator('#carrito-datos')).toHaveText('Cambiar');
       await expect(pagina.locator('#carrito-envio-datos')).toContainText(DATOS.direccion);
@@ -715,7 +720,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       // Editar: solo esa dirección, con su mismo identificador; la otra intacta; la elegida no cambia.
       await enGestor(pagina, DATOS2.nombre).getByRole('button', { name: /^Editar la dirección/ }).click();
       await pagina.locator('#envio-direccion').fill('Carrera 5 # 10-20, casa 9');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-libreta-aviso')).toContainText('Dirección actualizada.');
       const despues = await libretaGuardada(pagina);
       expect(despues.direcciones[0]).toEqual(antes.direcciones[0]);
@@ -817,7 +822,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await pagina.locator('#carrito-datos').click();
       await expect(pagina.locator('#envio-formulario-aviso')).toContainText('No pudimos leer las direcciones guardadas');
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       // 16.3: guardar es asíncrono (bloqueo entre pestañas): se espera a que termine.
       await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
       expect((await libretaGuardada(pagina)).direcciones).toHaveLength(1);
@@ -847,7 +852,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await pagina.locator('#carrito-datos').click();
       await expect(pagina.locator('#envio-formulario-aviso')).toContainText('no reconoce; no las modificamos');
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('No la guardamos para no modificar las direcciones de una versión más nueva');
       await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
       expect(await pagina.evaluate((c) => localStorage.getItem(c), CLAVE_LIBRETA), 'el formato nuevo queda intacto').toBe(futuro);
@@ -864,7 +869,7 @@ test.describe('Libreta de direcciones (16.2)', () => {
       await abrirCarrito(pagina);
       await pagina.locator('#carrito-datos').click();
       await rellenarEnvio(pagina);
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#carrito-envio-confirmacion')).toContainText('Este navegador no nos deja guardarla: servirá durante esta visita, pero no se recordará.');
       await expect(pagina.locator('#carrito-enviar')).toHaveAttribute('aria-disabled', 'false');
       await pagina.locator('#carrito-enviar').click();
@@ -1120,7 +1125,7 @@ test.describe('Libreta: guardados solapados y datos dañados (16.3)', () => {
       await otra.locator('#carrito-datos').click();
       await enGestor(otra, DATOS2.nombre).getByRole('button', { name: /^Editar la dirección/ }).click();
       await otra.locator('#envio-direccion').fill('Carrera 5 # 10-20, casa 7');
-      await otra.locator('#envio-guardar').click();
+      await guardarEnvio(otra);
       await expect(otra.locator('#envio-libreta-aviso')).toContainText('Dirección actualizada.');
       guardada = await libretaGuardada(pagina);
       expect(guardada.direcciones.map((d) => d.direccion)).toEqual([DATOS.direccion, 'Carrera 5 # 10-20, casa 7', DATOS3.direccion]);
@@ -1182,6 +1187,11 @@ test.describe('Libreta: guardados solapados y datos dañados (16.3)', () => {
       // 16.3: elegir es una operación sobre la libreta guardada (asíncrona): se espera su aviso.
       await expect(pagina.locator('#envio-libreta-aviso')).toContainText('Dirección elegida');
       await pagina.locator('#envio-usar').click();
+      // 17.6: una dirección ya guardada, en una visita nueva, también exige la autorización antes de abrir WhatsApp.
+      await pagina.locator('#carrito-enviar').click();
+      expect(await abiertas(pagina)).toBe(0);
+      await expect(pagina.locator('#carrito-notificacion')).toContainText('Marca la autorización');
+      await pagina.locator('#carrito-autorizo').check();
       await pagina.locator('#carrito-enviar').click();
       const mensaje = await ultimoMensaje(pagina);
       expect(mensaje).toContain('Nombre: Elena Ríos');
@@ -1231,7 +1241,7 @@ test.describe('Libreta: escritura bloqueada durante la visita (cierre 16.3)', ()
       // Se edita y se elige la primera dirección temporal.
       await enGestor(pagina, DATOS2.nombre).getByRole('button', { name: /^Editar la dirección/ }).click();
       await pagina.locator('#envio-direccion').fill('Carrera 5 # 10-20, casa 11');
-      await pagina.locator('#envio-guardar').click();
+      await guardarEnvio(pagina);
       await expect(pagina.locator('#envio-libreta-aviso')).toContainText('Dirección actualizada.');
       await expect(pagina.locator('#envio-direcciones .envio-direccion')).toHaveCount(3);
       await enGestor(pagina, DATOS2.nombre).getByRole('radio').check();

@@ -231,6 +231,41 @@ npx playwright test tests/etapa17/publicacion.spec.js --workers=1
    **CNAME** para `www`). Cópialos en Hostinger → **Dominios → DNS / Nameservers → Administrar registros DNS**. Los cambios pueden tardar
    en propagarse; el certificado HTTPS se emite solo cuando el DNS apunta a Netlify.
 
+## Política de privacidad y autorización de datos (completar antes de publicar)
+
+La tienda incluye la página `/privacidad/` (`privacidad/index.html`), un texto en lenguaje sencillo que sigue los puntos mínimos del
+art. 2.2.2.25.3.1 del Decreto 1074 de 2015 y la Ley 1581 de 2012, y describe el flujo real: las direcciones se guardan solo en el
+navegador del cliente (`gama-talla-direcciones`) y, al abrir WhatsApp, el borrador con los datos pasa a WhatsApp (Meta); el mensaje no se
+envía hasta que el cliente lo envía. Está enlazada desde el pie de página y desde el formulario de datos de envío, el carrito y
+«Pedir este par». **Haz revisar el texto con quien asesore legalmente al negocio antes de publicarlo.**
+
+**Una sola fuente.** El texto vive solo en `privacidad/index.html`, dentro de `data-politica-texto`. Desde el carrito, los datos de envío
+y «Pedir este par», `app.js` lo lee de esa misma página y lo muestra en un diálogo encima del pedido (el pedido queda intacto debajo);
+el enlace conserva su `href` real a `/privacidad/` como respaldo. Si el texto no carga, el diálogo ofrece «Reintentar».
+
+**Autorización.** Hay una casilla *desmarcada por defecto* en tres puntos: (1) el formulario de envío, antes de guardar una dirección;
+(2) el carrito, antes de «Enviar pedido por WhatsApp»; (3) la revisión de «Pedir este par». En el carrito y la revisión nace desmarcada en
+cada visita, también cuando se usa una dirección que ya estaba guardada de visitas anteriores. Leer o cerrar la política nunca la marca.
+Consultar la disponibilidad de una talla no pide datos de envío ni autorización.
+
+**Estado del texto.** El apartado 1 («Quién es el responsable») está completo y la política indica su fecha de vigencia («Vigente desde
+el 14 de noviembre de 2026»); no quedan marcadores `[COMPLETAR: …]` ni aviso de borrador. El empaquetado sigue avisando si reaparece un
+marcador y, con `PRIVACIDAD_ESTRICTA=1`, se detiene.
+
+**Constancia de la autorización.** El mensaje de WhatsApp **no** lleva una línea de autorización ni acredita por sí mismo que el cliente
+la dio: la tienda solo exige la casilla (obligatoria, desmarcada en cada visita) antes de guardar la dirección o abrir WhatsApp, y no
+registra esa autorización en ningún servidor. Si el negocio necesita conservar una constancia (por ejemplo, pedir en el chat una
+confirmación expresa), es un mecanismo **pendiente de definir** con tu asesor; hoy no existe.
+
+- La tienda **no envía** los datos de envío a ningún servidor propio: Netlify y Supabase no los reciben ni los registran (lo comprueba
+  `tests/etapa17/privacidad.spec.js`). Evita añadir analítica o formularios que los capturen.
+- **Versiona la política.** Cuando cambies su texto, actualiza la versión y la fecha de vigencia en `privacidad/index.html`. Marca la
+  versión publicada en Git, por ejemplo
+  `git tag politica-privacidad-v1`, para poder reconstruir el texto exacto. Si el cambio afecta la finalidad, el aviso de la página
+  indica que se volverá a pedir autorización.
+- Para consultas y reclamos, lleva un registro con fecha de solicitud, tipo y respuesta, **sin** copiar los datos de envío.
+- Consulta con tu asesor si el negocio debe inscribir sus bases de datos en el Registro Nacional de Bases de Datos de la SIC.
+
 ## Lista antes de vender
 
 - [ ] Cambiar el número provisional de WhatsApp.

@@ -73,6 +73,7 @@ export const lineasDatosEnvio = (d = DATOS_ENVIO) => [
 export async function guardarDatosEnvio(pagina, datos = DATOS_ENVIO) {
   await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', true);
   for (const [campo, valor] of Object.entries(datos)) await pagina.locator(`#envio-${campo}`).fill(valor);
+  await pagina.locator('#envio-autorizo').check(); // 17.6: la autorización nace desmarcada y se pide para guardar
   await pagina.locator('#envio-guardar').click();
 }
 

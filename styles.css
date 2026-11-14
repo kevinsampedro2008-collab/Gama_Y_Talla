@@ -3500,9 +3500,22 @@
   .envio-revision h3:focus { outline: none; }
   .envio-intro, .envio-ayuda, .envio-nota-envio { font-size: var(--t-xs); line-height: 1.45; color: var(--tinta-2); }
   .envio-campo { display: grid; gap: 0.375rem; }
+  /* Autorización de datos (17.6): casilla nativa de 20 px a la izquierda del texto, desmarcada por defecto;
+     pulsar el texto la marca. El mismo estilo compacto en datos de envío, carrito y «Pedir este par». */
+  .envio-privacidad { font-size: var(--t-sm); line-height: 1.4; color: var(--tinta-2); }
+  .envio-privacidad a, .casilla-autorizo a, .envio-aviso-datos a { color: var(--tinta); font-weight: 600; text-decoration: underline; text-underline-offset: 0.2em; }
+  .envio-aviso-datos { font-size: var(--t-xs); line-height: 1.5; color: var(--tinta-2); }
+  .casilla-autorizo { display: flex; align-items: flex-start; gap: 0.625rem; min-height: 2.5rem; padding-block: 0.125rem; font-size: var(--t-sm); font-weight: 400; line-height: 1.4; cursor: pointer; }
+  .casilla-autorizo input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0.0625rem 0 0; accent-color: var(--tinta); }
+  .envio-autorizo input { scroll-margin-bottom: 11rem; }
+  .envio-autorizo .envio-error { margin-top: 0.125rem; }
+  .envio-formulario { padding-bottom: 0.5rem; }
+  .carrito-autorizo { padding-top: var(--e-2); border-top: 1px solid var(--linea); }
+  .carrito-autorizo .casilla-autorizo { font-size: var(--t-xs); }
+  .envio-autorizo-revision { margin-block: var(--e-3); }
   .envio-campo label { font-size: var(--t-sm); font-weight: 600; }
   .envio-opcional { font-weight: 400; color: var(--tinta-2); }
-  .envio-campo :is(input, textarea) {
+  .envio-campo :is(input:not([type="checkbox"]), textarea) {
     width: 100%;
     min-height: 3rem;
     padding: 0.625rem var(--e-3);
@@ -3514,7 +3527,7 @@
     font-size: 1rem;
   }
   .envio-campo textarea { min-height: 4.5rem; resize: vertical; }
-  .envio-campo :is(input, textarea):focus-visible { outline: 2px solid var(--foco); outline-offset: 0; border-color: var(--foco); }
+  .envio-campo :is(input:not([type="checkbox"]), textarea):focus-visible { outline: 2px solid var(--foco); outline-offset: 0; border-color: var(--foco); }
   .envio-campo [aria-invalid="true"] { border-color: var(--error); }
   .envio-error { font-size: var(--t-xs); font-weight: 600; color: var(--error); }
   .envio-aviso { font-size: var(--t-sm); font-weight: 500; }
@@ -3532,6 +3545,10 @@
     background: var(--superficie);
   }
   .envio-acciones .boton { min-width: 0; min-height: 3rem; white-space: normal; text-align: center; line-height: 1.2; }
+  /* Formulario: «Guardar dirección» (negro) un poco más ancho que «Cancelar» (borde claro), a la misma altura. */
+  .envio-formulario .envio-acciones { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr); align-items: stretch; }
+  .envio-formulario .envio-acciones .boton { height: 100%; }
+  .envio-formulario .envio-acciones .boton-claro { border-color: var(--linea-fuerte); }
   .envio-revision .envio-acciones, .envio-libreta .envio-acciones { margin-top: auto; }
   .envio-formulario[hidden], .envio-revision[hidden], .envio-libreta[hidden] { display: none; }
 
@@ -3583,13 +3600,45 @@
   }
   #envio-enviar[aria-disabled="true"] { background: var(--linea); color: var(--tinta-2); cursor: not-allowed; }
   #envio-enviar[aria-disabled="true"] .icono { color: var(--tinta-2); }
-  @media (max-width: 359px) { .envio-acciones { grid-template-columns: 1fr; } }
+  @media (max-width: 359px) { .envio-acciones, .envio-formulario .envio-acciones { grid-template-columns: 1fr; } }
   @media (min-width: 640px) {
     dialog.modal-envio { width: min(34rem, calc(100% - var(--e-6))); margin: auto; }
     .envio { max-height: calc(100dvh - var(--e-6)); border-radius: 10px; }
   }
   @media (prefers-reduced-motion: no-preference) {
     .modal-envio[open] .envio { animation: hoja-entrar 320ms var(--ease-drawer); }
+  }
+
+  /* Política de privacidad (17.7): texto compartido por /privacidad/ y por el diálogo de la tienda. */
+  .privacidad-texto { font-size: var(--t-sm); }
+  .privacidad-texto h2 { margin: 2rem 0 0.75rem; font-size: 1.25rem; line-height: 1.2; }
+  .privacidad-texto p, .privacidad-texto li { line-height: 1.6; }
+  .privacidad-texto p { margin: 0 0 1rem; }
+  .privacidad-texto ul, .privacidad-texto ol { margin: 0 0 1rem; padding-left: 1.25rem; }
+  .privacidad-texto ul { list-style: disc; }
+  .privacidad-texto ol { list-style: decimal; }
+  .privacidad-texto li { margin-bottom: 0.5rem; padding-left: 0.25rem; }
+  .privacidad-texto code { font-family: var(--fuente-mono); font-size: 0.875em; overflow-wrap: anywhere; }
+  .privacidad-texto .privacidad-datos { list-style: none; padding-left: 0; }
+  .privacidad-texto .privacidad-datos li { padding-left: 0; }
+  .privacidad-borrador { padding: 0.75rem 1rem; border-left: 3px solid var(--cobalto); border-radius: 4px; background: var(--papel); }
+  /* Marcadores a completar (solo el apartado 1): bien visibles para que no se publiquen sin llenar. */
+  .completar { padding: 0.05rem 0.25rem; border-radius: 3px; background: #fff3b0; color: var(--tinta); font-weight: 600; }
+  dialog.modal-privacidad { width: 100%; margin: auto 0 0; }
+  .modal-privacidad::backdrop { background: rgb(20 20 20 / 0.7); }
+  .privacidad-dialogo { display: flex; flex-direction: column; max-height: calc(100dvh - var(--e-6)); overflow: hidden; border-radius: 10px 10px 0 0; background: var(--superficie); }
+  .privacidad-dialogo .envio-cabecera h2 { font-size: var(--t-xl); }
+  .privacidad-dialogo-cuerpo { min-height: 8rem; overflow-y: auto; overscroll-behavior: contain; padding: var(--e-4) var(--e-4) 0; }
+  .privacidad-dialogo-cuerpo > :last-child { margin-bottom: var(--e-4); }
+  .privacidad-dialogo-estado { display: grid; gap: var(--e-3); justify-items: start; font-size: var(--t-sm); }
+  .privacidad-dialogo-pie { flex: none; padding: var(--e-3) var(--e-4) calc(var(--e-4) + env(safe-area-inset-bottom)); border-top: 1px solid var(--linea); background: var(--superficie); }
+  .privacidad-dialogo-pie .boton { width: 100%; }
+  @media (min-width: 640px) {
+    dialog.modal-privacidad { width: min(40rem, calc(100% - var(--e-6))); margin: auto; }
+    .privacidad-dialogo { max-height: calc(100dvh - var(--e-6)); border-radius: 10px; }
+  }
+  @media (prefers-reduced-motion: no-preference) {
+    .modal-privacidad[open] .privacidad-dialogo { animation: hoja-entrar 320ms var(--ease-drawer); }
   }
 
 }

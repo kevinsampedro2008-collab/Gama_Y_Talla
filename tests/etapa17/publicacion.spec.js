@@ -97,11 +97,21 @@ test.describe('Contenido de dist', () => {
       expect(todos.some((f) => f === prohibido || f.startsWith(`${prohibido}/`)), prohibido).toBe(false);
     }
     expect(todos.some((f) => /\.env/.test(f))).toBe(false);
-    for (const necesario of ['index.html', 'config.js', 'admin/index.html', 'admin/config.js', 'admin/vendor/supabase-js-2.118.0/supabase.js', 'data/guias-tallas.json', '_headers', '_redirects',
+    for (const necesario of ['index.html', 'config.js', 'admin/index.html', 'admin/config.js', 'admin/vendor/supabase-js-2.118.0/supabase.js', 'data/guias-tallas.json', 'privacidad/index.html', 'privacidad/privacidad.css', '_headers', '_redirects',
       'assets/vendor/three-0.165.0/build/three.module.min.js', 'assets/images/pagos/nequi-icono.png']) expect(todos, necesario).toContain(necesario);
     // Las fotos de ejemplo se limitan a las tres de la portada.
     expect(todos.filter((f) => /^assets\/images\/productos\/.+\.webp$/.test(f))).toHaveLength(3);
     expect(todos.some((f) => /af1-model\.glb$/.test(f)), 'el modelo original de 19 MB no se publica').toBe(false);
+  });
+
+  test('la política llega a dist completa: sin marcadores ni aviso de borrador', () => {
+    const html = fs.readFileSync(path.join(dist, 'privacidad/index.html'), 'utf8');
+    expect(html).toContain('data-politica-texto');
+    expect(html).not.toContain('[COMPLETAR');
+    expect(html).not.toContain('data-borrador');
+    expect(html).toContain('Vigente desde el');
+    expect(html).toContain('href="../?intro=no"');
+    for (const clave of ['Netlify', 'Supabase', 'Google Fonts', 'Vigente desde el 14 de noviembre de 2026']) expect(html, clave).toContain(clave);
   });
 
   test('config.js y admin/config.js tienen los objetos que usan la tienda y el panel', () => {
@@ -143,7 +153,7 @@ test.describe('Contenido de dist', () => {
 
   test('cambiar un recurso cambia su URL; con los mismos bytes la URL se conserva', () => {
     const copia = path.join(temporal, 'copia-fuente');
-    for (const d of ['assets', 'admin', 'data']) fs.cpSync(path.join(RAIZ, d), path.join(copia, d), { recursive: true, filter: (o) => !/af1-model\.glb$/.test(o) && !(/editadas[\\/]zapatilla_\d+\.webp$/.test(o) && !/zapatilla_(48|24|11)\.webp$/.test(o)) });
+    for (const d of ['assets', 'admin', 'data', 'privacidad']) fs.cpSync(path.join(RAIZ, d), path.join(copia, d), { recursive: true, filter: (o) => !/af1-model\.glb$/.test(o) && !(/editadas[\\/]zapatilla_\d+\.webp$/.test(o) && !/zapatilla_(48|24|11)\.webp$/.test(o)) });
     for (const f of ['index.html', 'styles.css', 'app.js', 'favicon.svg']) fs.cpSync(path.join(RAIZ, f), path.join(copia, f));
     fs.mkdirSync(path.join(copia, 'scripts')); fs.cpSync(SCRIPT, path.join(copia, 'scripts', 'preparar-publicacion.mjs'));
     const nombres = (d) => fs.readdirSync(path.join(d, 'assets/images'), { recursive: true }).map(String).filter((f) => /\.[0-9a-f]{10}\.(glb|webp)$/.test(f)).map((f) => f.split(path.sep).join('/')).sort();
@@ -229,6 +239,7 @@ for (const vista of [CELULAR, ESCRITORIO]) {
         await expect(pagina.locator('#carrito .linea')).toHaveCount(1);
         await pagina.locator('#carrito-datos').click();
         for (const [c, v] of Object.entries({ nombre: 'Camila Rodríguez', telefono: '300 123 4567', ciudad: 'Barranquilla', direccion: 'Calle 84 # 51B-20, apto 302', nota: '' })) await pagina.locator(`#envio-${c}`).fill(v);
+        await pagina.locator('#envio-autorizo').check();
         await pagina.locator('#envio-guardar').click();
         await expect(pagina.locator('#datos-envio')).toHaveJSProperty('open', false);
         await pagina.mouse.move(1, 1);
@@ -244,6 +255,20 @@ for (const vista of [CELULAR, ESCRITORIO]) {
         expect(texto, 'tus dos retoques: separador de 16 y encabezado en negrita').toMatch(/\n─{16}\n\*Mis datos:\*\n/);
         expect(texto).not.toMatch(/─{17}/);
         expect(texto).toContain('Dirección: Calle 84 # 51B-20, apto 302');
+        expect(texto).not.toContain('Autorización de datos');
+        // La política publicada se abre ENCIMA del carrito (mismo texto que /privacidad/) y el carrito sigue debajo.
+        await pagina.locator('#carrito-autorizo-fila a[data-privacidad]').click();
+        await expect(pagina.locator('#dialogo-privacidad')).toHaveJSProperty('open', true);
+        await expect(pagina.locator('#dialogo-privacidad #responsable')).toBeVisible();
+        await expect(pagina.locator('#privacidad-dialogo-volver')).toHaveText('Volver al carrito');
+        await pagina.locator('#privacidad-dialogo-volver').click();
+        await expect(pagina.locator('#carrito')).toHaveJSProperty('open', true);
+        await expect(pagina.locator('#carrito-autorizo')).toBeChecked();
+        // La política publicada abre desde el pie del paquete.
+        expect(problemas, 'sin errores de consola, de red ni 4xx del sitio').toEqual([]);
+        await pagina.locator('#carrito .boton-cerrar').click();
+        await pagina.locator('footer a[href="privacidad/"]').click();
+        await expect(pagina.getByRole('heading', { name: 'Política de privacidad', level: 1 })).toBeVisible();
         expect(problemas, 'sin errores de consola, de red ni 4xx del sitio').toEqual([]);
       } finally { await contexto.close(); }
     });

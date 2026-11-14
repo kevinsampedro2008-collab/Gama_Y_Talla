@@ -1,0 +1,8 @@
+/* Política de privacidad (página independiente). El estilo del TEXTO (.privacidad-texto) vive en ../styles.css
+ * porque lo comparte con el diálogo de la tienda; aquí solo lo propio de la página. */
+.pagina-privacidad { background: var(--superficie); color: var(--tinta); }
+.privacidad-cabecera { border-bottom: 1px solid var(--linea); background: var(--papel); }
+.privacidad-cabecera-fila { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 4rem; }
+.privacidad { max-width: 46rem; padding-block: 2.5rem 4rem; }
+.privacidad h1 { margin: 0.5rem 0 1.5rem; font-size: clamp(2rem, 1.4rem + 3vw, 3rem); }
+.privacidad-volver { margin-top: 2.5rem; }

@@ -272,6 +272,13 @@ function totalPedido(resumen) {
 // El total y el envío van juntos, sin línea vacía entre ellos.
 const cierreTotales = (resumen) => [SEPARADOR_PEDIDO, `💰TOTAL: ${totalPedido(resumen)}`, "🚚 Envío: Por confirmar."];
 
+/* Autorización de datos (etapa 17.6). Sin ella no se guarda una dirección ni se abre WhatsApp con los datos
+   de envío, tampoco al usar una dirección que ya estaba guardada. Las casillas nacen DESMARCADAS en cada
+   visita; marcarla al guardar una dirección vale para el resto de la visita. El mensaje de WhatsApp no
+   lleva línea de autorización y no se guarda nada en servidores. */
+const POLITICA_PRIVACIDAD = Object.freeze({ version: "v1", ruta: "privacidad/" });
+let autorizacionVisita = false;
+
 // Datos de envío ya validados (etapa 16.1). La nota solo aparece si se escribió.
 function bloqueDatosEnvio(envio) {
   if (!envio) return [];
@@ -1771,6 +1778,81 @@ function iniciarDialogos() {
       const origen = origenesFoco.get(dialogo);
       if (origen?.isConnected) origen.focus({ preventScroll: true });
     });
+  });
+}
+
+/* ---------- Política de privacidad encima del pedido (17.7) ----------
+   El texto vive UNA sola vez, en privacidad/index.html (bloque [data-politica-texto]); aquí se lee de esa
+   misma página y se muestra en un diálogo apilado sobre el carrito, los datos de envío o «Pedir este par».
+   Esos diálogos siguen debajo, intactos (campos, selección, casilla, desplazamiento). Abrirla o cerrarla
+   nunca marca la autorización. El enlace conserva su href real a /privacidad/ como respaldo. */
+let politicaNodos = null;
+
+async function cargarPolitica() {
+  if (politicaNodos) return politicaNodos;
+  const opciones = typeof AbortSignal !== "undefined" && AbortSignal.timeout ? { signal: AbortSignal.timeout(12000) } : {};
+  const respuesta = await fetch(POLITICA_PRIVACIDAD.ruta, opciones);
+  if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+  const documento = new DOMParser().parseFromString(await respuesta.text(), "text/html");
+  const texto = documento.querySelector("[data-politica-texto]");
+  if (!texto || !texto.childNodes.length) throw new Error("La página de la política no trae el texto");
+  politicaNodos = [...texto.childNodes].map((nodo) => document.importNode(nodo, true));
+  return politicaNodos;
+}
+
+async function pintarPolitica() {
+  const cuerpo = $("#privacidad-dialogo-cuerpo");
+  if (!cuerpo || cuerpo.dataset.listo === "1") return;
+  const estado = (texto, reintentar = false) => {
+    const caja = document.createElement("div");
+    caja.className = "privacidad-dialogo-estado";
+    caja.setAttribute("role", reintentar ? "alert" : "status");
+    const p = document.createElement("p");
+    p.textContent = texto;
+    caja.append(p);
+    if (reintentar) {
+      const boton = document.createElement("button");
+      boton.type = "button";
+      boton.className = "boton boton-secundario";
+      boton.dataset.politicaReintentar = "";
+      boton.textContent = "Reintentar";
+      caja.append(boton);
+    }
+    return caja;
+  };
+  cuerpo.replaceChildren(estado("Cargando la política…"));
+  try {
+    const nodos = await cargarPolitica();
+    cuerpo.replaceChildren(...nodos.map((nodo) => nodo.cloneNode(true)));
+    cuerpo.dataset.listo = "1";
+  } catch {
+    cuerpo.replaceChildren(estado("No pudimos cargar la política de privacidad. Tu pedido no cambió.", true));
+    cuerpo.querySelector("[data-politica-reintentar]")?.focus({ preventScroll: true });
+  }
+}
+
+function abrirPolitica(origen) {
+  const dialogo = $("#dialogo-privacidad");
+  if (!dialogo) return;
+  const volver = $("#privacidad-dialogo-volver");
+  if (volver) volver.textContent = origen.dataset.privacidad || "Volver";
+  abrirDialogo(dialogo, origen);
+  const cuerpo = $("#privacidad-dialogo-cuerpo");
+  if (cuerpo) cuerpo.scrollTop = 0;
+  $("#privacidad-dialogo-titulo")?.focus({ preventScroll: true });
+  pintarPolitica();
+}
+
+function iniciarPolitica() {
+  document.addEventListener("click", (evento) => {
+    const enlace = evento.target instanceof Element ? evento.target.closest("a[data-privacidad]") : null;
+    if (!enlace || evento.defaultPrevented || evento.button !== 0 || evento.metaKey || evento.ctrlKey || evento.shiftKey || evento.altKey) return;
+    if (!$("#dialogo-privacidad")) return;
+    evento.preventDefault(); // sin pestaña nueva, sin recargar, sin cambiar la URL
+    abrirPolitica(enlace);
+  });
+  $("#privacidad-dialogo-cuerpo")?.addEventListener("click", (evento) => {
+    if (evento.target instanceof Element && evento.target.closest("[data-politica-reintentar]")) pintarPolitica();
   });
 }
 
@@ -3374,6 +3456,8 @@ function pintarEnvioCarrito(envio, sinPedido) {
   $("#carrito-entrega-ciudad").textContent = envio ? envio.ciudad : hayGuardadas ? "Sin dirección elegida" : "Sin dirección";
   aviso.lastChild.textContent = hayGuardadas ? "Elige una dirección de envío para continuar." : "Completa tus datos de envío para continuar.";
   ver.hidden = !envio;
+  const filaAutorizo = $("#carrito-autorizo-fila");
+  if (filaAutorizo) { filaAutorizo.hidden = !envio; sincronizarAutorizacion(); }
   if (envio) {
     $("#carrito-envio-datos").replaceChildren(...filasDatosEnvio(envio));
     fijarDetalleEnvio(ver.getAttribute("aria-expanded") === "true");
@@ -3453,6 +3537,7 @@ async function enviarPedidoCarrito() {
     $("#carrito-datos")?.focus();
     return;
   }
+  if (!pedirAutorizacion($("#carrito-autorizo"), "Marca la autorización de datos para abrir WhatsApp con tu pedido.")) return;
   const mensaje = crearMensajePedido(lineas, envio);
   if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
     abrirWhatsApp(mensaje);
@@ -3558,6 +3643,23 @@ function avisoFormularioEnvio(texto) {
 
 // Formulario de una dirección: la indicada (editar) o una nueva. Se rellena con lo GUARDADO: lo
 // que se escribió y se canceló no se conserva.
+// Las casillas del carrito y de la revisión siguen a la autorización de la visita; la del formulario
+// siempre nace desmarcada. Marcar o desmarcar una cambia la autorización de la visita.
+function sincronizarAutorizacion() {
+  for (const id of ["#carrito-autorizo", "#envio-autorizo-revision"]) { const c = $(id); if (c) c.checked = autorizacionVisita; }
+}
+function fijarAutorizacion(valor) {
+  autorizacionVisita = Boolean(valor);
+  sincronizarAutorizacion();
+  if (autorizacionVisita) { const e = $("#envio-autorizo-error"); if (e) { e.textContent = ""; e.hidden = true; } }
+}
+function pedirAutorizacion(casilla, mensaje) {
+  if (autorizacionVisita) return true;
+  notificarCarrito(mensaje);
+  casilla?.focus();
+  return false;
+}
+
 function mostrarFormularioEnvio(id = null) {
   const actual = id ? direccionPorId(id) : null;
   editandoDireccion = actual ? actual.id : null;
@@ -3565,6 +3667,9 @@ function mostrarFormularioEnvio(id = null) {
     $(`#envio-${campo}`).value = actual?.[campo] || "";
     limpiarErrorEnvio(campo);
   });
+  $("#envio-autorizo").checked = false;
+  const errorAutorizo = $("#envio-autorizo-error");
+  if (errorAutorizo) { errorAutorizo.textContent = ""; errorAutorizo.hidden = true; }
   $("#envio-titulo").textContent = actual ? "Editar dirección de envío" : (libreta.direcciones.length ? "Nueva dirección de envío" : "Datos de envío");
   $("#envio-guardar").textContent = actual ? "Guardar cambios" : (contextoEnvio === "directo" ? "Guardar y revisar el pedido" : "Guardar dirección");
   avisoFormularioEnvio(libreta.aviso);
@@ -3598,9 +3703,16 @@ async function guardarEnvio(evento) {
     error.textContent = errores[id];
     error.hidden = false;
   });
-  if (!valido) {
+  const autorizo = $("#envio-autorizo");
+  const errorAutorizo = $("#envio-autorizo-error");
+  const sinAutorizar = !autorizo.checked;
+  errorAutorizo.textContent = sinAutorizar ? "Marca la autorización para guardar tu dirección y poder enviar el pedido por WhatsApp." : "";
+  errorAutorizo.hidden = !sinAutorizar;
+  autorizo.setAttribute("aria-invalid", String(sinAutorizar));
+  if (sinAutorizar) autorizo.setAttribute("aria-describedby", "envio-autorizo-error"); else autorizo.removeAttribute("aria-describedby");
+  if (!valido || sinAutorizar) {
     const primero = CAMPOS_ENVIO.find(({ id }) => errores[id]);
-    $(`#envio-${primero.id}`).focus();
+    (primero ? $(`#envio-${primero.id}`) : autorizo).focus();
     return;
   }
   // Editar cambia SOLO esa dirección; añadir no toca las demás y elige la nueva. Ambas cosas se
@@ -3630,6 +3742,7 @@ async function guardarEnvio(evento) {
   }
   const nota = notaSinGuardar(r.guardada);
   editandoDireccion = null;
+  fijarAutorizacion(true);
   // El resumen, el envío y los respaldos largos se rehacen con la dirección actual.
   renderizarCarrito();
   actualizarRevisionEnvio();
@@ -3899,6 +4012,7 @@ async function enviarPedidoDirecto() {
     return;
   }
   if (!linea) { aviso.textContent = "Esta talla ya no se puede pedir. Vuelve a la ficha y elige otra."; actualizarRevisionEnvio(); return; }
+  if (!autorizacionVisita) { aviso.textContent = "Marca la autorización de datos para abrir WhatsApp con tu pedido."; $("#envio-autorizo-revision")?.focus(); return; }
   const mensaje = crearMensajePedido([linea], envio);
   if (enlaceWhatsApp(mensaje).length <= CONFIG.limiteEnlaceWhatsApp) {
     if (abrirWhatsApp(mensaje)) aviso.textContent = "Abrimos WhatsApp con tu pedido. Tu carrito no cambió.";
@@ -3925,7 +4039,13 @@ function iniciarEnvio() {
   window.addEventListener("storage", alCambiarLibretaEnOtraPestana);
   const dialogo = ventanaEnvio();
   if (!dialogo) return;
+  // Las casillas nacen desmarcadas en cada visita (Firefox restaura su estado al recargar).
+  autorizacionVisita = false;
+  sincronizarAutorizacion();
+  $("#envio-autorizo").checked = false;
   $("#envio-formulario").addEventListener("submit", guardarEnvio);
+  $("#envio-autorizo")?.addEventListener("change", (e) => { if (e.target.checked) { const err = $("#envio-autorizo-error"); err.textContent = ""; err.hidden = true; e.target.removeAttribute("aria-invalid"); } });
+  for (const id of ["#carrito-autorizo", "#envio-autorizo-revision"]) $(id)?.addEventListener("change", (e) => fijarAutorizacion(e.target.checked));
   CAMPOS_ENVIO.forEach(({ id }) => $(`#envio-${id}`)?.addEventListener("input", () => limpiarErrorEnvio(id)));
   dialogo.addEventListener("click", (evento) => {
     const objetivo = evento.target;
@@ -4417,6 +4537,7 @@ function iniciar() {
   iniciarCarrito();
   iniciarConfirmacion();
   iniciarEnvio();
+  iniciarPolitica();
   iniciarGuia();
   cargarProductos();
 }

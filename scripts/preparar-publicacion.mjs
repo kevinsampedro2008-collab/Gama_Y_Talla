@@ -40,6 +40,7 @@ const INMUTABLE = 'public, max-age=31536000, immutable';
 const ARCHIVOS = [
   'index.html', 'styles.css', 'app.js', 'favicon.svg',
   'data/guias-tallas.json',
+  'privacidad/index.html', 'privacidad/privacidad.css',
   'assets/css/catalog-intro.css',
   'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js',
   'assets/images/branding/placeholder.svg',
@@ -173,7 +174,11 @@ export function construir({ raiz = RAIZ_REPO, salida, env = process.env } = {}) 
 
   const problemas = verificarPaquete(destino, versionados);
   if (problemas.length) fallar(`El paquete no pasó la verificación:\n  - ${problemas.join('\n  - ')}`);
-  return { destino, versionados, archivos: listar(destino).length };
+  // La política de privacidad es un BORRADOR con marcadores [COMPLETAR: …]: se avisa (sin detener la compilación)
+  // para que no se publique sin llenar. Con PRIVACIDAD_ESTRICTA=1 la compilación se detiene.
+  const pendientes = (fs.readFileSync(path.join(destino, 'privacidad/index.html'), 'utf8').match(/\[COMPLETAR:/g) || []).length;
+  if (pendientes && env.PRIVACIDAD_ESTRICTA === '1') fallar(`La política de privacidad tiene ${pendientes} marcadores [COMPLETAR: …] sin llenar (PRIVACIDAD_ESTRICTA=1).`);
+  return { destino, versionados, archivos: listar(destino).length, privacidadPendiente: pendientes };
 }
 
 // Toda ruta assets/… nombrada por el HTML, el CSS y los JS existe (salvo ejemplos/depuración), y los
@@ -213,6 +218,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const r = construir({ raiz, salida: path.resolve(raiz, valor('--salida', 'dist')) });
     const mb = (b) => `${(b / 1048576).toFixed(2)} MB`;
     console.log(`Paquete listo en ${path.relative(process.cwd(), r.destino) || '.'} (${r.archivos} archivos).`);
+    if (r.privacidadPendiente) console.warn(`AVISO: privacidad/index.html tiene ${r.privacidadPendiente} marcadores [COMPLETAR: …] sin llenar. Complétalos antes de publicar.`);
     for (const x of r.versionados) console.log(`  ${x.ruta}  ${x.origen.endsWith('.glb') ? mb(x.bytes) : `${(x.bytes / 1024).toFixed(0)} KB`}`);
   } catch (e) {
     console.error(e instanceof ErrorPublicacion ? e.message : e);
