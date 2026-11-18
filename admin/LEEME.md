@@ -1,9 +1,137 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16 y 17
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17 y 18
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
 y (17) **público obligatorio con Unisex, historial de cambios, exportación a CSV y respaldo
 restaurable**.
+
+## Importar desde WhatsApp (18)
+
+El botón **«Importar desde WhatsApp»**, junto a «Agregar zapatilla», prepara varias zapatillas a la
+vez a partir de las publicaciones del proveedor. Cada publicación se presenta en este orden:
+**«Pega aquí el mensaje de WhatsApp»** (visible y con el foco al abrir), **«Fotos de esta
+publicación»**, **«Datos reconocidos»** (editables; lo dudoso lleva «Revisar») y **«Ajustes
+adicionales»** (categoría, guía de tallas y cómo mostrar el color). «Ajustes para varias fichas» es un
+bloque plegable, debajo de las publicaciones.
+
+1. Pega el **mensaje** de la publicación. Se lee **en el navegador** (`texto-proveedor.js`): marca
+   (lista de marcas conocidas y las del catálogo), modelo, público (Hombre, Dama, Unisex), precio en
+   COP (`$115.000`, `115.000`, `115 mil`), tallas EU y, si hay una línea que solo nombra colores, el
+   color. Una misma línea puede traerlo todo («Reebok Club C Bulc🔥tallas 40-41-42-43-44 euro $80.000»):
+   se toman el precio, las tallas y el teléfono, y el resto de la línea se sigue leyendo (marca, modelo,
+   público, color); los emojis pegados a las palabras no estorban. Un teléfono en una línea con datos se
+   omite, con su frase de contacto («Escríbeme al…»), sin perder esos datos. **Listas y rangos:**
+   «40-41-42-43-44» y «40-42-44» son listas (40-42-44 = 40, 42 y 44); «40 al 44», «40 hasta 44» y
+   «40-44» (solo dos tallas) son rangos. Rangos como «40 al 44 Euro» se expanden a 40, 41, 42, 43, 44; las tallas explícitas siguen
+   la gramática del editor (40 · 40,5 · 40.5 · 40 1/3). **Una sola talla** se reconoce cuando el texto
+   la nombra («Talla 37», «Talla: 40,5») o cuando ocupa sola una línea («37», «40 1/3») y el texto no
+   trae otras tallas; si ya trae un rango, esa línea suelta no se añade y la ficha queda «Revisar».
+   Los modelos (603, 1080), los precios y los teléfonos nunca se leen como tallas. Teléfonos y texto
+   promocional («RECARGA», «Te atiendo por aquí…», emojis, ✅) se omiten: son texto del proveedor. Lo
+   que no se reconoce queda vacío y marcado **«Revisar»**.
+2. Añade las **fotos originales**: arrástralas sobre la zona de fotos (escritorio) o elígelas desde la
+   galería (celular). Se validan y convierten a WebP aquí, con los mismos límites del editor. La
+   primera es la **principal** («Hacer principal» la cambia). Cada foto tiene **«Quitar foto»**
+   (también mientras se optimiza: no reaparece al terminar). Si quitas la principal, la siguiente
+   pasa a serlo y a ser la miniatura del selector; sin fotos se puede añadir otras. Una foto que ya
+   se subió en un guardado fallido se borra de Storage al quitarla (o al descartar el lote) si
+   ninguna galería la usa; con un guardado sin confirmar no se toca.
+3. **«Añadir otra publicación»** crea otra ficha y lleva el foco a su cuadro del mensaje. Cada ficha permite editar marca, modelo, público,
+   categoría, guía de tallas y, por color: nombre, tallas, fotos, **precio del proveedor** (solo para
+   revisar, no se publica) y **precio de venta** (el que se guarda).
+4. **Ajustes para varias fichas** (bloque plegable): se configuran **Público** (Hombre, Dama, Unisex),
+   **Categoría**, **Tabla de la guía de tallas** (incluido «Sin indicar») y **Sumar al precio del
+   proveedor**, y una sola acción, **«Aplicar todos los ajustes»**, los aplica a las fichas editables
+   marcadas con «Incluir en el guardado». «Sin cambiar» o un campo vacío conservan lo de cada ficha.
+   Los valores se validan antes de tocar ninguna ficha (el error aparece junto a su control). El
+   precio de venta = proveedor + importe se calcula siempre desde el del proveedor (aplicarlo dos veces
+   no lo acumula); los escritos a mano se conservan; un color sin precio del proveedor queda con su
+   precio de venta «Revisar» y lo demás se aplica. El público aplicado cuenta como elegido a mano: al
+   releer el mensaje no se pisa. Un resumen dice qué se aplicó y cuántos precios se conservaron o
+   quedan pendientes. Se guarda después, con «Guardar lote como oculto». Público y guía son
+   independientes.
+5. **Agrupar colores**: si dos fichas tienen la misma marca y modelo, la segunda propone «Agrupar como
+   color de la ficha N» o «Son zapatillas distintas». «Agrupar con otra ficha» mueve los colores a
+   cualquier ficha; «Separar en otra ficha» deshace. Cada color conserva su mensaje, sus fotos, su
+   nombre, precio, tallas y forma de mostrarse; lo corregido a mano no se pisa al releer el mensaje.
+6. **Coincidencias con el catálogo**: si la marca y el modelo ya existen, se muestran su código, su
+   estado y sus colores, con **«Abrir en el editor»** (para añadir el color o revisar una reposición).
+   Para crear otra ficha con el mismo modelo hay que marcar «Crear otra ficha con este mismo modelo de
+   todas formas».
+7. **«Guardar lote como oculto»** valida todo y guarda, una a una, las fichas válidas marcadas con
+   códigos automáticos y `fn_admin_guardar_producto` (una transacción por ficha). Las fotos se suben
+   al guardar, con la ruta de su ficha y color. El resultado se ve en cada ficha: las guardadas
+   ofrecen «Abrir en el editor»; las fallidas conservan sus datos y se reintentan al volver a pulsar
+   el botón (las guardadas no se reenvían). Si se pierde una respuesta, se comprueba con el
+   identificador de la operación antes de reintentar: nada se duplica.
+8. Las tallas nuevas quedan **por revisar**. Publicar y confirmar tallas se hace con las acciones de
+   siempre del panel.
+
+**Ventana:** la cabecera y el pie quedan fijos y solo se desplaza el contenido (el editor igual); al
+llegar a un extremo, la rueda o el dedo no mueven nada más, y el panel de fondo queda quieto mientras
+la ventana está abierta. Al cerrarla vuelven su desplazamiento, su posición y el foco en el botón que
+la abrió.
+
+Cerrar con fichas sin guardar ofrece «Cerrar y conservar el lote» (se conserva mientras no recargues
+la página, también si la sesión vence) o «Descartar el lote».
+
+## Cómo mostrar cada color (18)
+
+En el editor y en el importador, cada color tiene **«Cómo mostrar este color»**, con vista previa:
+
+- **Círculo de color**: muestra el **tono del círculo**: un recuadro que abre el selector de color
+  del navegador, el hexadecimal (#E8DCC8) y la vista previa. Elegir con el recuadro escribe el
+  hexadecimal; escribir uno válido actualiza el recuadro. Mientras escribes no se marca error; al
+  salir del campo se avisa si está incompleto y «e8dcc8» se normaliza a «#E8DCC8». **«Usar color
+  automático»** deja el tono vacío (la tienda usa su paleta para nombres simples o un círculo
+  neutro). Un color en automático se abre y se guarda en automático: el gris inicial del recuadro
+  nunca se guarda por sí solo.
+- **Foto de la zapatilla**: la miniatura es la foto principal del color; si cambias la principal,
+  cambia la miniatura. No se sube nada nuevo. El tono se conserva (plegado) por si vuelves al círculo.
+
+En «Ver detalles» se pueden mezclar círculos y miniaturas. Un color en «foto» que se queda sin fotos
+se muestra con su círculo; el editor y el tablero lo avisan. Se guarda **por color** en Supabase
+(`variantes.forma_muestra`, migración `20261117010000_forma_muestra_color.sql`); los registros
+antiguos quedan en «círculo». Un servidor sin esa migración bloquea la opción y lo dice.
+
+### Probarlo a mano contra el Supabase LOCAL (18)
+
+`admin/config.js` y `config.js` pueden apuntar al proyecto remoto `gama-talla-dev`. Para probar el
+importador sin tocarlo, `scripts/entorno-local.mjs` sirve el repositorio en **otro puerto (8770)** y
+entrega a la tienda y al panel la configuración del Supabase **local**, generada al vuelo: tus
+`config.js` no se leen, no se sirven y no cambian. Antes de servir o escribir comprueba que la API sea
+`127.0.0.1`, que responda, que tenga la migración `20261117010000` y que la CSP del panel la permita.
+
+```powershell
+npx --yes supabase@3.0.0 start -x realtime,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+npx --yes supabase@3.0.0 migration up            # solo si falta 20261117010000 en el local
+$env:GT_CLAVE_LOCAL = "<contraseña inventada, 12+ caracteres>"
+node scripts/entorno-local.mjs --crear-admin prueba@gamaytalla.test
+node scripts/entorno-local.mjs --fotos "C:\Users\kevin\Documents\Revisiones_Gama_Talla\fotos_prueba_18"
+node scripts/entorno-local.mjs                    # deja el servidor en marcha; Ctrl+C para detenerlo
+```
+
+- Panel: **http://127.0.0.1:8770/admin/** · Tienda: **http://127.0.0.1:8770/?intro=no**
+- Cómo saber que es el entorno local: el título de la pestaña empieza por **«[LOCAL]»** y abajo a la
+  izquierda aparece la etiqueta **«LOCAL · 127.0.0.1:54321»** (dentro de una ventana modal, como el
+  importador o «Ver detalles», la tapa la ventana; el título sigue a la vista). En las herramientas
+  del navegador (Red), las peticiones van a `127.0.0.1:54321` y nunca a `*.supabase.co`.
+- `http://127.0.0.1:8765` (el de `abrir-panel.ps1`) **sigue usando tus `config.js` reales**: no lo uses
+  para esta prueba.
+- Al terminar: `node scripts/entorno-local.mjs --limpiar` borra del Supabase local las zapatillas
+  creadas por los administradores ficticios de este script (con sus fotos de Storage) y esos usuarios.
+
+### Quitar fotos en el editor (18)
+
+Cada foto tiene **«Quitar foto»** (teclado y celular), en cualquier estado. En una galería guardada,
+la retirada se confirma **al guardar** («Quitaste 1 foto guardada: se retira de la galería al
+guardar») y «Cancelar» conserva la galería guardada. Si quitas la principal, la siguiente pasa a ser
+la principal y la miniatura del selector. Sin fotos, el color no se puede publicar y la tienda usa
+su círculo. Storage: tras un guardado confirmado (o al descartar el formulario) se borran solo los
+archivos **subidos en esa edición que nunca estuvieron en una galería guardada**, después de
+comprobar que ninguna galería los usa. Los que estuvieron en una galería guardada quedan en
+«Archivos sin usar», que pide confirmación. Una subida que termina después de quitar su foto no la
+devuelve al formulario.
 
 ## Público en la tienda (17)
 
@@ -83,6 +211,13 @@ node scripts/respaldo/restaurar.mjs "<carpeta del paquete>" --destino-workdir "C
 # Desechar el destino
 npx --yes supabase@3.0.0 stop --no-backup --workdir "C:\Users\kevin\Documents\Revisiones_Gama_Talla\destino_restauracion"
 ```
+
+Etapa 18: el paquete guarda cada fila completa, así que `variantes.forma_muestra` (círculo o foto)
+viaja y se restaura tal cual, junto con las fotos y las claves públicas. El destino debe tener las
+**16 migraciones** del repositorio (incluida `20261117010000`). Un paquete **anterior** a la etapa 18
+(sin esa columna) también se restaura: todos sus colores quedan en «círculo», y la verificación lo
+comprueba aparte y lo dice al final. El CSV de «Exportar catálogo» es un inventario para leer, no
+para restaurar: no incluye la presentación del color (ni el tono del círculo ni círculo/foto).
 
 **Qué guarda el paquete** (`gama-talla-respaldo-<fecha>-<origen>/`):
 
@@ -224,10 +359,15 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
 1. Busca la zapatilla (código interno, referencia, marca o modelo) y, si quieres, filtra por
    «Con tallas disponibles», «por revisar», «agotadas» o «Con elementos ocultos». Un producto aparece
    en todos los filtros que le correspondan: puede tener tallas en varios estados a la vez.
-2. Pulsa una o varias tallas **de un mismo color**. Debajo aparece su detalle (estado en la tienda,
-   estado guardado, vigencia y procedencia) y abajo la barra de acciones. Pulsar una talla de otro
-   color empieza una selección nueva. La selección se guarda por el UUID real de cada talla.
-3. Elige la acción. Un diálogo resume modelo, color y tallas, explica el efecto y pide confirmación:
+2. Pulsa las tallas que quieras, **de uno o varios modelos y colores** (etapa 18): cada pulsación
+   selecciona o quita esa talla y conserva las demás, sin teclas modificadoras. La selección se guarda
+   por el UUID real de cada talla (la 40 de un color no es la 40 de otro). Debajo de cada color aparece
+   el detalle de sus tallas elegidas y abajo la barra de acciones, con un resumen («4 tallas
+   seleccionadas · 2 modelos · 3 colores»). **«Seleccionar tallas visibles»** (encima de la lista)
+   añade todas las que se ven; **«Quitar selección»** la vacía. Buscar o filtrar **conserva** la
+   selección y dice cuántas tallas quedan fuera de la vista. Al perder el acceso se limpia.
+3. Elige la acción. Un diálogo detalla qué se modificará, **agrupado por modelo y color**, con sus
+   códigos y tallas, explica el efecto y pide confirmación:
 
 | Acción | Qué hace | Cuándo usarla |
 |---|---|---|
@@ -235,6 +375,15 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
 | **Nueva publicación** | `fn_confirmar_por_publicacion`: pide la **fecha y hora originales** de la publicación, en hora de Colombia (UTC−5, sin horario de verano); no se rellena con «ahora». La vigencia empieza en esa fecha. Si ya pasó, la talla queda por revisar | El proveedor volvió a publicar el modelo |
 | **Marcar agotada** | `fn_marcar_agotada`, con nota interna opcional. No borra nada | El proveedor confirmó que no hay |
 | **Dejar por revisar** | Pone el estado en `REVISAR` (una sola escritura, permitida por el RLS de administrador). No inventa fechas ni confirma nada | No sabes si hay; distinto de «agotada» |
+| **Desactivar tallas** | `activa = false` en una sola escritura (todas o ninguna). Deja de ofrecerse; conserva registro, estado, fechas e historial. Informa de las que ya estaban desactivadas | Ya no la vendes, pero quieres conservarla |
+| **Activar tallas** | `activa = true` en una sola escritura. Conserva estado y fechas: la tienda calcula la disponibilidad con la vigencia actual. No confirma nada. Informa de las que ya estaban activadas | Vuelves a ofrecerla |
+
+- **Varias tallas, varios colores:** antes de escribir se relee en una sola consulta el estado de
+  todas las variantes implicadas; si alguna talla cambió en otro lugar, no se aplica nada. Las
+  confirmaciones y «agotada» se guardan talla por talla: un fallo parcial dice cuáles se aplicaron,
+  identificadas por modelo, color, código y talla, y deja seleccionadas solo las que no se aplicaron
+  (reintentar no repite las aplicadas). Con una respuesta perdida se consulta el estado actual y no
+  queda nada preparado para repetir. Mientras se procesa, todo queda bloqueado.
 
 - Las confirmaciones **reactivan** una talla desactivada (`activa = true`); el diálogo lo avisa antes.
   Ninguna acción publica un producto o un color ocultos.
@@ -352,6 +501,19 @@ migración, historial, CSV y acceso; marca «MARCA DIECISIETE») y `tests/etapa1
 (tarjeta, Unisex y filtros con Supabase simulado). La migración se prueba desde las 14 anteriores
 con `supabase/pruebas/reproducir/datos_previos_17.sql` y `verificar_migracion_17.sql` (ver su
 README), y sus reglas con `supabase/pruebas/92_publico_obligatorio.sql`.
+
+Etapa 18: `tests/etapa18/importador.spec.js` (los dos mensajes de ejemplo, lote con agrupación de
+colores y precio de venta, coincidencia con el catálogo, fallo parcial con reintento, selector con un
+círculo y dos miniaturas en celular y escritorio, ficha antigua y build). Usa fotos ficticias y la
+marca «NEW BALANCE» solo con modelos de prueba («9060 P18», «LOTE A P18»…, además de 603 y 1080), que
+borra al terminar. Requiere la migración `20261117010000`; sus reglas se prueban con
+`supabase/pruebas/93_forma_muestra.sql`. `tests/etapa18/ventana.spec.js` cubre la ventana (una sola zona de desplazamiento, extremos con la rueda, 360 × 560, confirmación, cerrar restaura el panel, editor) y «Aplicar todos los ajustes». `tests/etapa18/revision.spec.js` cubre el mensaje Reebok en una línea, el orden del
+importador, el foco al añadir, la agrupación, el celular, el tono (recuadro, hexadecimal, validación
+al salir, automático) y «Quitar foto» en el importador y el editor (principal, última, subida en
+curso, cancelar, limpieza de Storage, recarga y tienda). `tests/etapa18/lector-tallas.spec.js` es la regresión del
+lector (una sola talla, modelos, precios y teléfonos que no son tallas, casos «Revisar» y los dos
+mensajes del proveedor); no necesita Supabase. El ciclo de respaldo
+(`supabase/pruebas/reproducir/ciclo_respaldo_17.mjs`) incluye un color en círculo y otro en foto.
 
 Las pruebas de la etapa 16 generan fotos ficticias con Chromium en la carpeta temporal
 (`gama-talla-16-fotos`), usan la marca «Marca Dieciséis» y borran al terminar sus productos y sus

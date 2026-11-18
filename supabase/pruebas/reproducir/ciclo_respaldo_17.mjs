@@ -18,13 +18,16 @@
  * 5. Restauración real y comparación ORIGEN ↔ DESTINO: filas de las 6 tablas, catalogo_publico,
  *    líneas de carrito V3 reconocidas por la tienda real y bytes de una foto servida.
  * 6. Limpieza del origen (lo sembrado). El destino queda restaurado para revisarlo.
+ * Etapa 18: el color «Beige/Blancas» se guarda con forma_muestra = 'foto' y «Negro» queda en
+ * 'circulo' (el valor por omisión); tras restaurar se comprueban las dos preferencias, las fotos
+ * y los identificadores públicos de la zapatilla y de cada color.
  * Termina con código 0 solo si todo se cumple.
  */
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from '@playwright/test';
-import { RAIZ, BUCKET, SQL_INSTANTANEA, TABLAS, argumentos, proyectoLocal, sql, sqlJson, sha256, dentroDelRepositorio } from '../../../scripts/respaldo/comun.mjs';
+import { RAIZ, BUCKET, SQL_INSTANTANEA, TABLAS, argumentos, proyectoLocal, sql, sqlJson, sha256, dentroDelRepositorio, migracionesDelRepositorio } from '../../../scripts/respaldo/comun.mjs';
 
 // Dos fotos WebP FICTICIAS (degradado con ruido y el texto «G&T PRUEBA»), generadas con Chromium.
 async function prepararFotos(salida) {
@@ -102,7 +105,7 @@ function sembrar(origen) {
         tallas: [{ id: ID.tA40, talla: '40', activa: true, ...(conOriginal ? { activa_original: true } : {}) },
                  { id: ID.tA41, talla: '41', activa: true, ...(conOriginal ? { activa_original: true } : {}) }],
         fotos: [{ ruta: url(OBJ_A), alt: 'Negro, de lado' }] },
-      { id: ID.uniB, color: 'Beige/Blancas', precio: 250000, muestra_color: '#e8dcc8', activa: true, orden: 1,
+      { id: ID.uniB, color: 'Beige/Blancas', precio: 250000, muestra_color: '#e8dcc8', forma_muestra: 'foto', activa: true, orden: 1,
         tallas: [{ id: ID.tB39, talla: '39', activa: true, ...(conOriginal ? { activa_original: true } : {}) }], fotos: [{ ruta: url(OBJ_B) }] }
     ]
   }).replace(/'/g, "''");
@@ -196,12 +199,15 @@ async function principal() {
     const sembrado = sqlJson(origen.contenedor, `select jsonb_build_object(
       'uni', (select to_jsonb(p) - 'actualizado_en' from (select publico, codigo_interno, clave_catalogo, activo from public.productos where id = '${ID.uni}') p),
       'leg', (select to_jsonb(p) from (select publico, codigo_interno, clave_catalogo from public.productos where id = '${ID.leg}') p),
+      'formas', (select jsonb_object_agg(id, forma_muestra) from public.variantes where producto_id = '${ID.uni}'),
       'historial_admin', (select count(*) from public.historial where autor = '${ID.admin}'),
       'lotes', (select count(distinct lote) from public.historial where autor = '${ID.admin}'));`);
     exigir('1 siembra: Unisex renombrada y publicada (clave = UUID), heredada con clave GT anterior al renombrado, historial con autor y lotes',
       sembrado.uni.publico === 'unisex' && sembrado.uni.codigo_interno === 'ZAP-UNI-17' && sembrado.uni.clave_catalogo === ID.uni && sembrado.uni.activo
       && sembrado.leg.publico === null && /^GT-\d{5}$/.test(sembrado.leg.clave_catalogo) && sembrado.leg.codigo_interno === 'LEG-RENOMBRADA-17'
       && sembrado.historial_admin > 0 && sembrado.lotes >= 3, JSON.stringify(sembrado));
+    exigir('1 siembra: «Negro» se muestra como círculo y «Beige/Blancas» como foto (etapa 18)',
+      sembrado.formas?.[ID.uniA] === 'circulo' && sembrado.formas?.[ID.uniB] === 'foto', JSON.stringify(sembrado.formas));
 
     // 2. Respaldo y verificación
     const respaldo = nodo('scripts/respaldo/respaldar.mjs', ['--origen', 'local', '--salida', salida]);
@@ -209,7 +215,7 @@ async function principal() {
     exigir('2 respaldar.mjs termina bien y escribe el paquete fuera del repositorio', respaldo.codigo === 0 && paquete && fs.existsSync(path.join(paquete, 'manifiesto.json')), respaldo.salida.slice(-600));
     const manifiesto = JSON.parse(fs.readFileSync(path.join(paquete, 'manifiesto.json'), 'utf8'));
     exigir('2 el manifiesto trae formato, fecha, commit, migraciones, recuentos y SHA-256',
-      manifiesto.version_formato === 1 && manifiesto.creado_en && /^[0-9a-f]{40}$/.test(manifiesto.commit.head) && manifiesto.migraciones.length === 15
+      manifiesto.version_formato === 1 && manifiesto.creado_en && /^[0-9a-f]{40}$/.test(manifiesto.commit.head) && JSON.stringify(manifiesto.migraciones) === JSON.stringify(migracionesDelRepositorio()) && manifiesto.migraciones.includes('20261117010000')
       && manifiesto.recuentos.productos === 3 && manifiesto.fotos.length === 2 && manifiesto.fotos_versionadas.length === 1
       && manifiesto.archivos.every((a) => /^[0-9a-f]{64}$/.test(a.sha256)), JSON.stringify(manifiesto.recuentos));
     exigir('2 la foto del repositorio se registra con su ruta y su commit', /^[0-9a-f]{40}$/.test(manifiesto.fotos_versionadas[0].commit)
@@ -277,6 +283,31 @@ async function principal() {
     const normal = (vista, p) => JSON.stringify(vista).split(`${p.api}/storage/`).join('<storage>/');
     exigir('5 catalogo_publico idéntico (ids, códigos, público, colores, tallas y estados; fotos con su nuevo origen)',
       vistaA.length === 2 && normal(vistaA, origen) === normal(vistaB, destino), `${vistaA.length} / ${vistaB.length}`);
+    // Etapa 18: preferencia círculo/foto, fotos e identificadores públicos de la zapatilla y sus colores.
+    const filaB = (id) => b.tablas.variantes.find((v) => v.id === id);
+    const filaA = (id) => a.tablas.variantes.find((v) => v.id === id);
+    exigir('5 forma_muestra restaurada: «Negro» círculo y «Beige/Blancas» foto, igual que en el origen',
+      filaB(ID.uniA)?.forma_muestra === 'circulo' && filaB(ID.uniB)?.forma_muestra === 'foto'
+      && filaA(ID.uniA)?.forma_muestra === 'circulo' && filaA(ID.uniB)?.forma_muestra === 'foto',
+      JSON.stringify([filaB(ID.uniA)?.forma_muestra, filaB(ID.uniB)?.forma_muestra]));
+    exigir('5 claves públicas (clave_catalogo) de la zapatilla y de sus dos colores conservadas',
+      b.tablas.productos.find((p) => p.id === ID.uni)?.clave_catalogo === a.tablas.productos.find((p) => p.id === ID.uni)?.clave_catalogo
+      && [ID.uniA, ID.uniB].every((id) => filaB(id)?.clave_catalogo && filaB(id).clave_catalogo === filaA(id)?.clave_catalogo));
+    const uniVistaB = vistaB.find((p) => p.id === ID.uni);
+    const varVista = (clave) => uniVistaB?.variantes.find((v) => v.id === clave);
+    const vNegro = varVista(filaA(ID.uniA)?.clave_catalogo);
+    const vBeige = varVista(filaA(ID.uniB)?.clave_catalogo);
+    const fotosDe = (id) => b.tablas.fotos.filter((f) => f.variante_id === id).map((f) => f.ruta);
+    exigir('5 la tienda del destino recibe «forma» por color: círculo para «Negro», foto para «Beige/Blancas»',
+      vNegro?.forma === 'circulo' && vBeige?.forma === 'foto', JSON.stringify([vNegro?.forma, vBeige?.forma]));
+    exigir('5 fotos de cada color: misma cantidad e ids que en el origen, servidas por el Storage del destino',
+      [ID.uniA, ID.uniB].every((id) => JSON.stringify(b.tablas.fotos.filter((f) => f.variante_id === id).map((f) => f.id))
+        === JSON.stringify(a.tablas.fotos.filter((f) => f.variante_id === id).map((f) => f.id)))
+      && fotosDe(ID.uniB).length === 1 && fotosDe(ID.uniB)[0] === `${destino.api}/storage/v1/object/public/${BUCKET}/${OBJ_B}`
+      && JSON.stringify(vBeige?.fotos ?? vBeige?.imagenes ?? null).includes(OBJ_B), JSON.stringify(vBeige).slice(0, 300));
+    const servidaB = Buffer.from(await (await fetch(fotosDe(ID.uniB)[0])).arrayBuffer());
+    exigir('5 la foto del color mostrado como foto se sirve desde el destino con sus bytes originales',
+      sha256(servidaB) === sha256(fs.readFileSync(fotos.otra)));
     exigir('5 ids de catalogo_publico: la Unisex por su UUID y la heredada por su código GT anterior',
       JSON.stringify(vistaB.map((p) => p.id).sort()) === JSON.stringify([ID.uni, a.tablas.productos.find((p) => p.id === ID.leg).clave_catalogo].sort()));
     // Líneas de carrito V3 guardadas con el origen: la tienda REAL las reconoce igual en el destino.

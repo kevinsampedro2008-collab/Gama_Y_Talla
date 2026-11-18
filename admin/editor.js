@@ -53,10 +53,16 @@
   const publicoValido = (valor) => PUBLICOS.some(([v]) => v === valor);
   const MENSAJE_PUBLICO = "Elige el público en la tienda: Hombre, Dama o Unisex.";
   const MUESTRA_HEX = /^#[0-9a-f]{6}$/i;
+  // Etapa 18: cómo se muestra cada color en la ficha («circulo» o «foto»). Solo existe con la
+  // migración 20261117010000; con un esquema anterior la opción queda bloqueada y se avisa.
+  let formaMuestra = null;       // null = aún no se sabe; true/false = el servidor la admite o no
+  const FORMAS = [["circulo", "Círculo de color"], ["foto", "Foto de la zapatilla"]];
+  const formaValida = (valor) => (valor === "foto" ? "foto" : "circulo");
   const columnas = () => "id,codigo_interno,referencia_proveedor,nombre,marca,categoria,descripcion,segmento,destacado,nuevo_ingreso,activo,orden,version,ultima_operacion,retirado_en" +
     (publicoYMuestras === false ? "" : ",publico") +
-    `,variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden${publicoYMuestras === false ? "" : ",muestra_color"},fotos(id,ruta,orden,alt))`;
+    `,variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden${publicoYMuestras === false ? "" : ",muestra_color"}${formaMuestra === false ? "" : ",forma_muestra"},fotos(id,ruta,orden,alt))`;
   const faltaColumnaNueva = (error) => String(error?.code) === "42703" || /publico|muestra_color/.test(error?.message || "");
+  const faltaForma = (error) => /forma_muestra/.test(error?.message || "");
 
   let ed = null;          // estado del formulario abierto
   let borrador = null;    // formulario sin guardar conservado al perder la sesión
@@ -65,6 +71,25 @@
   let origen = null;      // el botón que abrió el editor: recibe el foco al cerrarlo
 
   const nuevaClave = () => `f${++claves}`;
+
+  /* Etapa 18 · Panel de fondo quieto mientras hay un diálogo (editor o importador) abierto: la única zona
+     que se desplaza es el cuerpo del diálogo. Al cerrar el último, vuelve el desplazamiento normal y la
+     posición anterior. Cuenta aperturas: el editor puede abrirse encima del importador. */
+  let fondo = null;
+  function bloquearFondo() {
+    if (!fondo) fondo = { y: window.scrollY, x: window.scrollX, abiertos: 0 };
+    fondo.abiertos += 1;
+    document.documentElement.classList.add("con-dialogo");
+  }
+  function liberarFondo() {
+    if (!fondo) return;
+    fondo.abiertos -= 1;
+    if (fondo.abiertos > 0) return;
+    const { x, y } = fondo;
+    fondo = null;
+    document.documentElement.classList.remove("con-dialogo");
+    window.scrollTo(x, y);
+  }
   const uuid = () => crypto.randomUUID();
 
   function nodo(etiqueta, clase, texto) {
@@ -100,7 +125,7 @@
 
   // ------------------------------------------------------------- estado base
   function variantePorDefecto(orden) {
-    return { id: uuid(), nueva: true, codigo: "", codigoGuardado: "", color: "", referencia: "", muestra: "", precio: "", precioAnterior: "", activa: true, orden, tallas: [], fotos: [], entradaTalla: "", errorTalla: "" };
+    return { id: uuid(), nueva: true, codigo: "", codigoGuardado: "", color: "", referencia: "", muestra: "", forma: "circulo", precio: "", precioAnterior: "", activa: true, orden, tallas: [], fotos: [], galeria: [], entradaTalla: "", errorTalla: "" };
   }
 
   function estadoNuevo() {
@@ -108,7 +133,7 @@
       modo: "crear", id: uuid(), codigo: "", version: null, activo: false, retirado: false,
       datos: { codigo_interno: "", publico: "", nombre: "", marca: "", categoria: "", referencia_proveedor: "", descripcion: "", segmento: "", destacado: false, nuevo_ingreso: false, orden: "0" },
       variantes: [variantePorDefecto(0)],
-      operaciones: new Set(), pendiente: null, subidasSesion: new Set(), firmaGuardada: "", sinUsar: null
+      operaciones: new Set(), pendiente: null, subidasSesion: new Set(), enGaleria: new Set(), firmaGuardada: "", sinUsar: null
     };
   }
 
@@ -133,12 +158,19 @@
         .map((v) => ({
           id: v.id, nueva: false, codigo: v.codigo_variante, codigoGuardado: v.codigo_variante, color: v.color || "", referencia: v.referencia_variante || "",
           muestra: typeof v.muestra_color === "string" ? v.muestra_color : "",
+          forma: formaValida(v.forma_muestra),
           precio: String(v.precio ?? 0), precioAnterior: v.precio_anterior ? String(v.precio_anterior) : "", activa: v.activa, orden: v.orden,
           tallas: (porVariante.get(v.id) || []).sort(ordenTalla).map((t) => ({ id: t.id, talla: t.talla, activa: t.activa, activaGuardada: t.activa, nueva: false, estado: t.estado })),
           fotos: [...(v.fotos || [])].sort((a, b) => a.orden - b.orden).map((f) => ({ clave: nuevaClave(), ruta: f.ruta, alt: f.alt || "", estado: "guardada" })),
+          // Rutas de la galería guardada: si se quita alguna, se avisa de que se retira al guardar.
+          galeria: [...(v.fotos || [])].map((f) => f.ruta),
           entradaTalla: "", errorTalla: ""
         })),
-      operaciones: anterior?.operaciones || new Set(), pendiente: null, subidasSesion: anterior?.subidasSesion || new Set(), firmaGuardada: "", sinUsar: null
+      operaciones: anterior?.operaciones || new Set(), pendiente: null, subidasSesion: anterior?.subidasSesion || new Set(),
+      // Archivos que estuvieron alguna vez en una galería guardada: nunca se borran solos (quedan en
+      // «Archivos sin usar», que pide confirmación). Solo se limpian los subidos aquí y nunca guardados.
+      enGaleria: new Set([...(anterior?.enGaleria || []), ...(p.variantes || []).flatMap((v) => (v.fotos || []).map((f) => fotos().objetoDe(f.ruta)).filter(Boolean))]),
+      firmaGuardada: "", sinUsar: null
     };
     estado.firmaGuardada = firma(estado);
     return estado;
@@ -148,6 +180,10 @@
     const c = panel().cliente();
     try {
       let r = await c.from("productos").select(columnas()).eq("id", id).maybeSingle();
+      if (r.error && formaMuestra !== false && faltaForma(r.error)) {
+        formaMuestra = false;
+        r = await c.from("productos").select(columnas()).eq("id", id).maybeSingle();
+      }
       if (r.error && publicoYMuestras !== false && faltaColumnaNueva(r.error)) {
         publicoYMuestras = false;
         r = await c.from("productos").select(columnas()).eq("id", id).maybeSingle();
@@ -189,6 +225,7 @@
       variantes: e.variantes.map((v) => ({
         id: v.id, codigo_variante: codigoLimpio(v.codigo), color: mayus(v.color.trim()), referencia_variante: v.referencia.trim() || null,
         muestra_color: v.muestra.trim() ? v.muestra.trim().toLowerCase() : null,
+        forma_muestra: formaValida(v.forma),
         precio: entero(v.precio), precio_anterior: entero(v.precioAnterior), activa: v.activa, orden: v.orden,
         // Las existentes llevan también cómo estaban al abrir el formulario: el servidor solo
         // aplica lo que se cambió aquí y conserva lo que cambió en otro lugar (por ejemplo, una
@@ -230,7 +267,9 @@
     ed.variantes.forEach((v, i) => {
       const nombre = v.color.trim() || `el color ${i + 1}`;
       if (v.muestra.trim() && !MUESTRA_HEX.test(v.muestra.trim())) {
-        exigir(false, `ed-v-${v.id}-muestra`, `La muestra de ${nombre} debe ser un color hexadecimal como #E8DCC8 (o quedar vacía).`);
+        // Con «Foto de la zapatilla» el tono está plegado: el foco va a «Círculo de color», que lo muestra.
+        exigir(false, v.forma === "foto" ? `ed-v-${v.id}-forma-circulo` : `ed-v-${v.id}-muestra`,
+          `El tono del círculo de ${nombre} debe ser un color hexadecimal como #E8DCC8 (o «Usar color automático»).`);
       }
       const codigoV = codigoLimpio(v.codigo);
       if (codigosEditables !== false && (!v.nueva || codigoV)) {
@@ -483,7 +522,7 @@
       campo({ id: `ed-v-${v.id}-anterior`, etiqueta: "Precio anterior (opcional)", valor: v.precioAnterior, modo: "numeric", ayuda: "Para mostrar un descuento: debe ser mayor que el actual.", datos: { variante: v.id, vcampo: "precioAnterior" } }));
     const visible = casilla(`ed-v-${v.id}-activa`, "Color visible en la tienda", v.activa, { variante: v.id, vcampo: "activa" });
 
-    li.append(cabecera, filaA, filaR, campoMuestra(v), filaB, visible, pintarTallas(v), pintarFotos(v));
+    li.append(cabecera, filaA, filaR, campoForma(v), filaB, visible, pintarTallas(v), pintarFotos(v));
     return li;
   }
 
@@ -521,44 +560,228 @@
     if (valido) vista.style.setProperty("--muestra", valor.trim().toLowerCase());
     else vista.style.removeProperty("--muestra");
   }
-  function campoMuestra(v) {
-    const id = `ed-v-${v.id}-muestra`;
-    const caja = nodo("div", "campo editor-muestra");
-    const label = nodo("label", "", "Muestra del color (opcional)");
-    label.htmlFor = id;
-    const fila = nodo("div", "editor-muestra-fila");
-    const vista = nodo("span", "editor-muestra-vista");
-    vista.id = `${id}-vista`;
-    vista.setAttribute("aria-hidden", "true");
-    pintarVistaMuestra(vista, v.muestra);
+  /* Etapa 18: «Cómo mostrar este color», con el tono del círculo dentro. Dos opciones con su vista
+     previa: el círculo y la foto principal del color (la primera de su galería; si cambia, la
+     miniatura cambia con ella). Con «Círculo de color» se ve el tono: un recuadro que abre el
+     selector de color del navegador, el hexadecimal y la vista previa, y «Usar color automático».
+     Con «Foto de la zapatilla», la foto principal. El tono se conserva al cambiar de opción.
+     El importador usa el mismo componente (crearCampoPresentacion y las funciones de abajo).
+
+     Reglas del tono
+      - El texto manda: es lo que se guarda (#rrggbb o vacío = automático). El recuadro solo ayuda
+        a elegirlo y nace con un gris neutro que NUNCA se guarda por sí solo: solo cuenta cuando
+        la persona elige un tono con él (evento «input»).
+      - Mientras se escribe no se marca error; al salir del campo, un valor incompleto se avisa.
+        «e8dcc8» o «#e8dcc8» se normalizan a «#E8DCC8». */
+  const TONO_NEUTRO = "#d9d9d4";
+  function normalizarTono(texto) {
+    const t = String(texto ?? "").trim();
+    const cifras = t.startsWith("#") ? t.slice(1) : t;
+    return /^[0-9a-f]{6}$/i.test(cifras) ? `#${cifras.toUpperCase()}` : null;
+  }
+  function textoEstadoTono(valor) {
+    const t = String(valor ?? "").trim();
+    if (!t) return "Color automático: la tienda usa su paleta para nombres simples (NEGRO, BLANCO…) o un círculo neutro. Pulsa el recuadro para elegir un tono.";
+    const tono = normalizarTono(t);
+    return tono ? `Tono elegido: ${tono}. Pulsa el recuadro para cambiarlo.` : "Escribe 6 cifras hexadecimales, por ejemplo #E8DCC8.";
+  }
+  function fotoPrincipalDe(v) {
+    const f = (v.fotos || []).find((x) => ["guardada", "subida"].includes(x.estado) && (x.vistaPrevia || x.ruta));
+    return f ? (f.vistaPrevia || urlImagen(f.ruta)) : null;
+  }
+  function crearCampoPresentacion({ id, idTono, nombre, forma, muestra = "", foto, bloqueadoForma = false, bloqueadoTono = false,
+    datosForma = {}, datosTono = {}, datosSelector = {}, datosAuto = {} }) {
+    const elegida = formaValida(forma);
+    const caja = nodo("fieldset", "editor-opciones editor-forma");
+    caja.id = id;
+    caja.dataset.presentacion = "";
+    caja.dataset.tono = idTono;
+    caja.dataset.forma = elegida;
+    caja.append(nodo("legend", "", "Cómo mostrar este color"));
+    const lista = nodo("div", "editor-forma-lista");
+    for (const [valor, texto] of FORMAS) {
+      const opcion = nodo("label", "editor-forma-opcion");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = `${id}-radio`;
+      radio.id = `${id}-${valor}`;
+      radio.value = valor;
+      radio.checked = elegida === valor;
+      Object.assign(radio.dataset, datosForma, { opcionForma: "" });
+      if (bloqueadoForma) radio.dataset.bloqueado = "1";
+      const vista = nodo("span", `editor-forma-vista es-${valor}`);
+      vista.setAttribute("aria-hidden", "true");
+      if (valor === "circulo") {
+        const circulo = nodo("span", "editor-forma-circulo");
+        pintarVistaMuestra(circulo, normalizarTono(muestra) || "");
+        vista.append(circulo);
+      } else if (foto) {
+        const img = nodo("img");
+        img.src = foto;
+        img.alt = "";
+        vista.append(img);
+      } else vista.append(nodo("span", "editor-forma-sin-foto", "Sin foto"));
+      opcion.append(radio, vista, nodo("span", "editor-forma-texto", texto));
+      lista.append(opcion);
+    }
+
+    // Tono del círculo: recuadro (selector nativo), hexadecimal y vista previa.
+    const tono = nodo("div", "editor-tono");
+    tono.id = `${id}-tono`;
+    tono.hidden = elegida !== "circulo";
+    const etiqueta = nodo("label", "editor-tono-etiqueta", "Tono del círculo");
+    etiqueta.htmlFor = idTono;
+    const fila = nodo("div", "editor-muestra-fila editor-tono-fila");
+    const valido = normalizarTono(muestra);
+    const selector = nodo("input");
+    selector.type = "color";
+    selector.id = `${idTono}-selector`;
+    selector.className = "editor-tono-selector";
+    selector.value = valido ? valido.toLowerCase() : TONO_NEUTRO;
+    selector.setAttribute("aria-label", `Elegir el tono del círculo de ${nombre} con el selector de color`);
+    Object.assign(selector.dataset, datosSelector, { tonoSelector: "" });
+    if (bloqueadoTono) selector.dataset.bloqueado = "1";
     const texto = nodo("input");
     texto.type = "text";
-    texto.id = id;
-    texto.value = v.muestra;
+    texto.id = idTono;
+    texto.value = muestra;
     texto.maxLength = 7;
     texto.placeholder = "#E8DCC8";
     texto.autocomplete = "off";
     texto.spellcheck = false;
     texto.setAttribute("autocapitalize", "off");
-    Object.assign(texto.dataset, { variante: v.id, vcampo: "muestra", opcionNueva: "" });
-    texto.readOnly = publicoYMuestras === false;
-    const selector = nodo("input");
-    selector.type = "color";
-    selector.id = `${id}-selector`;
-    selector.value = MUESTRA_HEX.test(v.muestra) ? v.muestra.toLowerCase() : "#d9d9d4";
-    selector.setAttribute("aria-label", `Elegir la muestra de ${v.color.trim() || "este color"}`);
-    Object.assign(selector.dataset, { variante: v.id, vselector: "muestra", opcionNueva: "" });
-    if (publicoYMuestras === false) selector.dataset.bloqueado = "1";
-    const quitar = boton("Quitar", "quitar-muestra", "boton boton-texto boton-mini", { variante: v.id });
-    quitar.id = `${id}-quitar`;
-    quitar.hidden = !v.muestra || publicoYMuestras === false;
-    quitar.setAttribute("aria-label", `Quitar la muestra de ${v.color.trim() || "este color"}`);
-    fila.append(vista, texto, selector, quitar);
-    const ayuda = nodo("p", "campo-ayuda", "Color del círculo que verá el cliente, útil para nombres como «BEIGE/BLANCAS». Vacía: un nombre simple usa la paleta de la tienda y uno compuesto, un círculo neutro.");
+    texto.readOnly = bloqueadoTono;
+    Object.assign(texto.dataset, datosTono, { tonoTexto: "" });
+    const vistaTono = nodo("span", "editor-muestra-vista editor-tono-vista");
+    vistaTono.id = `${idTono}-vista`;
+    vistaTono.setAttribute("aria-hidden", "true");
+    pintarVistaMuestra(vistaTono, valido || "");
+    const auto = nodo("button", "boton boton-texto boton-mini editor-tono-auto", "Usar color automático");
+    auto.type = "button";
+    auto.id = `${idTono}-quitar`;
+    Object.assign(auto.dataset, datosAuto, { tonoAuto: "" });
+    auto.hidden = !String(muestra).trim() || bloqueadoTono;
+    auto.setAttribute("aria-label", `Usar color automático en ${nombre}`);
+    fila.append(selector, texto, vistaTono, auto);
+    const estado = nodo("p", "campo-ayuda editor-tono-estado", textoEstadoTono(muestra));
+    estado.id = `${idTono}-estado`;
+    estado.setAttribute("aria-live", "polite");
+    const error = nodo("p", "editor-tono-error", "");
+    error.id = `${idTono}-error`;
+    error.hidden = true;
+    texto.setAttribute("aria-describedby", `${estado.id} ${error.id}`);
+    tono.append(etiqueta, fila, estado, error);
+
+    // Foto principal (lo que verá el cliente con «Foto de la zapatilla»).
+    const panelFoto = nodo("div", "editor-forma-foto");
+    panelFoto.id = `${id}-foto`;
+    panelFoto.hidden = elegida !== "foto";
+    if (foto) {
+      const img = nodo("img");
+      img.src = foto;
+      img.alt = `Miniatura de ${nombre} en la tienda`;
+      panelFoto.append(img, nodo("p", "campo-ayuda", "Miniatura que verá el cliente: la foto principal de este color. Si cambias la principal, cambia con ella."));
+    }
+
+    const ayuda = nodo("p", "campo-ayuda", "En «Ver detalles» el cliente elige el color con este círculo o con la miniatura de la foto principal. Puedes mezclar ambos en la misma zapatilla.");
     ayuda.id = `${id}-ayuda`;
-    texto.setAttribute("aria-describedby", ayuda.id);
-    caja.append(label, fila, ayuda);
+    const aviso = nodo("p", "editor-nota editor-forma-aviso", `${nombre}: elegiste la foto, pero este color no tiene fotos. En la tienda se verá su círculo hasta que le añadas una.`);
+    aviso.id = `${id}-aviso`;
+    aviso.setAttribute("role", "status");
+    aviso.hidden = !(elegida === "foto" && !foto);
+    caja.setAttribute("aria-describedby", `${ayuda.id} ${aviso.id}`);
+    caja.append(lista, tono, panelFoto, aviso, ayuda);
     return caja;
+  }
+  const partesTono = (caja) => {
+    const id = caja?.dataset.tono;
+    return id ? {
+      texto: document.getElementById(id), selector: document.getElementById(`${id}-selector`), vista: document.getElementById(`${id}-vista`),
+      auto: document.getElementById(`${id}-quitar`), estado: document.getElementById(`${id}-estado`), error: document.getElementById(`${id}-error`),
+      circulo: caja.querySelector(".es-circulo .editor-forma-circulo")
+    } : null;
+  };
+  /* Refleja un tono en el componente. «escribiendo»: viene del propio campo de texto (no se toca su
+     valor ni se marca error). Un valor incompleto deja el recuadro como estaba y la vista neutra. */
+  function pintarTono(caja, valor, { escribiendo = false } = {}) {
+    const p = partesTono(caja);
+    if (!p?.texto) return;
+    const valido = normalizarTono(valor);
+    if (!escribiendo) p.texto.value = valor;
+    if (valido && p.selector) p.selector.value = valido.toLowerCase();
+    if (p.vista) pintarVistaMuestra(p.vista, valido || "");
+    if (p.circulo) pintarVistaMuestra(p.circulo, valido || "");
+    if (p.estado) p.estado.textContent = textoEstadoTono(valor);
+    if (p.auto && !p.texto.readOnly) p.auto.hidden = !String(valor).trim();
+    if (valido || !String(valor).trim()) marcarTono(caja, "");
+  }
+  function marcarTono(caja, mensaje) {
+    const p = partesTono(caja);
+    if (!p?.texto) return;
+    if (p.error) { p.error.textContent = mensaje; p.error.hidden = !mensaje; }
+    if (mensaje) p.texto.setAttribute("aria-invalid", "true"); else p.texto.removeAttribute("aria-invalid");
+  }
+  /* Al salir del campo: normaliza un hexadecimal válido y avisa de uno incompleto. Devuelve el valor
+     que debe quedar en el estado. */
+  function cerrarTono(caja, nombre) {
+    const p = partesTono(caja);
+    if (!p?.texto) return "";
+    const crudo = p.texto.value;
+    const valido = normalizarTono(crudo);
+    if (valido) { if (valido !== crudo) pintarTono(caja, valido); return valido; }
+    if (!crudo.trim()) { pintarTono(caja, ""); return ""; }
+    marcarTono(caja, `«${crudo.trim()}» no es un tono válido para ${nombre}. Usa 6 cifras hexadecimales, como #E8DCC8, o «Usar color automático».`);
+    return crudo;
+  }
+  function pintarFormaElegida(caja, forma, hayFoto) {
+    if (!caja) return;
+    const elegida = formaValida(forma);
+    caja.dataset.forma = elegida;
+    const tono = document.getElementById(`${caja.id}-tono`);
+    if (tono) tono.hidden = elegida !== "circulo";
+    const foto = document.getElementById(`${caja.id}-foto`);
+    if (foto) foto.hidden = elegida !== "foto";
+    const aviso = document.getElementById(`${caja.id}-aviso`);
+    if (aviso) aviso.hidden = !(elegida === "foto" && !hayFoto);
+  }
+
+  function campoForma(v) {
+    const caja = crearCampoPresentacion({ id: `ed-v-${v.id}-forma`, idTono: `ed-v-${v.id}-muestra`, nombre: v.color.trim() || "este color",
+      forma: v.forma, muestra: v.muestra, foto: fotoPrincipalDe(v), bloqueadoForma: formaMuestra === false, bloqueadoTono: publicoYMuestras === false,
+      datosForma: { variante: v.id, vcampo: "forma" }, datosTono: { variante: v.id, vcampo: "muestra", opcionNueva: "" },
+      datosSelector: { variante: v.id, vselector: "muestra", opcionNueva: "" }, datosAuto: { editor: "quitar-muestra", variante: v.id } });
+    const avisoEsquema = nodo("p", "editor-nota editor-codigos-aviso", "Este servidor todavía no guarda cómo se muestra cada color: falta aplicar la migración 20261117010000_forma_muestra_color. Mientras tanto la tienda usa el círculo.");
+    avisoEsquema.dataset.avisoForma = "";
+    avisoEsquema.hidden = formaMuestra !== false;
+    caja.append(avisoEsquema);
+    return caja;
+  }
+  // Repinta solo el campo de forma (al cambiar la foto principal o la galería), conservando el foco.
+  function repintarForma(v) {
+    const actual = document.getElementById(`ed-v-${v.id}-forma`);
+    if (!actual) return;
+    const enfocado = actual.contains(document.activeElement) ? document.activeElement.id : null;
+    const error = document.getElementById(`ed-v-${v.id}-muestra-error`);
+    const mensajeError = error && !error.hidden ? error.textContent : "";
+    actual.replaceWith(campoForma(v));
+    if (mensajeError) marcarTono(document.getElementById(`ed-v-${v.id}-forma`), mensajeError);
+    if (enfocado) document.getElementById(enfocado)?.focus({ preventScroll: true });
+  }
+
+  async function comprobarFormaMuestra() {
+    if (formaMuestra !== null) return;
+    try {
+      const r = await panel().cliente().from("variantes").select("forma_muestra").limit(1);
+      if (!r.error) formaMuestra = true;
+      else if (String(r.error.code) === "42703" || faltaForma(r.error)) formaMuestra = false;
+    } catch { /* sin conexión: se sabrá al guardar */ }
+  }
+  function aplicarCapacidadForma() {
+    if (!ed) return;
+    const antiguo = formaMuestra === false;
+    document.querySelectorAll("#editor [data-opcion-forma]").forEach((n) => { n.dataset.bloqueado = antiguo ? "1" : ""; });
+    document.querySelectorAll("#editor [data-aviso-forma]").forEach((n) => { n.hidden = !antiguo; });
+    pintarBotones();
   }
 
   async function comprobarPublicoYMuestras() {
@@ -660,8 +883,14 @@
     caja.append(nodo("legend", "", "Fotos de este color"));
     const L = fotos().LIMITES;
     caja.append(nodo("p", "campo-ayuda", `La primera es la principal. JPEG, PNG o WebP de hasta ${fotos().peso(L.bytesEntradaMax)}; se publican en WebP de hasta ${L.ladoMaximo} px, sin recortes. Hasta ${L.fotosPorColor} por color.`));
+    const quitadas = (v.galeria || []).filter((r) => !v.fotos.some((f) => f.estado === "guardada" && f.ruta === r)).length;
+    if (quitadas) {
+      const nota = nodo("p", "editor-nota editor-fotos-quitadas", `${quitadas === 1 ? "Quitaste 1 foto guardada: se retira" : `Quitaste ${quitadas} fotos guardadas: se retiran`} de la galería al guardar. «Cancelar» conserva la galería guardada.`);
+      nota.setAttribute("role", "status");
+      caja.append(nota);
+    }
     const lista = nodo("ol", "editor-fotos-lista");
-    if (!v.fotos.length) lista.append(nodo("li", "editor-vacio", "Todavía no hay fotos."));
+    if (!v.fotos.length) lista.append(nodo("li", "editor-vacio", "Todavía no hay fotos. Sin fotos no se puede publicar y la tienda muestra el círculo."));
     v.fotos.forEach((f, i) => lista.append(pintarFoto(v, f, i)));
     const subir = nodo("label", "boton boton-secundario boton-compacto editor-subir");
     const input = nodo("input");
@@ -732,10 +961,11 @@
       acciones.append(reemplazo);
     }
     if (f.estado === "error" && f.reintentable) acciones.append(boton("Reintentar subida", "foto-reintentar", "boton boton-secundario boton-mini", datos));
-    if (!["procesando", "subiendo", "comprobando"].includes(f.estado)) {
-      acciones.append(etiquetado(boton(f.estado === "error" || f.reemplaza ? "Descartar" : "Quitar de la galería", "foto-quitar", "boton boton-texto boton-mini", datos),
-        f.estado === "error" || f.reemplaza ? `Descartar la foto ${i + 1}` : `Quitar la foto ${i + 1} de la galería (el archivo no se borra)`));
-    }
+    // «Quitar foto» en cualquier estado (también mientras se optimiza o se sube): una respuesta
+    // tardía de una foto quitada no la vuelve a mostrar.
+    const nombreColor = v.color.trim() || "este color";
+    acciones.append(etiquetado(boton("Quitar foto", "foto-quitar", "boton boton-secundario boton-mini editor-foto-quitar", datos),
+      f.estado === "guardada" ? `Quitar la foto ${i + 1} de la galería de ${nombreColor} (se retira al guardar)` : `Quitar la foto ${i + 1} de ${nombreColor}`));
     info.append(acciones);
     item.append(info);
     return item;
@@ -760,6 +990,7 @@
   function repintarFotos(v, enfocarSelector = null) {
     const actual = document.getElementById(`ed-v-${v.id}-fotos`);
     if (actual) actual.replaceWith(pintarFotos(v));
+    repintarForma(v);
     pintarBotones();
     if (enfocarSelector) $(enfocarSelector, document.getElementById(`ed-v-${v.id}-fotos`))?.focus();
   }
@@ -838,9 +1069,11 @@
     $("#editor-salida").hidden = true;
     $("#editor-botones").hidden = false;
     pintarTodo();
-    if (!dialogo.open) dialogo.showModal();
+    if (!dialogo.open) { bloquearFondo(); dialogo.showModal(); }
     $("#editor-titulo").focus();
     if (codigosEditables === null) comprobarCodigosEditables().then(aplicarCapacidadCodigos);
+    if (formaMuestra === null) comprobarFormaMuestra().then(aplicarCapacidadForma);
+    else if (formaMuestra === false) aplicarCapacidadForma();
     if (publicoYMuestras === null) comprobarPublicoYMuestras().then(aplicarCapacidadPublico);
     else if (publicoYMuestras === false) aplicarCapacidadPublico();
     else if (codigosEditables === false) aplicarCapacidadCodigos();
@@ -851,11 +1084,12 @@
     for (const v of ed?.variantes || []) for (const f of v.fotos) if (f.vistaPrevia && !f.conservarVista) URL.revokeObjectURL(f.vistaPrevia);
     ed = null;
     enCurso = false;
-    if (dialogo.open) dialogo.close();
+    if (dialogo.open) { dialogo.close(); liberarFondo(); }
     $("#editor-cuerpo").replaceChildren();
     const destino = origen?.isConnected ? origen : document.querySelector("#boton-nuevo");
     origen = null;
-    destino?.focus();
+    // El foco vuelve al botón que lo abrió sin mover el panel (su posición ya se restauró).
+    destino?.focus({ preventScroll: true });
   }
 
   function intentarCerrar() {
@@ -868,9 +1102,10 @@
       ], "aviso");
       return;
     }
-    if (!sucio()) { cerrar(); return; }
-    const sinGuardar = [...ed.subidasSesion].filter((o) => !fotoGuardadaEnFormulario(o)).length;
-    $("#editor-salida-texto").textContent = `Tienes cambios sin guardar. ¿Quieres descartarlos?${sinGuardar ? ` ${sinGuardar === 1 ? "Una foto subida quedará" : `${sinGuardar} fotos subidas quedarán`} como archivo sin usar; puedes borrarla${sinGuardar === 1 ? "" : "s"} después desde «Archivos sin usar».` : ""}`;
+    if (!sucio()) { const formulario = ed; cerrar(); limpiarQuitadas(formulario); return; }
+    const sinGuardar = [...ed.subidasSesion].filter((o) => !ed.enGaleria.has(o) && !fotoGuardadaEnFormulario(o)).length;
+    const quitoGuardadas = ed.variantes.some((v) => (v.galeria || []).some((r) => !v.fotos.some((f) => f.estado === "guardada" && f.ruta === r)));
+    $("#editor-salida-texto").textContent = `Tienes cambios sin guardar. ¿Quieres descartarlos?${quitoGuardadas ? " Las fotos guardadas que quitaste vuelven a la galería." : ""}${sinGuardar ? ` ${sinGuardar === 1 ? "La foto subida que no llegó a guardarse se borrará" : `Las ${sinGuardar} fotos subidas que no llegaron a guardarse se borrarán`} de Storage.` : ""}`;
     $("#editor-salida").hidden = false;
     $("#editor-botones").hidden = true;
     $('[data-editor="seguir"]').focus();
@@ -929,6 +1164,7 @@
       delete datos.publico;
       for (const v of datos.variantes) delete v.muestra_color;
     }
+    if (formaMuestra === false) for (const v of datos.variantes) delete v.forma_muestra;
     const huella = JSON.stringify(datos);
     // La misma operación para el mismo contenido: reintentar no aplica nada dos veces.
     if (!ed.pendiente || ed.pendiente.huella !== huella || ed.pendiente.version !== ed.version || ed.pendiente.tipo !== "guardar") {
@@ -940,6 +1176,8 @@
     ed.pendiente.extras = "publico" in datos
       ? { publico: datos.publico, muestras: Object.fromEntries(datos.variantes.map((v) => [v.id, v.muestra_color ?? null])) }
       : null;
+    ed.pendiente.formas = datos.variantes.some((v) => v.forma_muestra === "foto")
+      ? Object.fromEntries(datos.variantes.map((v) => [v.id, v.forma_muestra])) : null;
     ed.operaciones.add(ed.pendiente.operacion);
     const op = ed.pendiente;
 
@@ -1075,6 +1313,10 @@
     if (respuesta?.publico_y_muestras === true) publicoYMuestras = true;
     const extrasSinGuardar = extrasSinAplicar(op.extras, leido.data);
     if (extrasSinGuardar) publicoYMuestras = false;
+    if (respuesta?.forma_muestra === true) formaMuestra = true;
+    // Se pidió «foto» y el servidor no la guardó (esquema anterior): se dice, no se presenta como hecho.
+    const formasSinGuardar = Boolean(op.formas) && (leido.data?.variantes || []).some((v) => op.formas[v.id] === "foto" && v.forma_muestra !== "foto");
+    if (formasSinGuardar) formaMuestra = false;
     if (leido.data) {
       const anterior = ed;
       ed = estadoDesdeServidor(leido.data, leido.tallas, anterior);
@@ -1090,6 +1332,7 @@
     pintarTodo();
     if (sinAplicar.length) aplicarCapacidadCodigos();
     if (extrasSinGuardar) aplicarCapacidadPublico();
+    if (formasSinGuardar) aplicarCapacidadForma();
     panel().recargar();
     const avisoCodigos = sinAplicar.length
       ? ` Atención: el código no cambió (${sinAplicar.join(", ")}). Este servidor todavía no admite editar códigos (falta aplicar la migración 20261108030000); lo demás sí se guardó.`
@@ -1097,16 +1340,29 @@
     const avisoExtras = extrasSinGuardar
       ? " Atención: el público y las muestras de color no se guardaron. Este servidor todavía no los admite (falta aplicar la migración 20261108040000); lo demás sí se guardó."
       : "";
+    const avisoForma = formasSinGuardar
+      ? " Atención: cómo se muestra cada color no se guardó. Este servidor todavía no lo admite (falta aplicar la migración 20261117010000); la tienda usa el círculo. Lo demás sí se guardó."
+      : "";
     const conservadas = (Array.isArray(respuesta?.tallas_conservadas) ? respuesta.tallas_conservadas : [])
       .map((t) => `La talla ${t.talla} de «${t.color}» cambió en otro lugar mientras editabas (se ${t.activa ? "reactivó" : "desactivó"}) y se conservó ese cambio.`);
-    const base = [comprobado ? "Guardado (comprobado con el identificador de esta operación)." : respuesta?.estado === "ya_aplicada" ? "Ese guardado ya se había aplicado; no se repitió." : "Guardado.", ...conservadas].join(" ") + avisoCodigos + avisoExtras;
+    const base = [comprobado ? "Guardado (comprobado con el identificador de esta operación)." : respuesta?.estado === "ya_aplicada" ? "Ese guardado ya se había aplicado; no se repitió." : "Guardado.", ...conservadas].join(" ") + avisoCodigos + avisoExtras + avisoForma;
     if (publicarDespues && !ed.activo) {
+      limpiarQuitadas(ed);
       resultado(`${base} Publicando…`, [], "ok");
       enCurso = false;
       await cambiarEstado("publicar", { trasGuardar: base });
       return;
     }
-    resultado(`${base} ${ed.activo ? "Los cambios ya se ven en la tienda." : "La zapatilla sigue oculta en la tienda."}`, [], avisoCodigos || avisoExtras ? "aviso" : "ok");
+    resultado(`${base} ${ed.activo ? "Los cambios ya se ven en la tienda." : "La zapatilla sigue oculta en la tienda."}`, [], avisoCodigos || avisoExtras || avisoForma ? "aviso" : "ok");
+    anunciarLimpieza(ed);
+  }
+  // Tras confirmar el guardado: borra lo subido y quitado antes de guardarlo, y lo añade al resultado.
+  function anunciarLimpieza(formulario) {
+    limpiarQuitadas(formulario).then((n) => {
+      if (!n || ed !== formulario) return;
+      const p = $("#editor-resultado p");
+      if (p) p.textContent += ` ${n === 1 ? "Se borró de Storage 1 foto que quitaste" : `Se borraron de Storage ${n} fotos que quitaste`} antes de guardarla${n === 1 ? "" : "s"}.`;
+    });
   }
 
   // Solo lectura: ¿se aplicó la operación pendiente?
@@ -1244,6 +1500,7 @@
       resultado(`Solo se pueden añadir ${maximo} ${maximo === 1 ? "foto" : "fotos"} más a este color (máximo ${L.fotosPorColor} por color y ${L.fotosPorOperacion} por vez).`, [], "aviso");
       lista = lista.slice(0, Math.max(0, maximo));
     }
+    const formulario = ed;
     const items = lista.map((archivo) => ({ clave: nuevaClave(), estado: "procesando", ruta: null, alt: "", archivo, reemplaza: reemplazarClave }));
     if (reemplazarClave) {
       const i = v.fotos.findIndex((f) => f.clave === reemplazarClave);
@@ -1252,32 +1509,37 @@
     repintarFotos(v);
     // De una en una: menos memoria y un progreso claro.
     for (const item of items) {
+      if (item.quitada) continue;
       try {
         item.info = await fotos().preparar(item.archivo);
       } catch (e) {
+        if (item.quitada) continue;
         item.estado = "error";
         item.reintentable = false;
         item.mensaje = e instanceof fotos().ErrorFoto ? e.message : "No pudimos procesar la foto.";
-        if (ed) repintarFotos(v);
+        if (ed === formulario) repintarFotos(v);
         continue;
       }
-      if (!ed) return;
+      delete item.archivo;
+      // Quitada mientras se optimizaba, o formulario cerrado: no se sube nada.
+      if (item.quitada || (ed !== formulario && borrador !== formulario)) continue;
       item.blob = item.info.blob;
       item.vistaPrevia = URL.createObjectURL(item.blob);
-      item.objeto = fotos().nombreObjeto(ed.id, v.id);
-      delete item.archivo;
+      item.objeto = fotos().nombreObjeto(formulario.id, v.id);
       await subirFoto(v, item);
     }
   }
 
   async function subirFoto(v, item) {
+    const formulario = ed || borrador;
     item.estado = "subiendo";
     item.progreso = 0;
     item.mensaje = "";
-    repintarFotos(v);
+    if (ed === formulario) repintarFotos(v);
     let token = null;
     try { token = (await panel().cliente().auth.getSession()).data?.session?.access_token || null; } catch { token = null; }
-    if (!token) { item.estado = "error"; item.reintentable = true; item.mensaje = "La sesión terminó o no se pudo leer. Vuelve a ingresar y reintenta."; repintarFotos(v); return; }
+    if (respuestaTardia(formulario, item, { ok: false })) return;
+    if (!token) { item.estado = "error"; item.reintentable = true; item.mensaje = "La sesión terminó o no se pudo leer. Vuelve a ingresar y reintenta."; if (ed === formulario) repintarFotos(v); return; }
     const conf = panel().configuracion();
     let ultimo = 0;
     const r = await fotos().subir({
@@ -1290,27 +1552,41 @@
         if (barra) { barra.value = p; barra.previousElementSibling.textContent = `${item.reemplaza ? "Reemplazo · " : ""}Subiendo ${Math.round(p * 100)} %`; }
       }
     });
-    if (!ed) return;
-    if (r.ok) { marcarSubida(v, item); return; }
+    if (respuestaTardia(formulario, item, r)) return;
+    if (r.ok) { marcarSubida(v, item, formulario); return; }
     if (r.tipo === "duplicado" || r.tipo === "red") {
       // El nombre es único y solo lo conoce este formulario: si existe, es esta subida.
       item.estado = "comprobando";
-      repintarFotos(v);
+      if (ed === formulario) repintarFotos(v);
       const existe = await existeObjeto(item.objeto);
-      if (!ed) return;
-      if (existe === true) { marcarSubida(v, item); return; }
+      if (respuestaTardia(formulario, item, { tipo: "red" })) return;
+      if (existe === true) { marcarSubida(v, item, formulario); return; }
       item.estado = "error";
       item.reintentable = true;
       item.mensaje = existe === false
         ? "No pudimos confirmar la subida: la foto todavía no aparece en Storage. Reintenta (usa el mismo nombre: no se duplicará)."
         : "Se perdió la conexión y no pudimos comprobar si la foto llegó. Reintenta (usa el mismo nombre: no se duplicará).";
-      repintarFotos(v);
+      if (ed === formulario) repintarFotos(v);
       return;
     }
     item.estado = "error";
     item.reintentable = r.tipo === "sin-sesion";
     item.mensaje = r.mensaje || "No se pudo subir.";
-    repintarFotos(v);
+    if (ed === formulario) repintarFotos(v);
+  }
+
+  /* Respuesta de una subida cuya foto ya no está en el formulario (se quitó, o el formulario se
+     descartó): no se vuelve a mostrar. Si el archivo pudo llegar a Storage, se apunta para limpiarlo
+     (al guardar o al descartar) o, sin formulario, se limpia ya si ninguna galería lo usa. */
+  function respuestaTardia(formulario, item, r) {
+    const vigente = !item.quitada && (ed === formulario || borrador === formulario);
+    if (vigente) return false;
+    const pudoLlegar = r.ok || r.tipo === "duplicado" || r.tipo === "red";
+    if (pudoLlegar && item.objeto) {
+      if (ed === formulario || borrador === formulario) formulario.subidasSesion.add(item.objeto);
+      else limpiarArchivoSinUso(item.objeto);
+    }
+    return true;
   }
 
   async function existeObjeto(objeto) {
@@ -1323,10 +1599,10 @@
     } catch { return null; }
   }
 
-  function marcarSubida(v, item) {
+  function marcarSubida(v, item, formulario = ed) {
     item.estado = "subida";
     item.ruta = fotos().urlPublica(panel().configuracion().url, item.objeto);
-    ed.subidasSesion.add(item.objeto);
+    formulario.subidasSesion.add(item.objeto);
     delete item.blob;
     if (item.reemplaza) {
       // El reemplazo ocupa el lugar de la foto anterior. El archivo anterior NO se borra.
@@ -1334,7 +1610,39 @@
       if (i >= 0) v.fotos.splice(i, 1);
       item.reemplaza = null;
     }
-    repintarFotos(v);
+    if (ed === formulario) repintarFotos(v);
+  }
+
+  /* ¿Alguna galería guardada usa este archivo? true / false / null (no se pudo comprobar). La
+     misma comprobación que «Borrar definitivamente»: cualquier color de cualquier zapatilla. */
+  async function archivoEnUso(objeto) {
+    try {
+      const uso = await panel().cliente().from("fotos").select("id").like("ruta", `%/fotos-catalogo/${objeto}`).limit(1);
+      if (uso.error) return null;
+      return (uso.data || []).length > 0;
+    } catch { return null; }
+  }
+  // Borra un archivo SOLO si ninguna galería lo usa. Devuelve true si se borró.
+  async function limpiarArchivoSinUso(objeto) {
+    if (!objeto || (await archivoEnUso(objeto)) !== false) return false;
+    try {
+      const r = await panel().cliente().storage.from(fotos().BUCKET).remove([objeto]);
+      return !r.error && (r.data || []).length === 1;
+    } catch { return false; }
+  }
+  /* Limpieza de Storage tras confirmar el cambio de galería (guardado confirmado) o al descartar el
+     formulario: archivos subidos aquí que nunca estuvieron en una galería guardada y que el
+     formulario ya no usa. Nunca con una operación sin confirmar. Lo que estuvo en una galería
+     guardada se queda en «Archivos sin usar», que pide confirmación para borrar. */
+  async function limpiarQuitadas(formulario, { descartando = false } = {}) {
+    if (!formulario || formulario.pendiente) return 0;
+    const usadas = new Set(descartando ? [] : formulario.variantes.flatMap((v) => v.fotos.map((f) => f.objeto || fotos().objetoDe(f.ruta)).filter(Boolean)));
+    let borradas = 0;
+    for (const objeto of [...formulario.subidasSesion]) {
+      if (formulario.enGaleria.has(objeto) || usadas.has(objeto)) continue;
+      if (await limpiarArchivoSinUso(objeto)) { borradas += 1; formulario.subidasSesion.delete(objeto); }
+    }
+    return borradas;
   }
 
   // --------------------------------------------------------- archivos sin usar
@@ -1469,7 +1777,7 @@
     switch (accion) {
       case "cerrar": case "cancelar": intentarCerrar(); break;
       case "seguir": $("#editor-salida").hidden = true; $("#editor-botones").hidden = false; $('[data-editor="cancelar"]').focus(); break;
-      case "descartar": cerrar(); break;
+      case "descartar": { const formulario = ed; cerrar(); limpiarQuitadas(formulario, { descartando: true }); break; }
       case "cerrar-forzado": cerrar(); break;
       case "guardar-publicar": guardar({ publicar: true }); break;
       case "comprobar": comprobar(); break;
@@ -1522,10 +1830,16 @@
         break;
       }
       case "foto-quitar": {
-        const f = v.fotos.find((x) => x.clave === objetivo.dataset.clave);
-        v.fotos = v.fotos.filter((x) => x !== f);
-        if (f?.vistaPrevia) URL.revokeObjectURL(f.vistaPrevia);
-        repintarFotos(v, `#ed-v-${v.id}-archivo`);
+        const i = v.fotos.findIndex((x) => x.clave === objetivo.dataset.clave);
+        if (i < 0) break;
+        const [f] = v.fotos.splice(i, 1);
+        f.quitada = true;
+        if (f.vistaPrevia) URL.revokeObjectURL(f.vistaPrevia);
+        // Una subida en curso o sin confirmar pudo llegar: su archivo se limpia al guardar o descartar.
+        if (f.objeto && f.estado !== "guardada") ed.subidasSesion.add(f.objeto);
+        // Si era la principal, la siguiente pasa a serlo (y a ser la miniatura del selector).
+        const siguiente = v.fotos[Math.min(i, v.fotos.length - 1)];
+        repintarFotos(v, siguiente ? `[data-clave="${siguiente.clave}"] [data-editor="foto-quitar"]` : `#ed-v-${v.id}-archivo`);
         break;
       }
       case "foto-reintentar": {
@@ -1534,13 +1848,11 @@
         break;
       }
       case "quitar-muestra": {
+        // «Usar color automático»: sin tono propio (la tienda usa su paleta o el círculo neutro).
         if (!v) break;
         v.muestra = "";
-        const texto = document.getElementById(`ed-v-${v.id}-muestra`);
-        if (texto) { texto.value = ""; texto.removeAttribute("aria-invalid"); texto.focus(); }
-        const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
-        if (vista) pintarVistaMuestra(vista, "");
-        objetivo.hidden = true;
+        pintarTono(document.getElementById(`ed-v-${v.id}-forma`), "");
+        document.getElementById(`ed-v-${v.id}-muestra-selector`)?.focus();
         pintarBotones();
         break;
       }
@@ -1567,16 +1879,25 @@
       if (n.dataset.campo === "nombre") $("#editor-titulo").textContent = ed.modo === "crear" ? "Nueva zapatilla" : (n.value.trim() || "Zapatilla sin nombre");
       if (n.dataset.campo === "publico") errorPublicoVisible("");
     } else if (n.dataset.variante && n.dataset.vselector === "muestra") {
-      // El selector de color escribe en el campo de texto, que es el que se guarda.
+      // El recuadro de color escribe en el campo de texto, que es el que se guarda. Solo cuenta
+      // cuando la persona elige un tono: su gris inicial nunca se guarda por sí solo.
+      const v = varianteDe(n.dataset.variante);
+      if (!v || n.readOnly || n.dataset.bloqueado === "1") return;
+      v.muestra = n.value.toUpperCase();
+      pintarTono(document.getElementById(`ed-v-${v.id}-forma`), v.muestra);
+    } else if (n.dataset.variante && n.dataset.vcampo === "forma") {
+      const v = varianteDe(n.dataset.variante);
+      if (!v || !n.checked) return;
+      v.forma = formaValida(n.value);
+      pintarFormaElegida(document.getElementById(`ed-v-${v.id}-forma`), v.forma, Boolean(fotoPrincipalDe(v)));
+    } else if (n.dataset.variante && n.dataset.vcampo === "muestra") {
+      // Se puede terminar de escribir: el error se muestra al salir del campo (alCambiar).
       const v = varianteDe(n.dataset.variante);
       if (!v) return;
-      v.muestra = n.value.toUpperCase();
-      const texto = document.getElementById(`ed-v-${v.id}-muestra`);
-      if (texto) { texto.value = v.muestra; texto.removeAttribute("aria-invalid"); }
-      const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
-      if (vista) pintarVistaMuestra(vista, v.muestra);
-      const quitar = document.getElementById(`ed-v-${v.id}-muestra-quitar`);
-      if (quitar) quitar.hidden = false;
+      v.muestra = n.value;
+      pintarTono(document.getElementById(`ed-v-${v.id}-forma`), n.value, { escribiendo: true });
+      pintarBotones();
+      return;
     } else if (n.dataset.variante && n.dataset.vcampo) {
       const v = varianteDe(n.dataset.variante);
       if (!v) return;
@@ -1584,14 +1905,6 @@
       if (n.dataset.vcampo === "color") { const t = document.getElementById(`ed-v-${v.id}-titulo`); if (t) t.textContent = n.value.trim() || `Color ${ed.variantes.indexOf(v) + 1}`; }
       if (n.dataset.vcampo === "precio") { const ayuda = document.getElementById(`${n.id}-ayuda`); if (ayuda) ayuda.textContent = textoPrecio(v); }
       if (n.dataset.vcampo === "activa") document.getElementById(`ed-v-${v.id}`)?.classList.toggle("es-inactiva", !n.checked);
-      if (n.dataset.vcampo === "muestra") {
-        const vista = document.getElementById(`ed-v-${v.id}-muestra-vista`);
-        if (vista) pintarVistaMuestra(vista, n.value);
-        const selector = document.getElementById(`ed-v-${v.id}-muestra-selector`);
-        if (selector && MUESTRA_HEX.test(n.value.trim())) selector.value = n.value.trim().toLowerCase();
-        const quitar = document.getElementById(`ed-v-${v.id}-muestra-quitar`);
-        if (quitar) quitar.hidden = !n.value.trim();
-      }
     } else return;
     if (n.getAttribute("aria-invalid") === "true" && !n.dataset.agregarTalla) n.removeAttribute("aria-invalid");
     pintarBotones();
@@ -1603,6 +1916,12 @@
     if (ed && n.classList?.contains("campo-mayus")) {
       const normal = n.dataset.codigo !== undefined ? codigoLimpio(n.value) : mayus(n.value);
       if (n.value !== normal) n.value = normal;
+    }
+    if (ed && n.dataset.variante && n.dataset.vcampo === "muestra" && n.type === "text") {
+      // Al salir del tono: se normaliza (#e8dcc8 → #E8DCC8) o se avisa de que está incompleto.
+      const v = varianteDe(n.dataset.variante);
+      if (v && !n.readOnly) { v.muestra = cerrarTono(document.getElementById(`ed-v-${v.id}-forma`), v.color.trim() || "este color"); pintarBotones(); }
+      return;
     }
     if (!ed || n.type !== "file") { alEscribir(e); return; }
     const archivos = [...(n.files || [])];
@@ -1643,6 +1962,15 @@
     });
   }
 
-  window.GamaTallaEditor = Object.freeze({ abrir: (id, disparador) => abrir(id, false, disparador), alPerderAcceso, ofrecerBorrador, abierto: () => Boolean(ed) });
+  window.GamaTallaEditor = Object.freeze({
+    abrir: (id, disparador) => abrir(id, false, disparador), alPerderAcceso, ofrecerBorrador, abierto: () => Boolean(ed),
+    // Etapa 18: lo que comparte el importador (mismas reglas de tallas, precios, muestra y forma).
+    comun: Object.freeze({
+      racional, equivalentes, entero, crearCampoPresentacion, pintarTono, cerrarTono, pintarFormaElegida, normalizarTono, pintarVistaMuestra,
+      formaValida, tipoError, limpiarArchivoSinUso, bloquearFondo, liberarFondo, LIM, MUESTRA_HEX, SEGMENTOS, PUBLICOS,
+      capacidadForma: async () => { await comprobarFormaMuestra(); return formaMuestra; },
+      capacidadPublico: async () => { await comprobarPublicoYMuestras(); return publicoYMuestras; }
+    })
+  });
   document.addEventListener("DOMContentLoaded", preparar);
 })();

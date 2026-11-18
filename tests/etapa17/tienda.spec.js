@@ -38,12 +38,17 @@ const lineaVisible = (loc) => loc.locator('.tarjeta-meta').evaluate((n) => n.inn
 
 test.describe('Tarjeta: marca · público · colores (sin categoría)', () => {
   for (const vista of [{ ...CELULAR, nombre: '360', ancho: 360 }, CELULAR, ESCRITORIO]) {
-    test(`${vista.ancho}px: «NIKE · CABALLERO · 2 COLORES», Unisex y heredada sin etiqueta; nada recortado`, async ({ browser, browserName }) => {
+    test(`${vista.ancho}px: «Nike · Caballero · 2 COLORES», Unisex y heredada sin etiqueta; mismo color; nada recortado`, async ({ browser, browserName }) => {
       await tiendaConSupabase({ browser, browserName }, vista, async (pagina) => {
         await expect(tarjetas(pagina)).toHaveCount(4);
-        expect(await lineaVisible(tarjeta(pagina, 'AIR FOR 1'))).toBe('Nike · CABALLERO · 2 COLORES');
-        expect(await lineaVisible(tarjeta(pagina, 'BOTA URBANA 17'))).toBe('Adidas · UNISEX');
-        expect(await lineaVisible(tarjeta(pagina, 'RUNNER 17'))).toBe('New balance · DAMA');
+        // Etapa 18: el público con mayúscula inicial (Caballero, Dama, Unisex), no en mayúsculas.
+        expect(await lineaVisible(tarjeta(pagina, 'AIR FOR 1'))).toBe('Nike · Caballero · 2 COLORES');
+        expect(await lineaVisible(tarjeta(pagina, 'BOTA URBANA 17'))).toBe('Adidas · Unisex');
+        expect(await lineaVisible(tarjeta(pagina, 'RUNNER 17'))).toBe('New balance · Dama');
+        // Marca, público y recuento con el mismo color de texto.
+        const colores = await tarjeta(pagina, 'AIR FOR 1').locator('.tarjeta-meta > span').evaluateAll((ss) => ss.map((s) => getComputedStyle(s).color));
+        expect(colores).toHaveLength(3);
+        expect(new Set(colores).size, `colores: ${colores.join(' | ')}`).toBe(1);
         expect(await lineaVisible(tarjeta(pagina, 'HEREDADA 17')), 'sin público: sin etiqueta').toBe('Puma');
         await expect(tarjeta(pagina, 'HEREDADA 17').locator('.tarjeta-publico')).toHaveCount(0);
         // La categoría ya no está en ninguna línea de tarjeta.

@@ -23,6 +23,11 @@
  *   3. Verificación: filas idénticas a las del paquete, disparadores activos, secuencias, ids de
  *      catalogo_publico, bytes de cada foto servida, que se generan códigos nuevos (en una
  *      transacción que se deshace) y auditoría de funciones con cero filas.
+ *
+ * Paquetes anteriores a una migración que añadió una columna con valor por omisión (etapa 18:
+ * variantes.forma_muestra = 'circulo'): el paquete no trae esa columna, la base la rellena con su
+ * valor por omisión, la comparación fila a fila se hace con las columnas del paquete y aparte se
+ * exige que TODAS las filas tengan ese valor. Un paquete que sí la trae se compara completo.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -64,8 +69,28 @@ function insertar(tabla, filas, m, { conflicto = '' } = {}) {
   const columnas = Object.keys(filas[0]).map((c) => `"${c.replace(/"/g, '""')}"`).join(', ');
   return `insert into public.${tabla} (${columnas})\n  select ${columnas} from pg_catalog.jsonb_populate_recordset(null::public.${tabla}, ${m}${JSON.stringify(filas)}${m}::jsonb)${conflicto};\n`;
 }
-const igualdad = (tabla, filas, m, orden = 'id') => `(select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x) order by x.${orden}), '[]') from pg_catalog.jsonb_populate_recordset(null::public.${tabla}, ${m}${JSON.stringify(filas)}${m}::jsonb) x)
-      = (select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(y) order by y.${orden}), '[]') from public.${tabla} y)`;
+// Columnas que una migración POSTERIOR al formato del paquete añadió con un valor por omisión fijo.
+const COLUMNAS_POSTERIORES = {
+  variantes: { forma_muestra: 'circulo' } // 20261117010000_forma_muestra_color (etapa 18)
+};
+// Las de una tabla que el paquete no trae (paquete anterior a esa migración).
+const ausentes = (tabla, filas) => (filas.length ? Object.keys(COLUMNAS_POSTERIORES[tabla] || {}).filter((c) => !(c in filas[0])) : []);
+const igualdad = (tabla, filas, m, orden = 'id') => {
+  const fuera = ausentes(tabla, filas);
+  const quitar = fuera.length ? ` - array[${fuera.map((c) => `'${c}'`).join(', ')}]::text[]` : '';
+  return `(select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(x)${quitar} order by x.${orden}), '[]') from pg_catalog.jsonb_populate_recordset(null::public.${tabla}, ${m}${JSON.stringify(filas)}${m}::jsonb) x)
+      = (select coalesce(pg_catalog.jsonb_agg(pg_catalog.to_jsonb(y)${quitar} order by y.${orden}), '[]') from public.${tabla} y)`;
+};
+// Cuántas filas NO tienen el valor por omisión en cada columna ausente del paquete (debe ser 0).
+function sqlPorOmision(t) {
+  const partes = [];
+  for (const tabla of Object.keys(COLUMNAS_POSTERIORES)) {
+    for (const c of ausentes(tabla, t[tabla] || [])) {
+      partes.push(`'${tabla}.${c}', (select count(*) from public.${tabla} where ${c} is distinct from '${COLUMNAS_POSTERIORES[tabla][c]}')`);
+    }
+  }
+  return partes.length ? `pg_catalog.jsonb_build_object(${partes.join(', ')})` : `'{}'::jsonb`;
+}
 
 async function principal() {
   const args = argumentos(process.argv.slice(2), ['destino-workdir', 'informe']);
@@ -189,8 +214,13 @@ commit;
       'secuencias', pg_catalog.jsonb_build_object(
         'seq_codigo_producto', (select pg_catalog.jsonb_build_object('last_value', x.last_value, 'is_called', x.is_called) from public.seq_codigo_producto x),
         'historial_id_seq', (select pg_catalog.jsonb_build_object('last_value', x.last_value, 'is_called', x.is_called) from public.historial_id_seq x)),
-      'claves', (select pg_catalog.jsonb_agg(p.clave_catalogo order by p.id) from public.productos p));`);
+      'claves', (select pg_catalog.jsonb_agg(p.clave_catalogo order by p.id) from public.productos p),
+      'por_omision', ${sqlPorOmision(t)});`);
   for (const tabla of TABLAS) if (comparacion[tabla] !== true) fallos.push(`Las filas de ${tabla} no son idénticas a las del paquete.`);
+  informe.fases.columnas_posteriores = Object.keys(comparacion.por_omision || {});
+  for (const [columna, distintas] of Object.entries(comparacion.por_omision || {})) {
+    if (Number(distintas) !== 0) fallos.push(`El paquete no trae ${columna} y ${distintas} filas no quedaron con su valor por omisión.`);
+  }
   claves = t.productos.map((p) => p.clave_catalogo);
   if (JSON.stringify(comparacion.claves || []) !== JSON.stringify(claves)) fallos.push('clave_catalogo no se conservó byte a byte.');
   const firma = (lista) => JSON.stringify(lista.map((d) => `${d.tabla}.${d.nombre}`));
@@ -266,7 +296,8 @@ commit;
     `${t.productos.length} zapatillas · ${t.variantes.length} colores · ${t.tallas.length} tallas · ${t.fotos.length} fotos · ${t.historial.length} eventos de historial · ${t.configuracion.length} ajustes: filas idénticas al paquete`,
     `clave_catalogo conservada byte a byte (${claves.length}); ids de catalogo_publico: ${idsEsperados.length} zapatillas publicadas`,
     `${comparacion.disparadores.length} disparadores activos; código nuevo de prueba ${codigos.codigo} / ${codigos.codigo_variante} (deshecho)`,
-    `${manifiesto.fotos.length} fotos servidas con los mismos bytes; auditoría de funciones: 0 filas`
+    `${manifiesto.fotos.length} fotos servidas con los mismos bytes; auditoría de funciones: 0 filas`,
+    ...Object.keys(comparacion.por_omision || {}).map((c) => `paquete anterior a ${c}: todas las filas quedaron con su valor por omisión (${COLUMNAS_POSTERIORES[c.split('.')[0]][c.split('.')[1]]})`)
   ]);
 }
 

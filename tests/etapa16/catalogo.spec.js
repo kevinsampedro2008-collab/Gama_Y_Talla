@@ -374,7 +374,7 @@ test('archivos no válidos: se rechazan por su contenido y no se sube nada', asy
   await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
   await expect(page.locator('#editor-error')).toContainText('Hay fotos que no se pudieron subir');
   expect(await productosDePrueba()).toHaveLength(0);
-  for (let i = 0; i < 3; i += 1) await items.first().getByRole('button', { name: /Descartar/ }).click();
+  for (let i = 0; i < 3; i += 1) await items.first().getByRole('button', { name: /^Quitar la foto 1 / }).click();
   await expect(items).toHaveCount(0);
   await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
@@ -397,7 +397,7 @@ test('navegador que no genera WebP: no se sube otra cosa; un WebP adecuado sí, 
   await expect(items.nth(0).locator('.editor-foto-mensaje')).toContainText('Este navegador no puede generar WebP');
   await esperarFotosListas(page, 0, 1);
   await expect(items.nth(1).locator('.editor-foto-peso')).toContainText('(sin recomprimir)');
-  await items.nth(0).getByRole('button', { name: /Descartar/ }).click();
+  await items.nth(0).getByRole('button', { name: /^Quitar la foto 1 / }).click();
   await editor(page).getByRole('button', { name: 'Guardar oculta' }).click();
   await expect(resultado(page)).toContainText('Guardado.');
   const [p] = await productosDePrueba();
@@ -1123,7 +1123,8 @@ test('ingreso oscuro: legible, con foco visible, solo en el ingreso; el flujo no
 // Etapa 16.3 · Público (Hombre / Dama), muestra de color y panel en celular
 // =====================================================================
 const radioPublico = (page, texto) => editor(page).getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: texto, exact: true });
-const campoMuestra = (page, n) => color(page, n).getByRole('textbox', { name: 'Muestra del color (opcional)' });
+// Etapa 18: la muestra es el «Tono del círculo», dentro de «Cómo mostrar este color».
+const campoMuestra = (page, n) => color(page, n).getByRole('textbox', { name: 'Tono del círculo', exact: true });
 
 test('público y muestra: se guardan y se ven en la tienda', async ({ page, browser, browserName }) => {
   await abrirPanel(page);

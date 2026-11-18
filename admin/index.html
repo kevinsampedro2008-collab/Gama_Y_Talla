@@ -22,6 +22,9 @@
   <script src="admin.js" defer></script>
   <script src="fotos.js" defer></script>
   <script src="editor.js" defer></script>
+  <!-- Etapa 18: lectura de las publicaciones del proveedor (en el navegador) e importador por lotes. -->
+  <script src="texto-proveedor.js" defer></script>
+  <script src="importador.js" defer></script>
 </head>
 <body>
   <!-- Mientras se comprueba la sesión no se muestra nada administrativo. -->
@@ -132,6 +135,8 @@
         </div>
         <div class="tablero-botones">
           <button class="boton boton-principal boton-compacto" id="boton-nuevo" type="button" data-accion="nuevo-producto">Agregar zapatilla</button>
+          <!-- Etapa 18: varias zapatillas a la vez desde las publicaciones del proveedor. -->
+          <button class="boton boton-secundario boton-compacto" id="boton-importar" type="button" data-accion="importar-whatsapp" aria-haspopup="dialog">Importar desde WhatsApp</button>
           <button class="boton boton-secundario boton-compacto" id="boton-historial" type="button" data-accion="historial" aria-controls="historial" aria-expanded="false">Historial</button>
           <button class="boton boton-secundario boton-compacto" id="boton-actualizar" type="button" data-accion="actualizar">Actualizar</button>
           <!-- Etapa 17: CSV del inventario completo (también lo oculto y lo retirado). -->
@@ -181,11 +186,16 @@
       </details>
 
       <p class="tablero-estado" id="tablero-estado" role="status" aria-live="polite"></p>
+      <!-- Etapa 18: selección de tallas de varios modelos y colores. -->
+      <div class="seleccion-herramientas" id="seleccion-herramientas" hidden>
+        <p class="seleccion-ayuda">Pulsa cada talla para seleccionarla o quitarla; puedes juntar tallas de varios modelos y colores.</p>
+        <button class="boton boton-secundario boton-compacto" type="button" data-accion="seleccionar-visibles">Seleccionar tallas visibles</button>
+      </div>
       <div class="tablero-aviso" id="tablero-aviso" hidden></div>
       <ul class="productos" id="lista-productos" aria-label="Zapatillas del catálogo"></ul>
     </main>
 
-    <!-- Acciones sobre las tallas seleccionadas (una variante a la vez). -->
+    <!-- Acciones sobre las tallas seleccionadas (etapa 18: de uno o varios modelos y colores). -->
     <div class="barra-acciones" id="barra-acciones" role="region" aria-label="Acciones de disponibilidad" hidden>
       <div class="barra-acciones-interior">
         <p class="barra-acciones-resumen" id="seleccion-resumen"></p>
@@ -194,6 +204,8 @@
           <button class="boton boton-secundario boton-compacto" type="button" data-accion="publicacion">Nueva publicación</button>
           <button class="boton boton-secundario boton-compacto" type="button" data-accion="agotada">Marcar agotada</button>
           <button class="boton boton-secundario boton-compacto" type="button" data-accion="revisar">Dejar por revisar</button>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="activar">Activar tallas</button>
+          <button class="boton boton-secundario boton-compacto" type="button" data-accion="desactivar">Desactivar tallas</button>
           <button class="boton boton-texto boton-compacto" type="button" data-accion="deseleccionar">Quitar selección</button>
         </div>
       </div>
@@ -228,6 +240,38 @@
             <button class="boton boton-secundario" type="button" data-editor="cancelar">Cancelar</button>
             <button class="boton boton-secundario" type="submit" data-editor="guardar" id="editor-guardar">Guardar oculta</button>
             <button class="boton boton-principal" type="button" data-editor="guardar-publicar" id="editor-publicar">Guardar y publicar</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <!-- Importador por lotes (etapa 18): lo construye importador.js. Reutiliza la maqueta del editor. -->
+    <dialog class="editor importador" id="importador" aria-labelledby="importador-titulo" aria-describedby="importador-descripcion">
+      <form class="editor-formulario" id="importador-formulario" novalidate>
+        <header class="editor-cabecera">
+          <div class="editor-titulos">
+            <p class="editor-codigo">Lote de publicaciones</p>
+            <h2 class="editor-titulo" id="importador-titulo" tabindex="-1">Importar desde WhatsApp</h2>
+            <p class="editor-nota importador-descripcion" id="importador-descripcion">Pega cada publicación y añade sus fotos. Se lee en este navegador; nada se guarda hasta «Guardar lote como oculto».</p>
+          </div>
+          <button class="boton boton-secundario boton-compacto editor-cerrar" type="button" data-imp="cerrar" aria-label="Cerrar el importador">Cerrar</button>
+        </header>
+        <div class="editor-cuerpo" id="importador-cuerpo"></div>
+        <footer class="editor-pie">
+          <div class="editor-mensajes">
+            <div class="editor-resultado" id="importador-resultado" role="status" aria-live="polite"></div>
+          </div>
+          <div class="editor-confirmar-salida" id="importador-salida" role="alertdialog" aria-labelledby="importador-salida-texto" hidden>
+            <p id="importador-salida-texto"></p>
+            <div class="editor-botones">
+              <button class="boton boton-secundario boton-compacto" type="button" data-imp="seguir">Seguir editando</button>
+              <button class="boton boton-secundario boton-compacto" type="button" data-imp="conservar">Cerrar y conservar el lote</button>
+              <button class="boton boton-principal boton-compacto" type="button" data-imp="descartar">Descartar el lote</button>
+            </div>
+          </div>
+          <div class="editor-botones" id="importador-botones">
+            <button class="boton boton-secundario" type="button" data-imp="cerrar-pie">Cerrar</button>
+            <button class="boton boton-principal" type="submit" data-imp="guardar" id="importador-guardar">Guardar lote como oculto</button>
           </div>
         </footer>
       </form>

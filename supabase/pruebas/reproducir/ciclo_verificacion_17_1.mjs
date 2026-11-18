@@ -3,7 +3,7 @@
  *   node supabase/pruebas/reproducir/ciclo_verificacion_17_1.mjs --destino-workdir <destino vacío> --salida <carpeta fuera del repo> --paquete-chico <paquete válido pequeño>
  *
  * Necesita el stack local de ESTE repositorio (origen, catálogo vacío) y OTRO stack local (destino),
- * ambos con las 15 migraciones. El paquete pequeño es un respaldo válido con al menos una foto de
+ * ambos con todas las migraciones del repositorio. El paquete pequeño es un respaldo válido con al menos una foto de
  * Storage (por ejemplo, el que deja ciclo_respaldo_17.mjs).
  *
  * Caso 1 · 1.001 productos publicados: se siembran en el origen, se respaldan con respaldar.mjs y se

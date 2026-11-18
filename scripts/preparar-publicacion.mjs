@@ -47,7 +47,9 @@ const ARCHIVOS = [
   'assets/images/pagos/nequi-icono.png', 'assets/images/pagos/bancolombia-icono.svg',
   // Fotos de la portada (las tres que usa index.html y la de la vista previa al compartir).
   'assets/images/productos/editadas/zapatilla_48.webp', 'assets/images/productos/editadas/zapatilla_24.webp', 'assets/images/productos/editadas/zapatilla_11.webp',
-  'admin/index.html', 'admin/admin.css', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js'
+  'admin/index.html', 'admin/admin.css', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js',
+  // Etapa 18: lectura de las publicaciones del proveedor e importador por lotes.
+  'admin/texto-proveedor.js', 'admin/importador.js'
 ];
 // Carpetas completas: el SDK del panel y three.js (con Draco), que la escena importa por import map.
 const CARPETAS = ['admin/vendor/supabase-js-2.118.0', 'assets/vendor/three-0.165.0'];
@@ -185,8 +187,19 @@ export function construir({ raiz = RAIZ_REPO, salida, env = process.env } = {}) 
 // archivos versionados de _headers existen y son los únicos «immutable».
 export function verificarPaquete(destino, versionados) {
   const problemas = [];
-  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css']
+  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js']
     .filter((f) => fs.existsSync(path.join(destino, f)));
+  // 18: todo <script src> y <link href> local de las dos páginas existe en el paquete (un archivo
+  // nuevo que se olvida en la lista de copia rompería el panel sin que nada más lo detecte).
+  for (const pagina of ['index.html', 'admin/index.html']) {
+    if (!fs.existsSync(path.join(destino, pagina))) continue;
+    const html = fs.readFileSync(path.join(destino, pagina), 'utf8');
+    for (const m of html.matchAll(/<(?:script[^>]*\ssrc|link[^>]*\shref)="([^"#?]+)"/g)) {
+      if (/^(?:[a-z]+:)?\/\//i.test(m[1]) || m[1].startsWith('data:')) continue;
+      const ruta = path.posix.normalize(path.posix.join(path.posix.dirname(pagina), m[1]));
+      if (!fs.existsSync(path.join(destino, ruta))) problemas.push(`${pagina} carga ${m[1]} y no está en el paquete.`);
+    }
+  }
   const vistas = new Set();
   for (const f of fuentes) {
     const texto = fs.readFileSync(path.join(destino, f), 'utf8');

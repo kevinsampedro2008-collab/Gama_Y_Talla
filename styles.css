@@ -2244,6 +2244,31 @@
   }
   .muestra-unica { width: 1.25rem; height: 1.25rem; align-self: center; }
 
+  /* 18: miniatura de la foto principal en lugar del círculo, cuando el panel lo elige. Se mezcla con
+     los círculos en la misma fila: zona táctil de 52 px (mayor que la del círculo, porque una foto
+     pequeña necesita más superficie para distinguirse) y el mismo anillo de tinta al elegirla. La
+     foto se ve entera (contain) sobre blanco, sin recortes. */
+  .variantes.variantes-muestras { align-items: center; }
+  .variante.variante-muestra.variante-miniatura { width: 3.25rem; height: 3.25rem; border-radius: 0.625rem; }
+  .muestra-foto {
+    display: block;
+    flex: none;
+    width: 2.75rem;
+    height: 2.75rem;
+    overflow: hidden;
+    border-radius: 0.5rem;
+    background: #fff;
+    box-shadow: inset 0 0 0 1px var(--linea-fuerte);
+    transition: box-shadow 160ms ease;
+  }
+  .variante .muestra-foto img, .muestra-foto img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .variante-muestra[aria-pressed="true"] .muestra-foto { box-shadow: inset 0 0 0 1px var(--linea-fuerte), 0 0 0 3px #fff, 0 0 0 5px var(--tinta); }
+  .variante.variante-muestra.variante-miniatura.variante-agotada::after { inset: 0.25rem; border-radius: 0.5rem; }
+  .muestra-foto.muestra-unica { width: 2rem; height: 2rem; border-radius: 0.375rem; }
+  @media (hover: hover) {
+    .variante-muestra:not([aria-pressed="true"]):hover .muestra-foto { box-shadow: inset 0 0 0 1px var(--tinta-2); }
+  }
+
   /* 16.3 y 17: «MARCA · PÚBLICO · N COLORES», pequeño, sin competir con modelo ni precio. Público y
      recuento nunca se recortan: si no caben (celular), pasan a una segunda línea. Solo la marca,
      sola en su línea, puede recortarse con puntos suspensivos. */
@@ -2253,7 +2278,9 @@
   .tarjeta-meta > span { white-space: nowrap; }
   .tarjeta-meta-marca { text-transform: none; flex: 0 1 auto; min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .tarjeta-publico, .tarjeta-colores { flex: none; }
-  .tarjeta-publico { color: var(--tinta); }
+  /* Etapa 18: el público se lee «Caballero», «Dama» o «Unisex» (no en mayúsculas) y con el mismo color
+     que la marca y el recuento: los tres fragmentos heredan el color de la línea. */
+  .tarjeta-publico { text-transform: none; color: inherit; }
   .detalle-publico { color: var(--tinta-2); }
 
   /* Tallas EU: una tabla de numeración impresa, con las casillas unidas (no botones sueltos) y

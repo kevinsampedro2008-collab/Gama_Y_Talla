@@ -287,7 +287,7 @@
 
   let filtro = "todas";
   let vigenciaPredeterminada = 48;
-  let seleccion = { varianteId: null, ids: new Set() };
+  let seleccion = new Set();        // etapa 18: UUID de cada talla seleccionada (de cualquier modelo y color)
   let ocupado = false;               // hay una acción en curso: todo lo demás queda bloqueado
   let verificacionPendiente = false; // un resultado quedó incierto: nada se repite hasta recargar
   let historialCursor = null;
@@ -308,8 +308,9 @@
   function limpiarTablero() {
     // El editor guarda en memoria lo que no se llegó a guardar (por ejemplo, si la sesión vence).
     window.GamaTallaEditor?.alPerderAcceso?.();
+    window.GamaTallaImportador?.alPerderAcceso?.();
     catalogo = [];
-    seleccion = { varianteId: null, ids: new Set() };
+    seleccion = new Set();
     accionAbierta = null;
     const dialogo = $("#dialogo-accion");
     if (dialogo?.open) dialogo.close();
@@ -400,6 +401,13 @@
     });
   }
 
+  // Etapa 18: «forma_muestra» (círculo o foto) solo existe con la migración 20261117010000. Con un
+  // esquema anterior se lee sin ella y el tablero no avisa de nada sobre la forma.
+  let leerFormaMuestra = true;
+  const columnasVariantesTablero = () => "variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden" +
+    `${leerFormaMuestra ? ",forma_muestra" : ""},fotos(ruta,orden,alt))`;
+  const faltaFormaMuestra = (error) => String(error?.code) === "42703" && /forma_muestra/.test(error?.message || "");
+
   async function cargarCatalogo({ conservarPosicion = false } = {}) {
     const mia = generacion;
     const posicion = window.scrollY;
@@ -416,8 +424,7 @@
 
       const respuestas = await Promise.all([
         leerPaginado(() => cliente.from("productos")
-          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,activo,orden,retirado_en," +
-                  "variantes(id,codigo_variante,color,referencia_variante,precio,precio_anterior,activa,orden,fotos(ruta,orden,alt))")
+          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,activo,orden,retirado_en," + columnasVariantesTablero())
           .order("orden").order("codigo_interno").order("id")),
         leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).order("variante_id").order("id")),
         leerPaginado(() => cliente.from("catalogo_publico").select("codigoInterno,variantes").order("orden").order("codigoInterno")),
@@ -425,6 +432,11 @@
           .then((r) => r, () => ({ error: { status: 0 } }))
       ]);
       if (mia !== generacion) return;
+      if (leerFormaMuestra && faltaFormaMuestra(respuestas[0].error)) {
+        leerFormaMuestra = false;
+        await cargarCatalogo({ conservarPosicion });
+        return;
+      }
       const fallo = respuestas.find((r) => r.error);
       if (fallo) {
         if (clasificar(fallo.error) === "sin-sesion") { await aplicarAcceso({ estado: "sin-sesion" }); return; }
@@ -434,6 +446,7 @@
       const horas = Number(respuestas[3].data?.valor);
       vigenciaPredeterminada = Number.isInteger(horas) && horas >= 1 && horas <= 60 ? horas : 48;
       catalogo = preparar(respuestas[0].data, respuestas[1].data, respuestas[2].data);
+      podarSeleccion();
       verificacionPendiente = false; // los datos vuelven a venir del servidor
       pintarCatalogo();
       if (conservarPosicion) window.scrollTo(0, posicion);
@@ -447,7 +460,7 @@
 
   function limpiarCatalogoVisible() {
     catalogo = [];
-    seleccion = { varianteId: null, ids: new Set() };
+    // La selección se conserva (se poda al volver a cargar): solo se limpia al perder el acceso.
     $("#lista-productos").replaceChildren();
     $("#tablero-resumen").textContent = "";
     $("#tablero-estado").textContent = "";
@@ -535,7 +548,7 @@
       $("#filtros").hidden = true;
       buscador.hidden = true;
       estado.textContent = "";
-      seleccion = { varianteId: null, ids: new Set() };
+      seleccion = new Set();
       actualizarBarraAcciones();
       window.GamaTallaEditor?.ofrecerBorrador?.();
       avisoTablero({
@@ -554,14 +567,11 @@
     const criterio = FILTROS.find((f) => f.id === filtro) || FILTROS[0];
     const visibles = catalogo.filter((p) => (!consulta || p.busqueda.includes(consulta)) && criterio.cumple(p));
 
-    // Una selección que ya no está a la vista se quita: nunca se actúa sobre lo que no se ve.
-    let nota = "";
-    if (seleccion.varianteId && !visibles.some((p) => p.variantes.some((v) => v.id === seleccion.varianteId))) {
-      seleccion = { varianteId: null, ids: new Set() };
-      nota = "Se quitó la selección porque ese color ya no está en la lista. ";
-    }
+    // Etapa 18: la selección se conserva al buscar o filtrar; se dice cuántas tallas quedan fuera.
     lista.replaceChildren(...visibles.map(tarjetaProducto));
     actualizarBarraAcciones();
+    const fuera = fueraDeLaVista();
+    const nota = fuera ? `${fuera === 1 ? "1 talla seleccionada queda" : `${fuera} tallas seleccionadas quedan`} fuera de la vista (búsqueda o filtro); sigue${fuera === 1 ? "" : "n"} seleccionada${fuera === 1 ? "" : "s"}. ` : "";
 
     if (!visibles.length) {
       estado.textContent = nota.trim();
@@ -665,13 +675,17 @@
     cabecera.append(precio);
     if (p.activo && !v.activa) cabecera.append(nodo("span", "variante-oculta", "Color oculto en la tienda"));
     li.append(cabecera);
+    // 18: el color se muestra con su foto, pero no tiene ninguna: la tienda usa el círculo.
+    if (v.forma_muestra === "foto" && !(v.fotos || []).length) {
+      li.append(nodo("p", "variante-aviso-forma", "Se muestra con foto, pero este color no tiene fotos: en la tienda se ve su círculo. Añade una foto o elige «Círculo de color»."));
+    }
 
     if (!v.tallas.length) {
       li.append(nodo("p", "variante-sin-tallas", "Sin tallas registradas."));
       return li;
     }
     const tallas = nodo("ul", "tallas");
-    tallas.setAttribute("aria-label", `Tallas EU de ${p.nombre}, color ${v.color}. Pulsa una talla para seleccionarla`);
+    tallas.setAttribute("aria-label", `Tallas EU de ${p.nombre}, color ${v.color}. Pulsa una talla para seleccionarla o quitarla; puedes elegir tallas de varios modelos y colores`);
     for (const t of v.tallas) {
       const item = nodo("li");
       const boton = nodo("button", `talla ${ESTADOS[t.efectivo].clase}`, t.talla);
@@ -679,18 +693,30 @@
       boton.dataset.tallaId = t.id;
       boton.dataset.varianteId = v.id;
       boton.title = `Talla ${t.talla}: ${ESTADOS[t.efectivo].texto}`;
-      boton.setAttribute("aria-pressed", String(seleccion.varianteId === v.id && seleccion.ids.has(t.id)));
+      boton.setAttribute("aria-pressed", String(seleccion.has(t.id)));
       boton.disabled = ocupado || verificacionPendiente;
       boton.append(nodo("span", "solo-lectores", `, ${ESTADOS[t.efectivo].texto}`));
       item.append(boton);
       tallas.append(item);
     }
     li.append(tallas);
-    if (seleccion.varianteId === v.id) li.append(detalleSeleccion(v));
+    if (v.tallas.some((t) => seleccion.has(t.id))) li.append(detalleSeleccion(v));
     return li;
   }
 
   // ------------------------------------------------------------------ selección
+  /* Etapa 18: la selección es un conjunto de UUID de tallas, de cualquier modelo y color. Cada talla se
+     marca y desmarca por separado (sin teclas modificadoras); una talla 40 de un color es distinta de
+     la 40 de otro. Cambiar la búsqueda o el filtro NO la quita: se dice cuántas quedan fuera de la vista. */
+  function buscarTalla(tallaId) {
+    for (const p of catalogo) {
+      for (const v of p.variantes) {
+        const t = v.tallas.find((x) => x.id === tallaId);
+        if (t) return { producto: p, variante: v, talla: t };
+      }
+    }
+    return null;
+  }
   function buscarVariante(varianteId) {
     for (const p of catalogo) {
       const v = p.variantes.find((x) => x.id === varianteId);
@@ -699,18 +725,32 @@
     return null;
   }
 
+  // Grupos por modelo y color, en el orden del catálogo: [{ producto, variante, tallas }].
   function tallasSeleccionadas() {
-    const encontrado = seleccion.varianteId && buscarVariante(seleccion.varianteId);
-    if (!encontrado) return null;
-    const tallas = encontrado.variante.tallas.filter((t) => seleccion.ids.has(t.id));
-    return tallas.length ? { ...encontrado, tallas } : null;
+    if (!seleccion.size) return null;
+    const grupos = [];
+    for (const p of catalogo) {
+      for (const v of p.variantes) {
+        const tallas = v.tallas.filter((t) => seleccion.has(t.id));
+        if (tallas.length) grupos.push({ producto: p, variante: v, tallas });
+      }
+    }
+    if (!grupos.length) return null;
+    const total = grupos.reduce((n, g) => n + g.tallas.length, 0);
+    const modelos = new Set(grupos.map((g) => g.producto.id)).size;
+    return { grupos, total, modelos, colores: grupos.length };
   }
+  // Tras recargar: solo se conservan las tallas que siguen existiendo.
+  function podarSeleccion() {
+    for (const id of [...seleccion]) if (!buscarTalla(id)) seleccion.delete(id);
+  }
+  const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 
   // Lo que ayuda a decidir: estado en la tienda, estado guardado, vigencia y procedencia.
   function detalleSeleccion(v) {
     const lista = nodo("ul", "detalle-seleccion");
     lista.setAttribute("aria-label", `Detalle de las tallas seleccionadas de ${v.color}`);
-    for (const t of v.tallas.filter((x) => seleccion.ids.has(x.id))) {
+    for (const t of v.tallas.filter((x) => seleccion.has(x.id))) {
       const item = nodo("li", "detalle-talla");
       item.append(nodo("strong", "", `Talla ${t.talla}`));
       const datos = [
@@ -729,51 +769,67 @@
 
   function alternarTalla(boton) {
     if (ocupado || verificacionPendiente) return;
-    const { tallaId, varianteId } = boton.dataset;
-    if (seleccion.varianteId !== varianteId) {
-      // La selección es siempre de un solo color: cambiar de color empieza una nueva.
-      seleccion = { varianteId, ids: new Set([tallaId]) };
-    } else if (seleccion.ids.has(tallaId)) {
-      seleccion.ids.delete(tallaId);
-      if (!seleccion.ids.size) seleccion = { varianteId: null, ids: new Set() };
-    } else {
-      seleccion.ids.add(tallaId);
-    }
+    const { tallaId } = boton.dataset;
+    if (seleccion.has(tallaId)) seleccion.delete(tallaId); else seleccion.add(tallaId);
     refrescarSeleccionVisible();
+  }
+
+  function seleccionarVisibles() {
+    if (ocupado || verificacionPendiente) return;
+    const antes = seleccion.size;
+    document.querySelectorAll("#lista-productos .talla[data-talla-id]").forEach((b) => seleccion.add(b.dataset.tallaId));
+    refrescarSeleccionVisible();
+    const nuevas = seleccion.size - antes;
+    $("#tablero-estado").textContent = nuevas
+      ? `Se ${nuevas === 1 ? "añadió 1 talla visible" : `añadieron ${nuevas} tallas visibles`} a la selección.`
+      : "Todas las tallas visibles ya estaban seleccionadas.";
   }
 
   // Actualiza la selección sin repintar la lista: el foco se queda en la talla pulsada.
   function refrescarSeleccionVisible() {
     document.querySelectorAll("#lista-productos .talla[data-talla-id]").forEach((b) => {
-      b.setAttribute("aria-pressed", String(seleccion.varianteId === b.dataset.varianteId && seleccion.ids.has(b.dataset.tallaId)));
+      b.setAttribute("aria-pressed", String(seleccion.has(b.dataset.tallaId)));
     });
     document.querySelectorAll("#lista-productos .detalle-seleccion").forEach((n) => n.remove());
-    if (seleccion.varianteId) {
-      const fila = document.querySelector(`#lista-productos .variante[data-variante-id="${CSS.escape(seleccion.varianteId)}"]`);
-      const encontrado = buscarVariante(seleccion.varianteId);
-      if (fila && encontrado) fila.append(detalleSeleccion(encontrado.variante));
-    }
+    document.querySelectorAll("#lista-productos .variante[data-variante-id]").forEach((fila) => {
+      const encontrado = buscarVariante(fila.dataset.varianteId);
+      if (encontrado && encontrado.variante.tallas.some((t) => seleccion.has(t.id))) fila.append(detalleSeleccion(encontrado.variante));
+    });
     actualizarBarraAcciones();
   }
 
   function quitarSeleccion() {
-    seleccion = { varianteId: null, ids: new Set() };
+    seleccion = new Set();
     refrescarSeleccionVisible();
+  }
+
+  // Tallas seleccionadas que la búsqueda o el filtro dejan fuera de la lista.
+  function fueraDeLaVista() {
+    const visibles = new Set([...document.querySelectorAll("#lista-productos .talla[data-talla-id]")].map((b) => b.dataset.tallaId));
+    return [...seleccion].filter((id) => !visibles.has(id)).length;
   }
 
   function actualizarBarraAcciones() {
     const barra = $("#barra-acciones");
     if (!barra) return;
+    const herramientas = $("#seleccion-herramientas");
+    if (herramientas) {
+      herramientas.hidden = !document.querySelector("#lista-productos .talla[data-talla-id]");
+      herramientas.querySelectorAll("button").forEach((b) => { b.disabled = ocupado || verificacionPendiente; });
+    }
     const elegidas = tallasSeleccionadas();
     if (!elegidas) {
       barra.hidden = true;
       document.body.classList.remove("con-seleccion");
       return;
     }
-    const { producto, variante, tallas } = elegidas;
+    const { grupos, total, modelos, colores } = elegidas;
+    const fuera = fueraDeLaVista();
+    const detalle = grupos.slice(0, 3).map((g) => `${g.producto.nombre} · ${g.variante.color} (${g.variante.codigo_variante}): ${g.tallas.map((t) => t.talla).join(", ")}`);
+    if (grupos.length > 3) detalle.push(`y ${plural(grupos.length - 3, "color más", "colores más")}`);
     $("#seleccion-resumen").textContent =
-      `${tallas.length} ${tallas.length === 1 ? "talla seleccionada" : "tallas seleccionadas"} · ` +
-      `${producto.nombre} · ${variante.color} (${variante.codigo_variante}): ${tallas.map((t) => t.talla).join(", ")}`;
+      `${plural(total, "talla seleccionada", "tallas seleccionadas")} · ${plural(modelos, "modelo", "modelos")} · ${plural(colores, "color", "colores")}` +
+      `${fuera ? ` · ${fuera} fuera de la vista` : ""} — ${detalle.join("; ")}`;
     barra.querySelectorAll("button").forEach((b) => { b.disabled = ocupado || verificacionPendiente; });
     barra.hidden = false;
     document.body.classList.add("con-seleccion");
@@ -781,8 +837,8 @@
 
   function marcarOcupado(si) {
     ocupado = si;
-    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
-      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, #barra-acciones button")); });
+    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #seleccion-herramientas button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
+      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, #barra-acciones button, #seleccion-herramientas button")); });
     $("#barra-acciones")?.setAttribute("aria-busy", String(si));
     document.querySelectorAll("#dialogo-accion button").forEach((b) => { b.disabled = si; });
   }
@@ -819,8 +875,26 @@
       hecho: "dejada por revisar",
       hechas: "dejadas por revisar",
       estadoEsperado: "REVISAR"
+    },
+    // Etapa 18: activar y desactivar tallas (sin tocar estado ni fechas; una escritura para todas).
+    activar: {
+      titulo: "Activar tallas",
+      boton: "Activar tallas",
+      hecho: "activada",
+      hechas: "activadas",
+      ya: "ya estaba activada",
+      activa: true
+    },
+    desactivar: {
+      titulo: "Desactivar tallas",
+      boton: "Desactivar tallas",
+      hecho: "desactivada",
+      hechas: "desactivadas",
+      ya: "ya estaba desactivada",
+      activa: false
     }
   };
+  const esCambioActiva = (tipo) => tipo === "activar" || tipo === "desactivar";
 
   function campo({ id, etiqueta, ayuda, control }) {
     const caja = nodo("div", "campo");
@@ -846,7 +920,7 @@
     control.step = "1";
     control.value = String(vigenciaPredeterminada);
     control.required = true;
-    return campo({ id: "accion-horas", etiqueta: "Horas de vigencia", ayuda: `De 1 a 60. La predeterminada de la tienda es ${vigenciaPredeterminada} h.`, control });
+    return campo({ id: "accion-horas", etiqueta: "Horas de vigencia", ayuda: `De 1 a 60. La predeterminada de la tienda es ${vigenciaPredeterminada} h.`, control });
   }
 
   // Fecha de hoy en Colombia (para el máximo del selector), sin usar la zona del computador.
@@ -863,6 +937,9 @@
     return { iso, ms };
   }
 
+  // Etiqueta de una talla en un mensaje: con su color cuando la selección tiene varios.
+  const etiquetaTalla = (t, varios) => (varios ? `${t.talla} de ${t.variante.color}` : t.talla);
+
   function abrirAccion(tipo) {
     if (ocupado || verificacionPendiente) return;
     const elegidas = tallasSeleccionadas();
@@ -871,13 +948,14 @@
       return;
     }
     const def = ACCIONES[tipo];
-    const { producto, variante, tallas } = elegidas;
-    accionAbierta = {
-      tipo,
+    const { grupos, total, modelos, colores } = elegidas;
+    const tallas = grupos.flatMap(({ producto, variante, tallas: ts }) => ts.map((t) => ({
+      id: t.id, talla: t.talla, efectivo: t.efectivo, estado: t.estado, activa: t.activa, actualizado_en: t.actualizado_en,
       producto: { id: producto.id, nombre: producto.nombre, codigo: producto.codigo_interno, activo: producto.activo },
-      variante: { id: variante.id, color: variante.color, codigo: variante.codigo_variante, activa: variante.activa },
-      tallas: tallas.map((t) => ({ id: t.id, talla: t.talla, efectivo: t.efectivo, estado: t.estado, activa: t.activa, actualizado_en: t.actualizado_en }))
-    };
+      variante: { id: variante.id, color: variante.color, codigo: variante.codigo_variante, activa: variante.activa }
+    })));
+    accionAbierta = { tipo, tallas, grupos: grupos.length, modelos, total };
+    const varios = grupos.length > 1;
 
     $("#dialogo-titulo").textContent = def.titulo;
     $("#dialogo-confirmar").textContent = def.boton;
@@ -886,16 +964,21 @@
     const cuerpo = $("#dialogo-cuerpo");
     cuerpo.replaceChildren();
 
-    const datos = nodo("dl", "dialogo-datos");
-    const par = (t, d) => { const caja = nodo("div"); caja.append(nodo("dt", "", t), nodo("dd", "", d)); datos.append(caja); };
-    par("Modelo", `${producto.nombre} (${producto.codigo_interno})`);
-    par("Color", `${variante.color} (${variante.codigo_variante})`);
-    par(tallas.length === 1 ? "Talla" : "Tallas", tallas.map((t) => `${t.talla} (${ESTADOS[t.efectivo].texto})`).join(", "));
-    cuerpo.append(datos);
+    // Qué se modificará: agrupado por modelo y color, con sus códigos y tallas.
+    cuerpo.append(nodo("p", "dialogo-alcance", `${plural(total, "talla", "tallas")} de ${plural(modelos, "modelo", "modelos")} y ${plural(colores, "color", "colores")}:`));
+    const lista = nodo("ul", "dialogo-grupos");
+    lista.setAttribute("aria-label", "Tallas que se modificarán, por modelo y color");
+    for (const { producto, variante, tallas: ts } of grupos) {
+      const item = nodo("li", "dialogo-grupo");
+      item.append(nodo("strong", "", `${producto.nombre} (${producto.codigo_interno}) · ${variante.color} (${variante.codigo_variante})`),
+        nodo("span", "", `${ts.length === 1 ? "Talla" : "Tallas"}: ${ts.map((t) => `${t.talla} (${ESTADOS[t.efectivo].texto})`).join(", ")}`));
+      lista.append(item);
+    }
+    cuerpo.append(lista);
 
     const efectos = nodo("ul", "dialogo-efectos");
     const efecto = (texto, aviso = false) => efectos.append(nodo("li", aviso ? "es-aviso" : "", texto));
-    const inactivas = tallas.filter((t) => !t.activa).map((t) => t.talla);
+    const inactivas = tallas.filter((t) => !t.activa).map((t) => etiquetaTalla(t, varios));
     if (tipo === "proveedor") {
       efecto("Úsala solo cuando el proveedor te haya confirmado la disponibilidad directamente.");
       efecto("La fecha de confirmación la pone el servidor en el momento de guardar; la vigencia empieza ahí.");
@@ -906,18 +989,34 @@
     } else if (tipo === "agotada") {
       efecto("La talla se mostrará agotada en la tienda hasta que vuelvas a confirmarla. No se borra.");
       efecto("Se retira de los carritos de los clientes que la tengan guardada.");
-    } else {
+    } else if (tipo === "revisar") {
       efecto("La talla deja de mostrarse como disponible o agotada y queda por revisar: se podrá consultar, no comprar.");
       efecto("No se inventan fechas ni se confirma nada; las fechas anteriores quedan en el historial.");
+    } else if (tipo === "desactivar") {
+      efecto("Las tallas desactivadas dejan de ofrecerse en la tienda. Se conservan su registro, su estado, sus fechas y su historial; puedes volver a activarlas.");
+    } else {
+      efecto("Se conservan su estado y sus fechas: la tienda calcula la disponibilidad con la vigencia actual (si ya venció, quedan por revisar).");
+      efecto("Activar no confirma disponibilidad: para eso usa «Confirmó el proveedor» o «Nueva publicación».");
     }
-    if (inactivas.length && (tipo === "proveedor" || tipo === "publicacion")) {
+    if (esCambioActiva(tipo)) {
+      const ya = tallas.filter((t) => t.activa === def.activa).map((t) => etiquetaTalla(t, varios));
+      if (ya.length === tallas.length) efecto(`No hay nada que cambiar: ${ya.length === 1 ? `la talla ${ya[0]} ${def.ya}` : `las ${ya.length} tallas ya estaban ${def.hechas}`}.`, true);
+      else if (ya.length) efecto(`${ya.length === 1 ? "La talla" : "Las tallas"} ${ya.join(", ")} ${ya.length === 1 ? def.ya : `ya estaban ${def.hechas}`}: no se tocan.`, true);
+    } else if (inactivas.length && (tipo === "proveedor" || tipo === "publicacion")) {
       efecto(`${inactivas.length === 1 ? "La talla" : "Las tallas"} ${inactivas.join(", ")} ${inactivas.length === 1 ? "está desactivada: al confirmarla se reactivará" : "están desactivadas: al confirmarlas se reactivarán"} y volverá a ofrecerse.`, true);
     } else if (inactivas.length) {
       efecto(`${inactivas.length === 1 ? "La talla" : "Las tallas"} ${inactivas.join(", ")} ${inactivas.length === 1 ? "sigue" : "siguen"} desactivada${inactivas.length === 1 ? "" : "s"}.`, true);
     }
-    if (!producto.activo) efecto("El producto está oculto en la tienda y seguirá oculto: este cambio no lo publica.", true);
-    else if (!variante.activa) efecto("Este color está oculto en la tienda y seguirá oculto: este cambio no lo publica.", true);
-    if (tallas.length > 1 && tipo !== "revisar") efecto("Cada talla se guarda por separado: si algo falla verás cuáles se aplicaron y cuáles no.");
+    const productosOcultos = [...new Map(grupos.filter((g) => !g.producto.activo).map((g) => [g.producto.id, g.producto.nombre])).values()];
+    const coloresOcultos = grupos.filter((g) => g.producto.activo && !g.variante.activa).map((g) => `${g.producto.nombre} · ${g.variante.color}`);
+    if (!varios && productosOcultos.length) efecto("El producto está oculto en la tienda y seguirá oculto: este cambio no lo publica.", true);
+    else if (!varios && coloresOcultos.length) efecto("Este color está oculto en la tienda y seguirá oculto: este cambio no lo publica.", true);
+    else {
+      if (productosOcultos.length) efecto(`${productosOcultos.length === 1 ? "El modelo" : "Los modelos"} ${productosOcultos.join(", ")} ${productosOcultos.length === 1 ? "está oculto en la tienda y seguirá oculto" : "están ocultos en la tienda y seguirán ocultos"}: este cambio no los publica.`, true);
+      if (coloresOcultos.length) efecto(`${coloresOcultos.length === 1 ? "El color" : "Los colores"} ${coloresOcultos.join(", ")} ${coloresOcultos.length === 1 ? "está oculto y seguirá oculto" : "están ocultos y seguirán ocultos"}: este cambio no los publica.`, true);
+    }
+    if (tallas.length > 1 && !["revisar", "activar", "desactivar"].includes(tipo)) efecto("Cada talla se guarda por separado: si algo falla verás cuáles se aplicaron y cuáles no.");
+    if (tallas.length > 1 && ["revisar", "activar", "desactivar"].includes(tipo)) efecto("Se guarda en una sola operación: se aplica a todas o a ninguna.");
     cuerpo.append(efectos);
 
     if (tipo === "publicacion") {
@@ -1029,15 +1128,11 @@
     return "el servidor no aplicó el cambio";
   }
 
-  // Solo lectura, con las columnas internas (fn_admin_tallas): nunca escribe ni renueva nada.
-  async function leerTallasVariante(varianteId) {
-    try {
-      const r = await cliente.rpc("fn_admin_tallas", { p_variante_id: varianteId }).select(COLUMNAS_TALLA);
-      if (r.error) return { error: r.error, status: r.status };
-      return { data: r.data || [] };
-    } catch {
-      return { error: { status: 0 } };
-    }
+  // Solo lectura, con las columnas internas (fn_admin_tallas): nunca escribe ni renueva nada. Una sola
+  // consulta para todas las variantes implicadas (por páginas, sin truncar).
+  async function leerTallasDe(varianteIds) {
+    const r = await leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).in("variante_id", varianteIds).order("id"));
+    return r.error ? { error: r.error, status: r.status } : { data: r.data };
   }
 
   function llamarFuncion(tipo, id, parametros) {
@@ -1048,6 +1143,29 @@
     if (tipo === "agotada") args.p_nota = parametros.nota;
     // Solo columnas públicas en la respuesta.
     return cliente.rpc(def.funcion, args).select("id,estado,activa");
+  }
+
+  // Una escritura para varias tallas (por revisar, activar, desactivar): todas o ninguna.
+  async function escribirJuntas(resultados, cambios, comprobar) {
+    let respuesta;
+    try {
+      respuesta = await cliente.from("tallas").update(cambios).in("id", resultados.map((r) => r.id)).select("id,estado,activa");
+    } catch { respuesta = { error: { status: 0 } }; }
+    if (respuesta.error) {
+      const tipo = clasificarEscritura(respuesta);
+      for (const r of resultados) {
+        r.resultado = tipo === "red" ? "no-confirmada" : "fallida";
+        r.motivo = tipo;
+        r.detalle = tipo === "red" ? "se perdió la respuesta del servidor" : textoError(tipo, respuesta);
+      }
+      return;
+    }
+    const hechas = new Map((respuesta.data || []).map((f) => [f.id, f]));
+    for (const r of resultados) {
+      const fila = hechas.get(r.id);
+      r.resultado = fila && comprobar(fila) ? "aplicada" : "fallida";
+      if (!fila) r.detalle = "no se modificó (sin permiso o ya no existe)";
+    }
   }
 
   async function ejecutarAccion(evento) {
@@ -1061,6 +1179,8 @@
     const def = ACCIONES[accion.tipo];
     const progreso = $("#dialogo-progreso");
     const resultados = accion.tallas.map((t) => ({ ...t, resultado: "no-intentada", detalle: "" }));
+    const varianteIds = [...new Set(accion.tallas.map((t) => t.variante.id))];
+    const varios = varianteIds.length > 1;
     marcarOcupado(true);
     try {
       progreso.textContent = "Comprobando tu sesión y tu permiso…";
@@ -1068,8 +1188,9 @@
       if (mia !== generacion) return;
       if (acceso.estado !== "admin") { cerrarDialogo(true); await aplicarAcceso(acceso); return; }
 
+      // Comprobación previa: el estado actual de TODAS las variantes implicadas, en una lectura.
       progreso.textContent = "Comprobando que la selección sigue vigente…";
-      const frescas = await leerTallasVariante(accion.variante.id);
+      const frescas = await leerTallasDe(varianteIds);
       if (mia !== generacion) return;
       if (frescas.error) {
         errorDialogo("No pudimos comprobar el estado actual de las tallas. No se cambió nada: revisa tu conexión e inténtalo de nuevo.");
@@ -1082,7 +1203,7 @@
         cerrarDialogo(true);
         anunciarResultado({
           titulo: "La disponibilidad cambió mientras revisabas",
-          texto: `${cambiadas.map((t) => t.talla).join(", ")}: ${cambiadas.length === 1 ? "cambió" : "cambiaron"} desde que cargaste el panel. No se aplicó nada; revisa los datos actualizados y vuelve a elegir.`,
+          texto: `${cambiadas.map((t) => (varios ? `${t.producto.nombre} · ${t.variante.color} ${t.talla}` : t.talla)).join(", ")}: ${cambiadas.length === 1 ? "cambió" : "cambiaron"} desde que cargaste el panel. No se aplicó nada; revisa los datos actualizados y vuelve a elegir.`,
           lineas: [],
           tipo: "aviso"
         });
@@ -1092,32 +1213,23 @@
       }
 
       if (accion.tipo === "revisar") {
-        // Una sola escritura para toda la selección: se aplica a todas o a ninguna.
         progreso.textContent = `Guardando ${resultados.length === 1 ? "la talla" : `las ${resultados.length} tallas`}…`;
-        let respuesta;
-        try {
-          respuesta = await cliente.from("tallas").update({ estado: "REVISAR" })
-            .in("id", accion.tallas.map((t) => t.id)).eq("variante_id", accion.variante.id).select("id,estado");
-        } catch { respuesta = { error: { status: 0 } }; }
-        if (respuesta.error) {
-          const tipo = clasificarEscritura(respuesta);
-          for (const r of resultados) {
-            r.resultado = tipo === "red" ? "no-confirmada" : "fallida";
-            r.motivo = tipo;
-            r.detalle = tipo === "red" ? "se perdió la respuesta del servidor" : textoError(tipo, respuesta);
-          }
-        } else {
-          const hechas = new Map((respuesta.data || []).map((f) => [f.id, f]));
-          for (const r of resultados) {
-            const fila = hechas.get(r.id);
-            r.resultado = fila && fila.estado === "REVISAR" ? "aplicada" : "fallida";
-            if (!fila) r.detalle = "no se modificó (sin permiso o ya no existe)";
-          }
+        await escribirJuntas(resultados, { estado: "REVISAR" }, (fila) => fila.estado === "REVISAR");
+      } else if (esCambioActiva(accion.tipo)) {
+        // Las que ya están como se pide no se escriben: se informan aparte.
+        const pendientes = [];
+        for (const r of resultados) {
+          if (actuales.get(r.id).activa === def.activa) { r.resultado = "sin-cambios"; r.detalle = def.ya; }
+          else pendientes.push(r);
+        }
+        if (pendientes.length) {
+          progreso.textContent = `Guardando ${pendientes.length === 1 ? "la talla" : `las ${pendientes.length} tallas`}…`;
+          await escribirJuntas(pendientes, { activa: def.activa }, (fila) => fila.activa === def.activa);
         }
       } else {
         for (let i = 0; i < resultados.length; i += 1) {
           const r = resultados[i];
-          progreso.textContent = `Aplicando ${i + 1} de ${resultados.length}: talla ${r.talla}…`;
+          progreso.textContent = `Aplicando ${i + 1} de ${resultados.length}: ${varios ? `${r.producto.nombre} · ${r.variante.color}, ` : ""}talla ${r.talla}…`;
           let respuesta;
           try { respuesta = await llamarFuncion(accion.tipo, r.id, parametros); } catch { respuesta = { error: { status: 0 } }; }
           if (mia !== generacion) return;
@@ -1149,7 +1261,7 @@
       const sinConfirmar = resultados.filter((r) => r.resultado === "no-confirmada");
       if (sinConfirmar.length) {
         progreso.textContent = "Consultando el estado actual…";
-        const despues = await leerTallasVariante(accion.variante.id);
+        const despues = await leerTallasDe([...new Set(sinConfirmar.map((r) => r.variante.id))]);
         if (mia !== generacion) return;
         if (despues.error) {
           verificacionPendiente = true;
@@ -1175,14 +1287,16 @@
         if (!(await aplicarAcceso(otraVez))) return;
       }
       anunciarResultado(resumenResultados(accion, resultados));
-      // Tras un resultado no confirmado no queda nada preparado para repetir: cualquier acción
-      // posterior pide elegir las tallas y confirmar otra vez, ya con los datos recargados.
-      if (sinConfirmar.length) seleccion = { varianteId: null, ids: new Set() };
+      // Selección después de la acción: con un resultado no confirmado no queda nada preparado para
+      // repetir (hay que comprobar y volver a elegir). Si no, quedan seleccionadas SOLO las tallas que
+      // no se aplicaron (para corregir y reintentar); las ya aplicadas nunca se repiten.
+      seleccion = sinConfirmar.length ? new Set() : new Set(resultados.filter((r) => r.resultado === "fallida" || r.resultado === "no-intentada").map((r) => r.id));
       marcarOcupado(false);
       if (!verificacionPendiente) {
         await cargarCatalogo({ conservarPosicion: true });
       } else {
         // No se pintan los estados anteriores como si siguieran vigentes.
+        seleccion = new Set();
         limpiarCatalogoVisible();
         avisoTablero({
           titulo: "Comprueba el resultado antes de seguir",
@@ -1200,29 +1314,43 @@
 
   function resumenResultados(accion, resultados) {
     const def = ACCIONES[accion.tipo];
-    const total = resultados.length;
-    const aplicadas = resultados.filter((r) => r.resultado === "aplicada").length;
-    const sinConfirmar = resultados.filter((r) => r.resultado === "no-confirmada");
+    const sinCambios = resultados.filter((r) => r.resultado === "sin-cambios");
+    const intentadas = resultados.filter((r) => r.resultado !== "sin-cambios");
+    const total = intentadas.length;
+    const aplicadas = intentadas.filter((r) => r.resultado === "aplicada").length;
+    const sinConfirmar = intentadas.filter((r) => r.resultado === "no-confirmada");
     const sinLeer = sinConfirmar.some((r) => !r.actual?.leido);
-    const quien = `${accion.producto.nombre} · ${accion.variante.color}`;
+    const varios = new Set(resultados.map((r) => r.variante.id)).size > 1;
+    const primera = resultados[0];
+    const quien = varios
+      ? `${plural(resultados.length, "talla", "tallas")} de ${plural(accion.modelos, "modelo", "modelos")} y ${plural(accion.grupos, "color", "colores")}`
+      : `${primera.producto.nombre} · ${primera.variante.color}`;
     let titulo;
-    if (sinConfirmar.length) titulo = "Resultado no confirmado";
-    else if (aplicadas === total) titulo = total === 1 ? `Talla ${resultados[0].talla} ${def.hecho}` : `${total} tallas ${def.hechas}`;
+    if (!total) titulo = sinCambios.length === 1 ? `La talla ${primera.talla} ${def.ya}` : `Las ${sinCambios.length} tallas ya estaban ${def.hechas}`;
+    else if (sinConfirmar.length) titulo = "Resultado no confirmado";
+    else if (aplicadas === total) titulo = total === 1 ? `Talla ${intentadas[0].talla} ${def.hecho}` : `${total} tallas ${def.hechas}`;
     else if (aplicadas) titulo = `Se aplicó a ${aplicadas} de ${total} tallas`;
     else titulo = "No se aplicó ningún cambio";
+    // Cada resultado se identifica por modelo, color, código y talla.
     const lineas = resultados.map((r) => {
-      if (r.resultado === "no-confirmada") return `${r.talla}: resultado no confirmado (${r.detalle}). ${textoEstadoActual(r)}`;
+      const quienTalla = `${r.producto.nombre} · ${r.variante.color} (${r.variante.codigo}) · talla ${r.talla}`;
+      if (r.resultado === "no-confirmada") return `${quienTalla}: resultado no confirmado (${r.detalle}). ${textoEstadoActual(r)}`;
+      if (r.resultado === "sin-cambios") return `${quienTalla}: sin cambios (${r.detalle})`;
       const estado = { aplicada: def.hecho, fallida: "no se aplicó", "no-intentada": "no se aplicó" }[r.resultado];
-      return `${r.talla}: ${estado}${r.detalle ? ` (${r.detalle})` : ""}`;
+      return `${quienTalla}: ${estado}${r.detalle ? ` (${r.detalle})` : ""}`;
     });
     let texto = quien;
+    if (sinCambios.length && total) texto += `. ${sinCambios.length === 1 ? "1 talla ya estaba" : `${sinCambios.length} tallas ya estaban`} ${sinCambios.length === 1 ? def.hecho : def.hechas}: no se tocó.`;
     if (sinConfirmar.length) {
-      texto += `. No sabemos si la petición de ${sinConfirmar.length === 1 ? `la talla ${sinConfirmar[0].talla}` : `las tallas ${sinConfirmar.map((r) => r.talla).join(", ")}`} se aplicó.`;
+      texto += `. No sabemos si la petición de ${sinConfirmar.length === 1 ? `la talla ${etiquetaTalla(sinConfirmar[0], varios)}` : `las tallas ${sinConfirmar.map((r) => etiquetaTalla(r, varios)).join(", ")}`} se aplicó.`;
       texto += sinLeer
         ? " Tampoco pudimos leer el estado actual: no repitas la acción y pulsa «Actualizar» cuando vuelva la conexión."
         : " El estado actual es el que tiene ahora en el servidor, pero no indica qué operación lo produjo. No repitas la acción sin revisarlo; si hace falta, vuelve a elegir las tallas y confirma de nuevo.";
     }
-    if (aplicadas !== total && total > 1 && accion.tipo !== "revisar") texto += `${sinConfirmar.length ? "" : "."} Cada talla se guardó por separado; no fue una operación única.`;
+    const unaOperacion = ["revisar", "activar", "desactivar"].includes(accion.tipo);
+    if (aplicadas !== total && total > 1 && !unaOperacion) texto += `${sinConfirmar.length ? "" : "."} Cada talla se guardó por separado; no fue una operación única.`;
+    const pendientes = intentadas.filter((r) => r.resultado === "fallida" || r.resultado === "no-intentada").length;
+    if (pendientes && !sinConfirmar.length) texto += ` ${pendientes === 1 ? "La talla que no se aplicó sigue seleccionada" : `Las ${pendientes} tallas que no se aplicaron siguen seleccionadas`} para revisarla${pendientes === 1 ? "" : "s"} y reintentar; las aplicadas no se repiten.`;
     return { titulo, texto, lineas, tipo: sinConfirmar.length || aplicadas !== total ? "aviso" : "ok" };
   }
 
@@ -1670,9 +1798,16 @@
       else if (accion === "exportar") { if (!ocupado) exportarCatalogo(); }
       else if (accion in ACCIONES) abrirAccion(accion);
       else if (accion === "deseleccionar") { if (!ocupado) quitarSeleccion(); }
+      else if (accion === "seleccionar-visibles") seleccionarVisibles();
       else if (accion === "cancelar-dialogo") cerrarDialogo();
       else if (accion === "cerrar-resultado") { const caja = $("#resultado-accion"); caja.hidden = true; caja.replaceChildren(); }
       else if (accion === "nuevo-producto") { if (!ocupado) abrirEditor(null, e.target.closest("[data-accion]")); }
+      else if (accion === "importar-whatsapp") {
+        if (ocupado) return;
+        if (!window.GamaTallaImportador) { anunciarResultado({ titulo: "El importador no se pudo cargar", texto: "Recarga la página.", tipo: "aviso" }); return; }
+        quitarSeleccion();
+        window.GamaTallaImportador.abrir(e.target.closest("[data-accion]"));
+      }
       else if (accion === "editar-producto") { const b = e.target.closest("[data-producto-id]"); if (!ocupado) abrirEditor(b.dataset.productoId, b); }
     });
     document.addEventListener("visibilitychange", revisarAlVolver);

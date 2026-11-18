@@ -307,7 +307,12 @@ exigir('Escenarios con productos de nombre distinto (para leer los mensajes sin 
     && JSON.stringify(b.porRevisar) === JSON.stringify([`${lineaB.producto}|${lineaB.talla}`]), JSON.stringify(b));
   const ui = await leerCarritoAbierto(p);
   // 16.1/16.2: el envío es una acción explícita con la dirección elegida; no hay enlace previo.
-  await p.evaluate(() => document.querySelector('#carrito-enviar').click());
+  // 17.6: la autorización de datos nace desmarcada y es obligatoria para abrir WhatsApp; se marca como lo haría el cliente.
+  await p.evaluate(() => {
+    const autorizo = document.querySelector('#carrito-autorizo');
+    if (autorizo && !autorizo.checked) autorizo.click();
+    document.querySelector('#carrito-enviar').click();
+  });
   const enviado = await p.evaluate(() => { const e = window.__abiertas.at(-1); return e ? new URL(e).searchParams.get('text') : null; });
   exigir('Mezcla: el pedido confirmado lleva solo la línea DISPONIBLE',
     ui.enviar.oculto === false && ui.enviar.ariaDisabled === 'false' && /NUEVO PEDIDO/.test(enviado || '')

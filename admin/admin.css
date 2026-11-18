@@ -837,6 +837,9 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
   #boton-nuevo { grid-column: 1 / -1; min-height: 3rem; font-size: 1rem; }
   /* 17: «Exportar catálogo» debajo, a lo ancho (Historial y Actualizar siguen juntos). */
   #boton-exportar { grid-column: 1 / -1; }
+  /* 18: «Importar desde WhatsApp» a lo ancho, justo debajo de «Agregar zapatilla». */
+  #boton-importar { grid-column: 1 / -1; order: -1; }
+  #boton-nuevo { order: -2; }
   /* Buscador a todo el ancho, con etiqueta breve (el nombre accesible sigue completo). */
   .buscador { max-width: none; }
   .buscador-etiqueta-detalle {
@@ -904,3 +907,240 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
   .editor-pie { gap: var(--e-2); padding-block: var(--e-2) calc(var(--e-2) + env(safe-area-inset-bottom)); }
   .editor-resultado.es-ok, .editor-resultado.es-aviso { padding-block: var(--e-1); }
 }
+
+/* =====================================================================
+   Etapa 18 · Cómo mostrar cada color e importador desde WhatsApp
+   ===================================================================== */
+/* «Cómo mostrar este color»: dos tarjetas con su vista previa; la elegida lleva marco de tinta. */
+.editor-forma { display: grid; gap: var(--e-2); }
+.editor-forma-lista { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr)); gap: var(--e-2); }
+.editor-forma-opcion {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--e-3);
+  min-height: 3.5rem;
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--r-control);
+  background: var(--superficie);
+  cursor: pointer;
+}
+.editor-forma-opcion:has(input:checked) { border-color: var(--tinta); box-shadow: inset 0 0 0 1px var(--tinta); }
+.editor-forma-opcion:has(input:focus-visible) { outline: 2px solid var(--foco); outline-offset: 2px; }
+.editor-forma-opcion input { width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--tinta); }
+.editor-forma-opcion input:focus-visible { outline: none; }
+.editor-forma-opcion:has(input[data-bloqueado="1"]) { cursor: not-allowed; opacity: 0.6; }
+.editor-forma-vista { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; }
+/* Círculo de la vista previa: clase propia (no la de la muestra de arriba), mismo aspecto. */
+.editor-forma-circulo { width: 2.25rem; height: 2.25rem; border-radius: 50%; background: var(--muestra, transparent); box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
+.editor-forma-circulo.es-neutra { background: repeating-linear-gradient(135deg, #e6e6e1 0 3px, #c4c4be 3px 6px); }
+.editor-forma-vista.es-foto { overflow: hidden; border-radius: 0.5rem; background: #fff; box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
+.editor-forma-vista.es-foto img { width: 100%; height: 100%; object-fit: contain; }
+.editor-forma-sin-foto { font-size: 0.6875rem; line-height: 1.1; text-align: center; color: var(--tinta-2); }
+.editor-forma-texto { font-weight: 600; line-height: 1.25; }
+.editor-forma-aviso { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fff4e0; color: #5c3b00; font-weight: 600; }
+
+/* Tablero: color configurado con foto que se quedó sin fotos. */
+.variante-aviso-forma { padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fff4e0; color: #5c3b00; font-size: 0.9375rem; font-weight: 600; }
+
+/* Importador: misma maqueta que el editor (pantalla completa en celular, panel en escritorio). */
+.importador .editor-cabecera { grid-template-columns: minmax(0, 1fr) auto; }
+.importador-descripcion { font-size: 0.875rem; }
+.importador .editor-cerrar { grid-column: 2; }
+.importador-ajustes { gap: var(--e-4); }
+.importador-ajuste { display: grid; gap: var(--e-2); align-items: end; padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+.importador-ajuste > .boton { justify-self: start; }
+@media (min-width: 640px) {
+  .importador-ajuste { grid-template-columns: minmax(0, 1fr) auto; }
+  .importador-ajuste > .campo .campo-ayuda { min-height: 0; }
+  .importador-ajuste > .boton { margin-bottom: var(--e-1); }
+}
+.importador-seleccion { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+.importador-seleccion-texto { font-weight: 600; margin-right: auto; }
+.importador-fichas { display: grid; gap: var(--e-5); margin: 0; padding: 0; list-style: none; }
+.importador-ficha-articulo { gap: var(--e-4); }
+.importador-ficha.es-guardada .importador-ficha-articulo { background: var(--papel-2); }
+.importador-ficha.es-fallida .importador-ficha-articulo { box-shadow: inset 4px 0 0 #8e1c1c; }
+.importador-ficha.es-sin-confirmar .importador-ficha-articulo { box-shadow: inset 4px 0 0 #b26a00; }
+.importador-ficha-cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-4); }
+.importador-ficha-cabecera h3 { margin-right: auto; overflow-wrap: anywhere; }
+.importador-estado { display: grid; gap: var(--e-2); padding: var(--e-2) var(--e-3); border-radius: var(--r-control); font-weight: 600; }
+.importador-estado.es-guardada { background: var(--cobalto-suave); }
+.importador-estado.es-guardando { background: var(--papel); }
+.importador-estado.es-fallida { background: var(--error-suave); color: #8e1c1c; }
+.importador-estado.es-sin-confirmar { background: #fff4e0; color: #5c3b00; }
+.importador-estado .editor-botones { justify-content: flex-start; }
+.importador-coincidencia { display: grid; gap: var(--e-2); padding: var(--e-3) var(--e-4); border-radius: var(--r-control); background: #fff4e0; color: #3d2800; }
+.importador-coincidencia p { font-weight: 600; }
+.importador-coincidencia .editor-botones { justify-content: flex-start; }
+.importador-coincidencia .campo-ayuda { color: #5c3b00; font-weight: 400; }
+.importador-existentes { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.importador-existente { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); padding: var(--e-2) 0; border-top: 1px solid rgb(92 59 0 / 0.2); }
+.importador-existente-colores { flex-basis: 100%; font-size: 0.875rem; }
+.importador-existente .boton { margin-left: auto; }
+.importador-revisar {
+  display: inline-block;
+  margin-left: var(--e-2);
+  padding: 0 0.375rem;
+  border-radius: 4px;
+  background: #fff4e0;
+  color: #5c3b00;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  vertical-align: 0.1em;
+}
+.importador .campo.es-revisar :is(input, textarea) { border-color: #b26a00; background: #fffaf0; }
+.importador-lectura { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); }
+.importador-tallas-leidas { font-family: var(--fuente-mono); font-size: 0.8125rem; }
+.importador-errores { display: grid; gap: var(--e-1); margin: 0; padding: var(--e-3) var(--e-4) var(--e-3) calc(var(--e-4) + 1em); border-radius: var(--r-control); background: var(--error-suave); color: #8e1c1c; font-weight: 600; list-style: disc; }
+.importador-mover summary { min-height: 2.75rem; display: flex; align-items: center; font-weight: 600; cursor: pointer; }
+.importador-mover summary:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-mover .editor-botones { justify-content: flex-start; }
+.importador-agregar { display: grid; gap: var(--e-2); justify-items: start; }
+/* Zona de fotos: grande y táctil; al arrastrar archivos encima se resalta. */
+.importador-soltar {
+  display: grid;
+  gap: var(--e-1);
+  padding: var(--e-4);
+  border: 2px dashed var(--linea-fuerte);
+  border-radius: var(--r-superficie);
+  background: var(--papel);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+.importador-soltar:hover, .importador-soltar.es-encima { border-color: var(--cobalto); background: var(--cobalto-suave); }
+.importador-soltar:focus-within { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-soltar-titulo { font-weight: 700; }
+.importador-soltar-detalle { font-size: 0.875rem; color: var(--tinta-2); }
+@media (max-width: 479px) {
+  #importador-botones { display: grid; grid-template-columns: 1fr 1.6fr; }
+  #importador-botones .boton { min-height: 2.75rem; padding: 0 var(--e-3); font-size: 0.9375rem; }
+  .importador-existente .boton { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .importador-soltar { transition: none; } }
+
+/* =====================================================================
+   Etapa 18 · Revisión: importador por publicación, tono del círculo y quitar fotos
+   ===================================================================== */
+/* Tarjeta de foto: el texto se ajusta al ancho de la tarjeta y las acciones siempre se ven. */
+.editor-foto { grid-template-columns: minmax(0, 1fr); overflow: visible; }
+.editor-foto-marco { border-radius: var(--r-control) var(--r-control) 0 0; overflow: hidden; }
+.editor-foto-info > * { min-width: 0; overflow-wrap: anywhere; }
+.editor-foto-acciones { align-items: center; }
+.editor-foto-quitar { margin-left: auto; }
+.editor-fotos-quitadas { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fff4e0; color: #5c3b00; font-weight: 600; }
+@media (max-width: 767px) {
+  /* En celular, «Quitar foto» ocupa toda la fila: un blanco cómodo para el dedo. */
+  .editor-foto-quitar { flex: 1 1 100%; margin-left: 0; }
+}
+
+/* Tono del círculo: recuadro que abre el selector del navegador, hexadecimal y vista previa. */
+.editor-tono { display: grid; gap: var(--e-2); padding: var(--e-3); border-radius: var(--r-control); background: var(--papel); }
+.editor-tono-etiqueta { font-weight: 600; }
+.editor .editor-tono-fila { gap: var(--e-3); }
+.editor .editor-muestra-fila input.editor-tono-selector {
+  width: 3.25rem;
+  height: 3.25rem;
+  padding: 0.25rem;
+  border: 2px solid var(--tinta);
+  border-radius: var(--r-control);
+  background: var(--superficie);
+  cursor: pointer;
+}
+.editor .editor-muestra-fila input.editor-tono-selector:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.editor .editor-muestra-fila input.editor-tono-selector[data-bloqueado="1"] { cursor: not-allowed; opacity: 0.6; }
+.editor-tono-vista.editor-muestra-vista { width: 2.75rem; height: 2.75rem; }
+.editor-tono-estado { margin: 0; }
+.editor-tono-error { margin: 0; font-size: 0.875rem; font-weight: 600; color: #8e1c1c; }
+.editor .editor-tono-fila input[aria-invalid="true"] { border-color: #8e1c1c; }
+.editor-forma-foto { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-3); padding: var(--e-3); border-radius: var(--r-control); background: var(--papel); }
+.editor-forma-foto img { width: 5.5rem; height: 5.5rem; object-fit: contain; border-radius: 0.5rem; background: #fff; box-shadow: inset 0 0 0 1px var(--linea-fuerte); }
+.editor-forma-foto .campo-ayuda { flex: 1 1 12rem; margin: 0; }
+.editor-forma-foto:empty { display: none; }
+
+/* Importador: cada publicación en orden (mensaje, fotos, datos reconocidos, ajustes adicionales). */
+.importador-mensaje { display: grid; gap: var(--e-2); }
+.importador-mensaje-etiqueta { font-size: 1.0625rem; font-weight: 700; }
+.importador .importador-mensaje textarea { min-height: 9.5rem; font-size: 1rem; line-height: 1.45; resize: vertical; }
+.importador .importador-mensaje textarea::placeholder { color: var(--tinta-2); opacity: 0.85; }
+.importador-paso { display: grid; gap: var(--e-3); padding-top: var(--e-4); border-top: 1px solid var(--linea); min-width: 0; }
+.importador-paso-titulo { font-size: 1rem; font-weight: 700; }
+.importador-datos-nota { margin: 0; }
+.importador-fotos { min-width: 0; }
+
+/* «Ajustes para varias fichas»: plegable, secundario, debajo de las publicaciones. */
+details.importador-ajustes { display: block; }
+details.importador-ajustes[open] { display: grid; }
+.importador-ajustes-resumen { display: grid; gap: 2px; min-height: 2.75rem; align-content: center; padding-left: 1.5rem; position: relative; cursor: pointer; list-style: none; }
+.importador-ajustes-resumen::-webkit-details-marker { display: none; }
+.importador-ajustes-resumen::before { content: "▸"; position: absolute; left: 0; top: 50%; transform: translateY(-50%); font-size: 1rem; }
+details[open] > .importador-ajustes-resumen::before { content: "▾"; }
+.importador-ajustes-resumen:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-ajustes-titulo { font-size: 1.0625rem; font-weight: 700; }
+.importador-ajustes-pista { font-size: 0.875rem; color: var(--tinta-2); }
+
+/* El final del lote nunca queda tapado: margen bajo el último bloque y foco con aire. */
+.importador .editor-cuerpo { padding-bottom: calc(var(--e-7) + env(safe-area-inset-bottom)); scroll-padding-block: var(--e-4) var(--e-6); }
+/* La foto se ve entera dentro de su marco 4:3 (sin recortes), sea cual sea su proporción. */
+.editor-foto-marco img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+/* El hexadecimal del tono, con el mismo aspecto y blanco táctil que los demás campos. */
+.editor .editor-tono-fila input[type="text"] {
+  min-height: 3rem;
+  padding: var(--e-2) var(--e-3);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--r-control);
+  background: var(--superficie);
+  font-size: 1rem;
+  color: inherit;
+}
+.editor .editor-tono-fila input[type="text"]:focus-visible { outline: 2px solid var(--foco); outline-offset: 0; border-color: var(--foco); }
+.editor .editor-tono-fila input[type="text"][aria-invalid="true"] { border-color: var(--error); }
+
+/* =====================================================================
+   Etapa 18 · Una sola zona de desplazamiento en el editor y el importador
+   ===================================================================== */
+/* El diálogo nunca se desplaza (su «overflow: auto» de serie creaba un segundo desplazamiento): la
+   cabecera y el pie quedan fijos y solo se mueve el cuerpo. */
+.editor { overflow: hidden; }
+.editor-formulario { height: 100%; max-height: 100%; }
+/* Los campos de archivo ocultos (.solo-lectores, en posición absoluta) se miden dentro de su etiqueta:
+   sin esto su bloque contenedor era el propio diálogo y alargaban su altura desplazable. */
+.importador-soltar, .editor-subir, .editor-foto-acciones label { position: relative; }
+/* Panel de fondo quieto mientras hay un diálogo abierto; al cerrar vuelve su desplazamiento normal. */
+html.con-dialogo, html.con-dialogo body { overflow: hidden; }
+/* Al llegar al principio o al final del contenido, la rueda o el dedo no arrastran nada más. */
+.editor-cuerpo { overscroll-behavior: contain; }
+.editor-cabecera, .editor-pie { overscroll-behavior: none; touch-action: pan-x pinch-zoom; }
+/* Pantallas bajas (p. ej. 360 × 560): cabecera del importador compacta para dejar sitio al contenido. */
+@media (max-height: 640px) {
+  .importador .importador-descripcion { display: none; }
+  .importador .editor-cabecera { padding-block: var(--e-2); }
+}
+/* «Aplicar todos los ajustes»: acción principal del bloque y resumen de lo aplicado. */
+.importador-ajustes-acciones { display: grid; gap: var(--e-3); justify-items: start; padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+.importador-ajustes-estado { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--cobalto-suave); font-weight: 600; }
+.importador-ajustes-estado.es-aviso { background: #fff4e0; color: #5c3b00; }
+.importador-ajustes > .editor-opciones, .importador-ajustes > .campo { padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+@media (max-width: 479px) { .importador-ajustes-acciones .boton { width: 100%; } }
+
+/* =====================================================================
+   Etapa 18 · Selección de tallas de varios modelos y colores
+   ===================================================================== */
+.seleccion-herramientas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); margin-block: var(--e-2); }
+.seleccion-ayuda { margin: 0; flex: 1 1 18rem; color: var(--tinta-2); font-size: 0.9375rem; }
+/* La barra crece con 7 acciones: el tablero deja sitio para no tapar la última zapatilla. */
+body.con-seleccion .tablero { padding-bottom: 22rem; }
+@media (min-width: 768px) { body.con-seleccion .tablero { padding-bottom: 11rem; } }
+/* Resumen compacto: en celular, como mucho tres líneas (el detalle completo está en el diálogo). */
+@media (max-width: 767px) {
+  .barra-acciones-resumen { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
+}
+/* Diálogo: qué se modificará, agrupado por modelo y color. */
+.dialogo-alcance { margin: 0; font-weight: 600; }
+.dialogo-grupos { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.dialogo-grupo { display: grid; gap: 2px; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); overflow-wrap: anywhere; }
+.dialogo-grupo span { color: var(--tinta-2); font-size: 0.9375rem; }

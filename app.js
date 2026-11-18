@@ -178,6 +178,24 @@ function muestraDeColor(variante) {
   const css = propia || PALETA_COLORES.get(normalizarTexto(variante?.color).replace(/\s+/g, " ")) || "";
   return { css: MUESTRA_VALIDA.test(css) ? css : "", clara: Boolean(css) && luminanciaDe(css) > 0.6 };
 }
+/* Etapa 18: un color configurado como «foto» se elige con la miniatura de su foto principal (la
+   primera de su galería). Solo cuenta una foto PROPIA del color: sin fotos, la variante no trae
+   miniatura y se usa su círculo. La imagen es decorativa: el nombre lo lleva el botón. */
+function crearMiniaturaColor(variante, clase = "muestra-foto") {
+  const marco = crearElemento("span", clase);
+  marco.setAttribute("aria-hidden", "true");
+  const img = document.createElement("img");
+  img.src = variante.miniatura;
+  img.alt = "";
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.draggable = false;
+  marco.append(img);
+  return marco;
+}
+const muestraOMiniatura = (variante, clase) => (variante.miniatura
+  ? crearMiniaturaColor(variante, clase ? `muestra-foto ${clase}` : "muestra-foto")
+  : crearMuestra(variante, clase ? `muestra-circulo ${clase}` : "muestra-circulo"));
 function crearMuestra(variante, clase = "muestra-circulo") {
   const { css, clara } = muestraDeColor(variante);
   const circulo = crearElemento("span", `${clase}${css ? "" : " muestra-neutra"}${clara ? " muestra-clara" : ""}`);
@@ -697,6 +715,9 @@ function normalizarVariante(bruto, base, idsUsados) {
   idsUsados.add(id);
 
   const imagenes = base.heredada ? listaDeImagenes(bruto.imagenes, bruto.imagen) : listaDeImagenes(bruto.imagenes, bruto.imagen, base.imagenes);
+  // 18: miniatura solo con forma «foto» y una foto propia del color (nunca la de respaldo).
+  const fotosPropias = Array.isArray(bruto.imagenes) ? bruto.imagenes.map((ruta) => limpiarTexto(ruta)).filter(Boolean) : [];
+  const miniatura = !base.heredada && bruto.forma === "foto" && fotosPropias.length ? rutaImagen(fotosPropias[0]) : "";
   return {
     id,
     heredada: base.heredada,
@@ -709,6 +730,9 @@ function normalizarVariante(bruto, base, idsUsados) {
     referenciaProveedor: base.heredada ? "" : limpiarTexto(bruto.referencia),
     // 16.3: muestra del color, solo si es un hexadecimal #rrggbb (cualquier otra cosa se ignora).
     muestra: typeof bruto.muestra === "string" && MUESTRA_VALIDA.test(bruto.muestra) ? bruto.muestra.toLowerCase() : "",
+    // 18: «foto» o «circulo» tal como se ve: una «foto» sin fotos propias se muestra como círculo.
+    forma: miniatura ? "foto" : "circulo",
+    miniatura,
     fotoPrincipal: imagenes[0],
     imagenes: imagenes.map(rutaImagen),
     tallasDisponibles: disponibles,
@@ -900,6 +924,8 @@ function aplicarConfiguracion() {
   });
   $$('[data-horario]').forEach((nodo) => {
     nodo.textContent = CONFIG.horario || "Lunes a viernes: 8:00 a. m. - 6:00 p. m. / Sábados y domingos: 8:00 a. m. - 1:00 p. m.";
+
+
   });
   $$('[data-anio]').forEach((nodo) => { nodo.textContent = String(new Date().getFullYear()); });
   if (String(CONFIG.whatsapp).replace(/\D/g, "") === NUMERO_PROVISIONAL) {
@@ -2040,12 +2066,15 @@ function construirDetalle(producto) {
   variantes.setAttribute("aria-labelledby", "etiqueta-color");
   /* 16.3: círculos de muestra (la galería grande sigue mostrando las fotos del color). Cada uno es
      un botón con el nombre del color y su estado; conserva el identificador de su variante. Con un
-     solo color se nombra y se muestra su círculo, sin selector. */
+     solo color se nombra y se muestra su círculo, sin selector.
+     18: cada color se muestra como lo eligió el panel, círculo o miniatura de su foto principal, y
+     ambos pueden convivir en el mismo selector. */
   if (producto.variantes.length > 1) {
     variantes.classList.add("variantes-muestras");
     producto.variantes.forEach((variante) => {
       const nombreColor = `${variante.color}${variante.ofrecida ? "" : ", agotado"}`;
-      const pieza = crearBoton("variante variante-muestra", crearMuestra(variante), { variante: variante.id });
+      const clase = `variante variante-muestra${variante.miniatura ? " variante-miniatura" : ""}`;
+      const pieza = crearBoton(clase, muestraOMiniatura(variante), { variante: variante.id });
       pieza.setAttribute("aria-label", nombreColor);
       pieza.title = nombreColor;
       pieza.classList.toggle("variante-agotada", !variante.ofrecida);
@@ -2054,7 +2083,7 @@ function construirDetalle(producto) {
     colores.append(tituloColor, variantes);
   } else {
     colores.classList.add("detalle-colores-unico");
-    tituloColor.prepend(crearMuestra(producto.variantes[0], "muestra-circulo muestra-unica"));
+    tituloColor.prepend(muestraOMiniatura(producto.variantes[0], "muestra-unica"));
     tituloColor.append(crearElemento("span", "variante-unica", "Único color"));
     colores.append(tituloColor);
   }

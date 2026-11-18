@@ -85,6 +85,17 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
 # Para repetirlo: npx --yes supabase@3.0.0 db reset --workdir "<destino>"
 ```
 
+Etapa 18: el ciclo guarda el color «Beige/Blancas» como **foto** y deja «Negro» en **círculo**, y tras
+restaurar exige las dos preferencias en las filas y en `catalogo_publico` («forma»), las mismas fotos
+(ids, rutas en el Storage del destino y bytes) y las claves públicas de la zapatilla y sus colores.
+El manifiesto debe traer exactamente las migraciones del repositorio (16, con `20261117010000`). Si
+ya hay otro destino en marcha en los puertos 563xx, se puede preparar uno nuevo y cambiar en su
+`supabase/config.toml` los puertos 563xx por otros libres (p. ej. 573xx) antes de arrancarlo.
+
+Un paquete **anterior** a la etapa 18 (sin `forma_muestra`) se restaura en un destino con las 16
+migraciones: `restaurar.mjs` compara las filas con las columnas del paquete y exige aparte que todos
+los colores queden en `'circulo'`.
+
 ## Etapa 17.1 · Verificación de la restauración (1.001 productos y un 503)
 
 ```bash

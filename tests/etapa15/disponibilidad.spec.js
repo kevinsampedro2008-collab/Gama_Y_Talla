@@ -60,7 +60,9 @@ function enColombia(ms) {
   return { dia: d.slice(0, 10), hora: d.slice(11, 16), iso: `${d.slice(0, 10)}T${d.slice(11, 16)}:00-05:00` };
 }
 
-test('selección: vacía, por UUID, de un solo color y se quita al cambiar la búsqueda', async ({ page }) => {
+const MODELO = '(?:DISPONIBILIDAD|OCULTA) [^·]+';
+
+test('selección: por UUID, de varios colores y modelos; se conserva al buscar y filtrar', async ({ page }) => {
   await expect(barra(page)).toBeHidden();
   // Cada botón lleva el UUID real de su talla.
   for (const t of ['38', '39', '40']) await expect(talla(page, 'negro', t)).toHaveAttribute('data-talla-id', cat.talla('negro', t));
@@ -75,19 +77,32 @@ test('selección: vacía, por UUID, de un solo color y se quita al cambiar la b�
   await expect(page.locator('#seleccion-resumen')).toContainText('38, 40');
   await expect(page.locator('.detalle-seleccion li')).toHaveCount(2);
 
-  // Otro color empieza una selección nueva.
+  // Etapa 18: otro color se SUMA a la selección (la misma numeración en otro color es otra talla).
   await talla(page, 'verde', '40').click();
-  await expect(talla(page, 'negro', '38')).toHaveAttribute('aria-pressed', 'false');
-  await expect(page.locator('#seleccion-resumen')).toContainText('1 talla seleccionada');
+  await expect(talla(page, 'negro', '38')).toHaveAttribute('aria-pressed', 'true');
+  await expect(talla(page, 'negro', '40')).toHaveAttribute('aria-pressed', 'true');
+  await expect(talla(page, 'verde', '40')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#seleccion-resumen')).toContainText('3 tallas seleccionadas · 1 modelo · 2 colores');
+  // Y otro modelo también.
+  await talla(page, 'gris', '39').click();
+  await expect(page.locator('#seleccion-resumen')).toContainText('4 tallas seleccionadas · 2 modelos · 3 colores');
+  // Deseleccionar una no toca las demás.
   await talla(page, 'verde', '40').click();
-  await expect(barra(page)).toBeHidden();
+  await expect(talla(page, 'verde', '40')).toHaveAttribute('aria-pressed', 'false');
+  await expect(talla(page, 'negro', '40')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#seleccion-resumen')).toContainText('3 tallas seleccionadas · 2 modelos · 2 colores');
 
-  // Si la búsqueda oculta el color elegido, la selección se quita.
-  await talla(page, 'negro', '39').click();
+  // La búsqueda que oculta un modelo conserva la selección y dice cuántas quedan fuera.
   await page.getByLabel('Buscar por código interno, referencia, marca o modelo').fill(`ocul-${sufijo}`);
   await expect(page.locator('#lista-productos > li')).toHaveCount(1);
+  await expect(barra(page)).toBeVisible();
+  await expect(page.locator('#seleccion-resumen')).toContainText('3 tallas seleccionadas · 2 modelos · 2 colores · 2 fuera de la vista');
+  await expect(page.locator('#tablero-estado')).toContainText('2 tallas seleccionadas quedan fuera de la vista');
+  await page.getByLabel('Buscar por código interno, referencia, marca o modelo').fill('');
+  await expect(page.locator('#lista-productos > li')).toHaveCount(2);
+  await expect(talla(page, 'negro', '38')).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('button', { name: 'Quitar selección' }).click();
   await expect(barra(page)).toBeHidden();
-  await expect(page.locator('#tablero-estado')).toContainText('Se quitó la selección');
 });
 
 test('filtros: un producto puede estar en varios estados a la vez', async ({ page }) => {
@@ -331,7 +346,7 @@ test('conexión perdida: resultado no confirmado, estado actual y sin repetir na
   await expect(lineas(page)).toHaveCount(2);
   await expect(lineas(page).nth(0)).toContainText('38: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como agotada');
   await expect(lineas(page).nth(0)).toContainText(CAMBIO_SIN_ORIGEN);
-  await expect(lineas(page).nth(1)).toHaveText('39: no se aplicó (no se intentó)');
+  await expect(lineas(page).nth(1)).toHaveText(new RegExp(`^${MODELO} · NEGRO \\(GT-\\d{5}-A\\) · talla 39: no se aplicó \\(no se intentó\\)$`));
   await expect(resultado(page)).toContainText('No sabemos si la petición de la talla 38 se aplicó.');
   await expect(resultado(page)).not.toContainText('marcada agotada');
   expect(agotadas, 'sin reintentos automáticos').toBe(1);
@@ -366,15 +381,17 @@ test('conexión perdida: resultado no confirmado, estado actual y sin repetir na
   // 3) Tampoco se puede leer el estado actual: nada se repite, la lista se vacía y se pide actualizar.
   let lecturas = 0;
   await page.route('**/rpc/fn_admin_tallas**', async (r) => {
-    const cuerpo = r.request().postData() || '';
-    if (cuerpo.includes('p_variante_id') && (lecturas += 1) > 1) await r.abort('internetdisconnected');
+    // Etapa 18: las lecturas de la acción (comprobación previa y relectura) filtran por las variantes
+    // implicadas («variante_id=in.(…)»); la carga del tablero no.
+    const deLaAccion = /variante_id=in\./.test(r.request().url());
+    if (deLaAccion && (lecturas += 1) > 1) await r.abort('internetdisconnected');
     else await r.continue();
   });
   await talla(page, 'negro', '41').click();
   await accion(page, 'Confirmó el proveedor').click();
   await confirmar(page, 'Confirmar disponibilidad').click();
   await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
-  await expect(lineas(page)).toHaveText(['41: resultado no confirmado (se perdió la respuesta del servidor). No pudimos leer su estado actual.']);
+  await expect(lineas(page)).toHaveText([new RegExp(`^${MODELO} · NEGRO \\(GT-\\d{5}-A\\) · talla 41: resultado no confirmado \\(se perdió la respuesta del servidor\\)\\. No pudimos leer su estado actual\\.$`)]);
   await expect(resultado(page)).not.toContainText('Estado actual:');
   await expect(resultado(page)).toContainText('Tampoco pudimos leer el estado actual');
   await expect(page.getByRole('heading', { name: 'Comprueba el resultado antes de seguir' })).toBeVisible();
@@ -470,7 +487,7 @@ test('relectura sin cambios mientras la escritura sigue en camino: no se afirma 
   });
   let tardia = null;
   await page.route('**/rpc/fn_admin_tallas**', async (r) => {
-    if (!enCamino || !(r.request().postData() || '').includes('p_variante_id')) return r.continue();
+    if (!enCamino || !/variante_id=in\./.test(r.request().url())) return r.continue();
     const leida = await r.fetch();                     // la relectura ve la talla todavía sin cambios
     const { url, headers, body } = enCamino;
     enCamino = null;
@@ -507,11 +524,11 @@ test('lote con conexión perdida: conserva lo confirmado, los fallos conocidos y
   await confirmar(page, 'Confirmar disponibilidad').click();
   await expect(resultado(page).getByRole('heading')).toHaveText('Resultado no confirmado');
   await expect(lineas(page)).toHaveCount(4);
-  await expect(lineas(page).nth(0)).toHaveText('38: confirmada por el proveedor');
-  await expect(lineas(page).nth(1)).toHaveText('39: no se aplicó (la talla ya no existe)');
+  await expect(lineas(page).nth(0)).toHaveText(new RegExp(`^${MODELO} · NEGRO \\(GT-\\d{5}-A\\) · talla 38: confirmada por el proveedor$`));
+  await expect(lineas(page).nth(1)).toHaveText(new RegExp(`^${MODELO} · NEGRO \\(GT-\\d{5}-A\\) · talla 39: no se aplicó \\(la talla ya no existe\\)$`));
   await expect(lineas(page).nth(2)).toContainText('40: resultado no confirmado (se perdió la respuesta del servidor). Estado actual: guardada como confirmada · procedencia: confirmación del proveedor');
   await expect(lineas(page).nth(2)).toContainText(CAMBIO_SIN_ORIGEN);
-  await expect(lineas(page).nth(3)).toHaveText('41: no se aplicó (no se intentó)');
+  await expect(lineas(page).nth(3)).toHaveText(new RegExp(`^${MODELO} · NEGRO \\(GT-\\d{5}-A\\) · talla 41: no se aplicó \\(no se intentó\\)$`));
   await expect(resultado(page)).toContainText('No sabemos si la petición de la talla 40 se aplicó.');
   await expect(resultado(page)).toContainText('Cada talla se guardó por separado; no fue una operación única.');
   expect(n, 'se detiene tras perder la respuesta y no reintenta').toBe(3);

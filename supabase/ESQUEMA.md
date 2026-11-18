@@ -107,6 +107,28 @@ para que **ningún rol de aplicación necesite permiso sobre la secuencia**.
   `verificar_migracion_17.sql`.
 - **Solo aplicada y probada en local.** Su aplicación remota queda pendiente de revisión.
 
+### Círculo o foto para cada color (migración `20261117010000`, etapa 18)
+
+- `variantes.forma_muestra`: `circulo` (predeterminado) o `foto`, `NOT NULL` con restricción. Las
+  filas existentes quedan en `circulo`: los registros antiguos se ven igual que antes.
+- Con `foto`, la tienda usa como miniatura la **primera** foto del color (la principal; si cambia la
+  principal, cambia la miniatura). Un color en `foto` **sin fotos** se muestra con su círculo, y el
+  panel lo avisa en el editor y en el tablero.
+- `catalogo_publico` añade `forma` dentro de cada color, después de `muestra`. Las columnas de la
+  vista, sus nombres y los identificadores (`clave_catalogo`) no cambian. `anon` solo tiene `SELECT`
+  de la columna; sigue `security_invoker`.
+- `fn_admin_guardar_producto` (misma firma, permisos y `SECURITY INVOKER`): `variantes[].forma_muestra`
+  opcional. Ausente o `null` = se conserva (un panel anterior no la borra; al crear, `circulo`);
+  otro valor → `PT422`. La respuesta lleva `forma_muestra: true`. El panel comprueba la columna y,
+  con un esquema anterior, bloquea la opción y lo avisa.
+- Pruebas: `supabase/pruebas/93_forma_muestra.sql`. No toca existencias, vigencias, fotos, códigos
+  ni claves del carrito.
+- **Aplicada en `gama-talla-dev` el 2026-11-17** (16 migraciones, auditoría 0 filas). Respaldo previo
+  (paquete del catálogo, esquema e inventario de Storage) y comparación antes/después en
+  `Documents\Revisiones_Gama_Talla\respaldo_remoto_previo_18_20261117`: filas, códigos, claves,
+  fotos, vigencias y objetos idénticos; los 4 colores existentes quedaron en `circulo`.
+- **Solo aplicada y probada en local.** Su aplicación remota queda pendiente de revisión.
+
 ## Formato de las tallas (migración `20261107030000`)
 
 | Forma | Admitidas | Regla |
