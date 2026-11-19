@@ -37,15 +37,18 @@
   const CONSERVAR = "conservar";
 
   // ------------------------------------------------------------------ estado
-  let lote = null;          // { fichas, margen, margenAplicado, categoria, segmento, publico, erroresAjustes, resumenAjustes }
+  let lote = null;          // { fichas, margen, categoria, segmento, publico, erroresAjustes, resumenAjustes, destinos, avisoDestinos, reparto }
   let guardando = false;
   let origen = null;        // botón que abrió el importador
   let formaMuestra = null;  // ¿el servidor guarda la forma de cada color?
   const temporizadores = new Map();
 
   function loteNuevo() {
-    return { fichas: [fichaNueva()], margen: "", margenAplicado: null, categoria: "", segmento: CONSERVAR, publico: CONSERVAR,
-      ajustesAbiertos: false, erroresAjustes: {}, resumenAjustes: null };
+    /* destinos (etapa 19): fichas que recibirán los ajustes, independientes de «Incluir en el guardado».
+       null = todas las editables (mientras no se elija nada); un Set de claves de ficha = elegidas a mano
+       (las fichas nuevas no se añaden solas). avisoDestinos explica cambios en esa selección. */
+    return { fichas: [fichaNueva()], margen: "", categoria: "", segmento: CONSERVAR, publico: CONSERVAR,
+      ajustesAbiertos: false, erroresAjustes: {}, resumenAjustes: null, destinos: null, avisoDestinos: "" };
   }
   function fichaNueva() {
     return {
@@ -59,7 +62,15 @@
   function colorNuevo() {
     return {
       clave: nuevaClave("c"), id: uuid(), texto: "", color: "", proveedor: "", venta: "", ventaManual: false,
-      tallasTexto: "", muestra: "", errorTono: "", forma: "circulo", fotos: [], editados: new Set(), revisar: new Set(), notas: [], omitido: null
+      tallasTexto: "", muestra: "", errorTono: "", forma: "circulo", fotos: [], editados: new Set(), revisar: new Set(), notas: [], omitido: null,
+      // Etapa 19: el mensaje dice «todas las tallas» sin tallas concretas: las tallas salen de la regla
+      // del proveedor según el público de la ficha (y cambian con él mientras no se escriban a mano).
+      todas: false, notaRegla: "", expresionRegla: "",
+      // Varios precios en el mensaje: candidatos para elegir el del proveedor (elegir uno cuenta como a mano).
+      precios: [], notaPrecios: "",
+      // Importe sumado al precio del proveedor por «Aplicar ajustes» A ESTE COLOR (null = nunca se le aplicó).
+      // Es del color, no del lote: un color de una ficha fuera de los destinos no lo hereda nunca.
+      margenAplicado: null
     };
   }
 
@@ -74,6 +85,10 @@
   const editable = (f) => f.estado !== "guardada" && f.estado !== "guardando";
   const numero = (f) => lote.fichas.indexOf(f) + 1;
   const nombreFicha = (f) => [f.marca, f.modelo].map((t) => t.trim()).filter(Boolean).join(" ") || "sin nombre";
+  // Etapa 19: el público identifica la versión de un mismo modelo («NIKE 7 CAMARAS · Dama»). El modelo
+  // sigue escrito tal cual en su campo; el público solo se añade a la etiqueta.
+  const textoPublico = (p) => comun()?.PUBLICOS.find(([v]) => v === p)?.[1] || "";
+  const etiquetaFicha = (f) => [nombreFicha(f), textoPublico(f.publico)].filter(Boolean).join(" · ");
 
   // ------------------------------------------------------------------ utilidades de DOM
   function nodo(etiqueta, clase, contenido) {
@@ -142,6 +157,10 @@
 
   // ------------------------------------------------------------------ catálogo y coincidencias
   const marcasCatalogo = () => [...new Set(panel().productos().map((p) => p.marca).filter(Boolean))];
+  /* Marcas que el lector reconoce además de su lista base: las del catálogo (también las que se crearon a
+     mano en el panel) y las escritas a mano en fichas de este lote. */
+  const marcasConocidas = () => [...new Set([...marcasCatalogo(),
+    ...(lote?.fichas || []).filter((f) => f.editados.has("marca") && f.marca.trim()).map((f) => mayus(f.marca.trim()))])];
   const categoriasCatalogo = () => [...new Set(panel().productos().map((p) => p.categoria).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es"));
   const claveFicha = (f) => texto().claveModelo(f.marca, f.modelo);
 
@@ -150,17 +169,36 @@
     if (!k) return [];
     return panel().productos().filter((p) => texto().claveModelo(p.marca, p.nombre) === k);
   }
-  // Otra ficha ANTERIOR del lote con la misma marca y modelo, que no se haya marcado como distinta.
-  function coincidenciaLote(f) {
+  /* Etapa 19: las coincidencias tienen en cuenta el público. Con la misma marca y modelo:
+     - mismo público → otro color de la misma zapatilla: se propone agrupar (la ficha anterior);
+     - públicos distintos → versiones independientes del modelo (Dama y Hombre): es válido y solo se
+       informa;
+     - falta el público en alguna de las dos → hay que elegirlo antes de decidir.
+     Todo por identificadores estables de ficha (f.clave). */
+  function relacionLote(f) {
     const k = claveFicha(f);
-    if (!k || !editable(f)) return null;
+    const vacia = { agrupar: null, sinPublico: null, versiones: [] };
+    if (!k || !editable(f)) return vacia;
     const i = lote.fichas.indexOf(f);
-    return lote.fichas.slice(0, i).find((o) => o !== f && claveFicha(o) === k && !f.distintaDe.has(o.clave) && editable(o)) || null;
+    const mismas = lote.fichas.filter((o) => o !== f && editable(o) && claveFicha(o) === k);
+    const anteriores = mismas.filter((o) => lote.fichas.indexOf(o) < i && !f.distintaDe.has(o.clave));
+    const agrupar = f.publico ? anteriores.find((o) => o.publico === f.publico) || null : null;
+    const sinPublico = agrupar ? null : anteriores.find((o) => !f.publico || !o.publico) || null;
+    const versiones = f.publico ? mismas.filter((o) => o.publico && o.publico !== f.publico) : [];
+    return { agrupar, sinPublico, versiones };
+  }
+  // Otra ficha ANTERIOR del lote, mismo modelo y MISMO público, que no se haya marcado como distinta.
+  const coincidenciaLote = (f) => relacionLote(f).agrupar;
+  // Catálogo: «mismas» (mismo público, o sin clasificar) piden decidir; «otras» son versiones para otro público.
+  function relacionCatalogo(f) {
+    const todas = coincidenciasCatalogo(f);
+    if (!f.publico) return { todas, mismas: todas, otras: [] };
+    return { todas, mismas: todas.filter((p) => !p.publico || p.publico === f.publico), otras: todas.filter((p) => p.publico && p.publico !== f.publico) };
   }
 
   // ------------------------------------------------------------------ leer la publicación
   function aplicarTexto(f, c) {
-    const r = texto().analizar(c.texto, { marcas: marcasCatalogo() });
+    const r = texto().analizar(c.texto, { marcas: marcasConocidas() });
     const esPrincipal = f.colores[0] === c;
     // Solo se rellena lo que la persona no cambió a mano.
     if (esPrincipal) {
@@ -178,16 +216,39 @@
       const campoColor = k === "precio" ? "proveedor" : k;
       if (r.revisar.includes(k) && !c.editados.has(campoColor)) c.revisar.add(k); else c.revisar.delete(k);
     }
-    c.notas = r.notas;
+    // Las notas de la regla dependen del público de la FICHA (que puede elegirse a mano): las pone
+    // aplicarRegla. La de varios precios solo se muestra mientras no se elija uno (pintarColor).
+    c.notas = r.notas.filter((n) => !r.notasRegla.includes(n) && n !== r.notaPrecios);
+    c.precios = r.precios.length > 1 ? r.precios : [];
+    c.notaPrecios = r.notaPrecios;
+    // «Todas las tallas» o «numeración <público>» sin tallas concretas: las tallas siguen la regla.
+    c.todas = r.reglaTallas && !r.tallasExplicitas;
+    c.expresionRegla = r.expresionRegla;
+    c.notaRegla = r.reglaTallas && r.tallasExplicitas ? r.notasRegla.join(" ") : "";
     c.omitido = r.omitido;
     if (!c.ventaManual) ventaAutomatica(c);
+    aplicarRegla(f);
   }
 
-  // Precio de venta = proveedor + valor del lote, salvo que se haya escrito a mano.
+  /* «Todas las tallas» o «numeración <público>»: las tallas de cada color que lo dice salen de la regla
+     del proveedor según el público de la ficha. Unas tallas escritas a mano no se tocan. Sin público, se
+     pide elegirlo. */
+  function aplicarRegla(f) {
+    for (const c of f.colores) {
+      if (!c.todas) continue;
+      if (c.editados.has("tallas")) { c.notaRegla = ""; continue; }
+      const tallas = texto().tallasPorRegla(f.publico);
+      c.tallasTexto = tallas.join("; ");
+      c.notaRegla = texto().notaRegla(f.publico, c.expresionRegla);
+      if (tallas.length) c.revisar.delete("tallas"); else c.revisar.add("tallas");
+    }
+  }
+
+  // Precio de venta = proveedor + importe aplicado a ESTE color, salvo que se haya escrito a mano.
   function ventaAutomatica(c) {
     const proveedor = comun().entero(c.proveedor);
-    if (lote.margenAplicado === null || !Number.isFinite(proveedor) || proveedor <= 0) return;
-    c.venta = String(proveedor + lote.margenAplicado);
+    if (c.margenAplicado === null || c.margenAplicado === undefined || !Number.isFinite(proveedor) || proveedor <= 0) return;
+    c.venta = String(proveedor + c.margenAplicado);
     c.revisar.delete("venta");
   }
 
@@ -195,7 +256,8 @@
   function pintar() {
     const cuerpo = $("#importador-cuerpo");
     if (!cuerpo || !lote) return;
-    cuerpo.replaceChildren(pintarListaFichas(), pintarAgregar(), pintarAjustes(), pintarListas());
+    // Etapa 19: primero lo que afecta a varias fichas (ajustes plegables y fotos por lote), después las fichas.
+    cuerpo.replaceChildren(pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
     pintarPie();
   }
 
@@ -223,14 +285,8 @@
     const resumen = nodo("summary", "importador-ajustes-resumen");
     resumen.append(nodo("span", "importador-ajustes-titulo", "Ajustes para varias fichas"),
       nodo("span", "importador-ajustes-pista", "Público, categoría, guía de tallas y precio de venta para todas las fichas marcadas, de una vez."));
-    const nota = nodo("p", "editor-nota", "Elige solo lo que quieras cambiar y pulsa «Aplicar todos los ajustes». Se aplica a las fichas marcadas con «Incluir en el guardado»; lo que quede «Sin cambiar» o vacío no se toca. Se guarda después, con «Guardar lote como oculto».");
-
-    const seleccion = nodo("div", "importador-seleccion");
-    const elegibles = lote.fichas.filter(editable);
-    const marcadas = elegibles.filter((f) => f.seleccionada).length;
-    const textoSeleccion = nodo("p", "importador-seleccion-texto", `${marcadas} de ${elegibles.length} ${elegibles.length === 1 ? "ficha marcada" : "fichas marcadas"} para aplicar y guardar.`);
-    textoSeleccion.id = "imp-seleccion-resumen";
-    seleccion.append(textoSeleccion, boton("Marcar todas", "marcar-todas", "boton boton-texto boton-mini"), boton("Desmarcar todas", "desmarcar-todas", "boton boton-texto boton-mini"));
+    const nota = nodo("p", "editor-nota", "Elige las fichas que recibirán los ajustes y solo lo que quieras cambiar. Lo que quede «Sin cambiar» o vacío no se toca. Esta elección es independiente de «Incluir en el guardado»: se guarda después, con «Guardar lote como oculto».");
+    const seleccion = pintarDestinos();
 
     const publico = radios({ nombre: "imp-lote-publico", id: "imp-lote-publico", leyenda: "Público en la tienda", valor: lote.publico,
       opciones: [[CONSERVAR, "Sin cambiar"], ...comun().PUBLICOS], datos: { lote: "publico" } });
@@ -254,8 +310,10 @@
     }
 
     const acciones = nodo("div", "importador-ajustes-acciones");
-    const aplicar = boton("Aplicar todos los ajustes", "aplicar-ajustes", "boton boton-principal");
+    const elegidas = fichasDestino().length;
+    const aplicar = boton(`Aplicar ajustes a ${elegidas} ${elegidas === 1 ? "ficha" : "fichas"}`, "aplicar-ajustes", "boton boton-principal");
     aplicar.id = "imp-aplicar-ajustes";
+    aplicar.setAttribute("aria-describedby", "imp-destinos-resumen");
     const estado = nodo("p", `importador-ajustes-estado${lote.resumenAjustes?.tipo === "aviso" ? " es-aviso" : ""}`, lote.resumenAjustes?.texto || "");
     estado.id = "imp-ajustes-estado";
     estado.setAttribute("role", "status");
@@ -264,6 +322,63 @@
 
     s.append(resumen, nota, seleccion, publico, categoria, guia, margen, acciones);
     return s;
+  }
+
+  // ------------------------------------------------------------------ destinos de los ajustes (etapa 19)
+  // Fichas que recibirán «Aplicar ajustes»: las editables elegidas (todas mientras no se elija a mano).
+  const fichasDestino = () => lote.fichas.filter((f) => editable(f) && (lote.destinos === null || lote.destinos.has(f.clave)));
+  const enDestinos = (f) => editable(f) && (lote.destinos === null || lote.destinos.has(f.clave));
+  const listaNumeros = (fs) => {
+    const n = fs.map(numero);
+    return n.length > 1 ? `${n.slice(0, -1).join(", ")} y ${n[n.length - 1]}` : String(n[0] ?? "");
+  };
+  // Pasar a selección elegida a mano (a partir de lo que se ve marcado).
+  function fijarDestinos() {
+    if (lote.destinos === null) lote.destinos = new Set(lote.fichas.filter(editable).map((f) => f.clave));
+    return lote.destinos;
+  }
+  // Aviso junto al bloque cuando una ficha cambia (nueva, agrupada, quitada o guardada) y la selección elegida no la sigue sola.
+  function avisarDestinos(texto) {
+    lote.avisoDestinos = texto;
+    repintarAjustes();
+  }
+
+  /* Lista de fichas con una casilla cada una (número, marca, modelo y público), «Elegir todas», «Quitar
+     selección» y el recuento. Las guardadas aparecen sin casilla activa. */
+  function pintarDestinos() {
+    const grupo = nodo("fieldset", "editor-opciones importador-destinos");
+    grupo.id = "imp-destinos";
+    grupo.append(nodo("legend", "", "Fichas que recibirán los ajustes"));
+    const cabecera = nodo("div", "importador-destinos-cabecera");
+    const editables = lote.fichas.filter(editable);
+    const elegidas = fichasDestino();
+    const cuenta = nodo("p", "importador-seleccion-texto", `${elegidas.length} de ${editables.length} ${editables.length === 1 ? "ficha elegida" : "fichas elegidas"}${elegidas.length ? ` (${elegidas.length === 1 ? "la" : "las"} ${listaNumeros(elegidas)})` : ""}.`);
+    cuenta.id = "imp-destinos-resumen";
+    cuenta.setAttribute("aria-live", "polite");
+    cabecera.append(cuenta, boton("Elegir todas", "destinos-todas", "boton boton-texto boton-mini"), boton("Quitar selección", "destinos-ninguna", "boton boton-texto boton-mini"));
+    const lista = nodo("ul", "importador-destinos-lista");
+    for (const f of lote.fichas) {
+      const li = nodo("li");
+      const caja = nodo("label", "casilla");
+      const check = nodo("input");
+      check.type = "checkbox";
+      check.id = `imp-${f.clave}-destino-ajustes`;
+      check.checked = enDestinos(f);
+      check.dataset.destinoAjustes = f.clave;
+      if (!editable(f)) { check.disabled = true; check.dataset.bloqueado = "1"; }
+      const estado = f.estado === "guardada" ? " (guardada)" : f.estado === "guardando" ? " (guardando…)" : "";
+      caja.append(check, nodo("span", "", `Ficha ${numero(f)} · ${etiquetaFicha(f)}${estado}`));
+      li.append(caja);
+      lista.append(li);
+    }
+    grupo.append(cabecera, lista);
+    if (lote.avisoDestinos) {
+      const aviso = nodo("p", "importador-destinos-aviso", lote.avisoDestinos);
+      aviso.id = "imp-destinos-aviso";
+      aviso.setAttribute("role", "status");
+      grupo.append(aviso);
+    }
+    return grupo;
   }
 
   function pintarListaFichas() {
@@ -287,7 +402,7 @@
     li.id = `imp-${f.clave}`;
     li.dataset.ficha = f.clave;
     const articulo = nodo("article", "editor-seccion importador-ficha-articulo");
-    const titulo = nodo("h3", "editor-seccion-titulo", `Ficha ${numero(f)} · ${nombreFicha(f)}`);
+    const titulo = nodo("h3", "editor-seccion-titulo", `Ficha ${numero(f)} · ${etiquetaFicha(f)}`);
     titulo.id = `imp-${f.clave}-titulo`;
     titulo.tabIndex = -1;
     articulo.setAttribute("aria-labelledby", titulo.id);
@@ -355,47 +470,70 @@
 
   function pintarCoincidencias(f) {
     const bloques = [];
-    const enLote = coincidenciaLote(f);
-    if (enLote) {
-      const caja = nodo("div", "importador-coincidencia");
+    const grupo = (clase, etiqueta) => {
+      const caja = nodo("div", `importador-coincidencia ${clase}`.trim());
       caja.setAttribute("role", "group");
-      caja.setAttribute("aria-label", "Coincidencia en el lote");
-      caja.append(nodo("p", "", `Mismo modelo que la ficha ${numero(enLote)} (${nombreFicha(enLote)}). ¿Es otro color de la misma zapatilla?`));
+      caja.setAttribute("aria-label", etiqueta);
+      bloques.push(caja);
+      return caja;
+    };
+    const { agrupar: enLote, sinPublico, versiones } = relacionLote(f);
+    if (enLote) {
+      // Mismo modelo y mismo público: otro color de la misma zapatilla, o una zapatilla distinta.
+      const caja = grupo("", "Coincidencia en el lote");
+      caja.append(nodo("p", "", `Mismo modelo que la ficha ${numero(enLote)} (${nombreFicha(enLote)}), también para ${textoPublico(f.publico)}. ¿Es otro color de la misma zapatilla?`));
       const fila = nodo("div", "editor-botones");
       fila.append(boton(`Agrupar como color de la ficha ${numero(enLote)}`, "agrupar", "boton boton-principal boton-compacto", { ficha: f.clave, destino: enLote.clave }),
         boton("Son zapatillas distintas", "distinta", "boton boton-secundario boton-compacto", { ficha: f.clave, destino: enLote.clave }));
       caja.append(fila);
-      bloques.push(caja);
+    } else if (sinPublico) {
+      // Falta el público: no se puede saber si es otro color o una versión para otro público.
+      const caja = grupo("es-pendiente", "Coincidencia en el lote");
+      const falta = !f.publico ? "de esta ficha" : `de la ficha ${numero(sinPublico)}`;
+      caja.append(nodo("p", "", `Mismo modelo que la ficha ${numero(sinPublico)} (${etiquetaFicha(sinPublico)}). Elige el público ${falta} para saber si es otro color de la misma zapatilla o una versión para otro público.`));
     }
-    const existentes = coincidenciasCatalogo(f);
+    if (versiones.length) {
+      // Mismo modelo, públicos distintos: versiones independientes. Es válido; solo se informa.
+      const caja = grupo("es-version", "Versiones del modelo");
+      const otras = versiones.map((o) => `la ficha ${numero(o)} es la versión para ${textoPublico(o.publico)}`).join("; ");
+      caja.append(nodo("p", "", `Versión para ${textoPublico(f.publico)} de ${nombreFicha(f)}: ${otras}. Se guardarán como zapatillas independientes, cada una con su público.`));
+    }
+    const { todas: existentes, mismas, otras } = relacionCatalogo(f);
     if (existentes.length) {
-      const caja = nodo("div", "importador-coincidencia es-catalogo");
-      caja.setAttribute("role", "group");
-      caja.setAttribute("aria-label", "Ya existe en el catálogo");
-      caja.append(nodo("p", "importador-coincidencia-titulo", existentes.length === 1 ? "Este modelo ya está en el catálogo:" : "Este modelo ya está en el catálogo varias veces:"));
+      const caja = grupo(mismas.length ? "es-catalogo" : "es-version", "Ya existe en el catálogo");
+      const titulo = mismas.length
+        ? (f.publico ? `Este modelo ya está en el catálogo para ${textoPublico(f.publico)}${mismas.some((p) => !p.publico) ? " (o sin público)" : ""}:` : (existentes.length === 1 ? "Este modelo ya está en el catálogo:" : "Este modelo ya está en el catálogo varias veces:"))
+        : `En el catálogo está este modelo para otro público (esta ficha es la versión para ${textoPublico(f.publico)}):`;
+      caja.append(nodo("p", "importador-coincidencia-titulo", titulo));
       const lista = nodo("ul", "importador-existentes");
       for (const p of existentes) {
         const li = nodo("li", "importador-existente");
         const estado = p.retirado_en ? "retirada" : p.activo ? "publicada" : "oculta";
         const colores = (p.variantes || []).map((v) => v.color).filter(Boolean);
-        li.append(nodo("span", "codigo", p.codigo_interno), nodo("span", "", ` ${p.nombre} · ${estado}`),
+        li.append(nodo("span", "codigo", p.codigo_interno), nodo("span", "", ` ${p.nombre} · ${textoPublico(p.publico) || "sin público"} · ${estado}`),
           nodo("span", "importador-existente-colores", colores.length ? `Colores: ${colores.join(", ")}` : "Sin colores"));
         const abrir = boton("Abrir en el editor", "abrir-editor", "boton boton-secundario boton-mini", { producto: p.id });
         abrir.setAttribute("aria-label", `Abrir ${p.codigo_interno} en el editor para añadir un color o revisar una reposición`);
         li.append(abrir);
         lista.append(li);
       }
-      caja.append(lista, nodo("p", "campo-ayuda", "Para añadir este color o revisar una reposición, ábrela en el editor. Si de verdad es otra zapatilla, confírmalo:"));
-      const decision = nodo("label", "casilla");
-      const check = nodo("input");
-      check.type = "checkbox";
-      check.id = `imp-${f.clave}-decision`;
-      check.checked = f.decisionCatalogo;
-      check.dataset.ficha = f.clave;
-      check.dataset.fcampo = "decisionCatalogo";
-      decision.append(check, nodo("span", "", "Crear otra ficha con este mismo modelo de todas formas"));
-      caja.append(decision);
-      bloques.push(caja);
+      caja.append(lista);
+      if (!mismas.length) {
+        caja.append(nodo("p", "campo-ayuda", `Se creará una zapatilla independiente para ${textoPublico(f.publico)}. Para añadir un color a la otra versión, ábrela en el editor.`));
+      } else {
+        caja.append(nodo("p", "campo-ayuda", f.publico
+          ? "Para añadir este color o revisar una reposición, ábrela en el editor. Si de verdad es otra zapatilla, confírmalo:"
+          : "Elige el público: si es para otro público, será una versión independiente. Para añadir este color o revisar una reposición, ábrela en el editor. Si de verdad es otra zapatilla, confírmalo:"));
+        const decision = nodo("label", "casilla");
+        const check = nodo("input");
+        check.type = "checkbox";
+        check.id = `imp-${f.clave}-decision`;
+        check.checked = f.decisionCatalogo;
+        check.dataset.ficha = f.clave;
+        check.dataset.fcampo = "decisionCatalogo";
+        decision.append(check, nodo("span", "", "Crear otra ficha con este mismo modelo de todas formas"));
+        caja.append(decision);
+      }
     }
     return bloques;
   }
@@ -405,10 +543,18 @@
     const caja = nodo("details", "importador-mover");
     if (!otras.length || !editable(f)) { caja.hidden = true; return caja; }
     caja.append(nodo("summary", "", "Agrupar con otra ficha"));
-    caja.append(nodo("p", "campo-ayuda", `Los colores de esta ficha pasan a la ficha elegida, cada uno con su mensaje, sus fotos, precios, tallas y forma de mostrarse. Se conservan la marca, el modelo y el público de la ficha elegida.`));
+    // Solo fichas compatibles: con el mismo público (un color no cambia de público al agruparse).
+    if (!f.publico) {
+      caja.append(nodo("p", "campo-ayuda", "Elige el público de esta ficha para ver con qué fichas se puede agrupar (las del mismo público)."));
+      return caja;
+    }
+    const compatibles = otras.filter((o) => o.publico === f.publico);
+    caja.append(nodo("p", "campo-ayuda", compatibles.length
+      ? `Los colores de esta ficha pasan a la ficha elegida, cada uno con su mensaje, sus fotos, precios, tallas y forma de mostrarse. Se conservan la marca y el modelo de la ficha elegida. Solo se ofrecen fichas para ${textoPublico(f.publico)}.`
+      : `No hay otra ficha para ${textoPublico(f.publico)} con la que agrupar: las de otro público son zapatillas independientes.`));
     const fila = nodo("div", "editor-botones importador-mover-lista");
-    for (const o of otras) fila.append(boton(`Mover a la ficha ${numero(o)} · ${nombreFicha(o)}`, "agrupar", "boton boton-secundario boton-mini", { ficha: f.clave, destino: o.clave }));
-    caja.append(fila);
+    for (const o of compatibles) fila.append(boton(`Mover a la ficha ${numero(o)} · ${etiquetaFicha(o)}`, "agrupar", "boton boton-secundario boton-mini", { ficha: f.clave, destino: o.clave }));
+    if (compatibles.length) caja.append(fila);
     return caja;
   }
 
@@ -456,8 +602,11 @@
     mensajeCaja.append(etiqueta, area, ayudaMensaje);
     const omitido = [];
     if (c.omitido?.telefonos) omitido.push(c.omitido.telefonos === 1 ? "un teléfono" : `${c.omitido.telefonos} teléfonos`);
+    if (c.omitido?.contacto) omitido.push(c.omitido.contacto === 1 ? "una frase de contacto" : `${c.omitido.contacto} frases de contacto`);
     if (c.omitido?.promocional) omitido.push(c.omitido.promocional === 1 ? "una línea promocional" : `${c.omitido.promocional} líneas promocionales`);
-    const avisos = [...(omitido.length ? [`Se omitió ${omitido.join(" y ")}.`] : []), ...c.notas];
+    const listaOmitido = omitido.length > 1 ? `${omitido.slice(0, -1).join(", ")} y ${omitido[omitido.length - 1]}` : omitido[0];
+    const avisos = [...(omitido.length ? [`Se omitió ${listaOmitido}.`] : []), ...c.notas,
+      ...(c.notaPrecios && c.revisar.has("precio") ? [c.notaPrecios] : []), ...(c.notaRegla ? [c.notaRegla] : [])];
     const revisar = [...c.revisar].map((k) => NOMBRES_CAMPO[k]).concat(i === 0 ? [...f.revisar].map((k) => NOMBRES_CAMPO[k]) : []);
     if (c.texto.trim() && revisar.length) avisos.push(`Revisa: ${revisar.join(", ")}.`);
     if (avisos.length) {
@@ -502,6 +651,32 @@
       campo({ id: `imp-${c.clave}-venta`, etiqueta: "Precio de venta (COP)", valor: c.venta, modo: "numeric", obligatorio: true, revisar: c.revisar.has("venta"),
         ayuda: textoVenta(c), datos: { color: c.clave, ccampo: "venta" } }));
     datos.push(filaA, filaB);
+    // Varios precios en el mensaje: se elige el del proveedor entre los leídos (o se escribe otro). Elegir
+    // cuenta como corrección a mano: volver a leer el mensaje la conserva. El precio de venta es aparte.
+    if (c.precios?.length > 1) {
+      const proveedorActual = comun().entero(c.proveedor);
+      const grupoPrecios = nodo("fieldset", `editor-opciones importador-precios${c.revisar.has("precio") ? " es-revisar" : ""}`);
+      grupoPrecios.id = `imp-${c.clave}-precios`;
+      const leyenda = nodo("legend", "", "Precios del mensaje: ¿cuál es el del proveedor?");
+      if (c.revisar.has("precio")) leyenda.append(" ", nodo("span", "importador-revisar", "Revisar"));
+      grupoPrecios.append(leyenda);
+      const listaPrecios = nodo("div", "editor-opciones-lista");
+      c.precios.forEach((valor, n) => {
+        const caja = nodo("label", "casilla");
+        const radio = nodo("input");
+        radio.type = "radio";
+        radio.name = `imp-${c.clave}-precio`;
+        radio.id = `imp-${c.clave}-precio-${n}`;
+        radio.value = String(valor);
+        radio.checked = proveedorActual === valor && !c.revisar.has("precio");
+        radio.dataset.color = c.clave;
+        radio.dataset.cprecio = "1";
+        caja.append(radio, nodo("span", "", formatoPesos(valor)));
+        listaPrecios.append(caja);
+      });
+      grupoPrecios.append(listaPrecios);
+      datos.push(grupoPrecios);
+    }
     const pendientes = (i === 0 ? f.revisar.size : 0) + c.revisar.size;
     const notaDatos = nodo("p", "campo-ayuda importador-datos-nota", pendientes
       ? `${pendientes === 1 ? "Un dato necesita" : `${pendientes} datos necesitan`} revisión (marcados «Revisar»). Lo que cambies a mano no se sobrescribe al volver a leer el mensaje.`
@@ -600,6 +775,7 @@
       if (p.aviso) info.append(nodo("p", "editor-foto-aviso", p.aviso));
     }
     if (foto.mensaje) info.append(nodo("p", "editor-foto-mensaje", foto.mensaje));
+    if (foto.archivoLote) info.append(nodo("p", "editor-foto-peso importador-foto-origen", `Asignada por lote · ${foto.archivoLote}`));
     const acciones = nodo("div", "editor-foto-acciones");
     const datos = { color: c.clave, foto: foto.clave };
     if (fotoLista(foto) && i > 0) {
@@ -644,11 +820,15 @@
         if (seleccion && typeof n.setSelectionRange === "function") { try { n.setSelectionRange(...seleccion); } catch { /* tipo sin selección */ } }
       }
     }
+    // Los destinos del reparto de fotos dependen de los nombres y de las fotos de las fichas.
+    if (lote.reparto?.items.length) repintarReparto();
     pintarPie();
   }
   // Las coincidencias de las demás fichas dependen de la marca y el modelo de esta.
   function repintarOtras(f) {
     for (const o of lote.fichas) if (o !== f) repintarFicha(o);
+    // La lista de destinos de los ajustes muestra la marca, el modelo y el público de cada ficha.
+    repintarAjustes();
   }
   function repintarAjustes() {
     const actual = $("#imp-ajustes");
@@ -707,6 +887,446 @@
     }
   }
 
+  // ------------------------------------------------------------------ asignar fotos por lote (etapa 19)
+  /* Se eligen varias imágenes a la vez y cada una pasa a ser la foto principal de un color SIN fotos de
+     las fichas editables marcadas: en el orden de las fichas en pantalla y, dentro de cada una, en el
+     orden de sus colores. Un color con fotos (también si una se está optimizando) se salta.
+     Antes de aplicar hay una revisión: miniatura, archivo y destino de cada imagen; se puede cambiar el
+     orden (que es el que se usa), elegir a mano el destino de una imagen, quitarla o reemplazarla si
+     falló. «Asignar fotos» aplica todo de una vez y solo al borrador: la subida sigue siendo al guardar.
+     - Destinos por identificador estable de color (c.clave): agrupar o separar fichas durante la revisión
+       no los cambia; un destino que deja de estar pendiente vuelve al orden (y se avisa).
+     - Una imagen que falla o aún se optimiza conserva su destino: las siguientes no se corren.
+     - Las imágenes se optimizan de una en una, cediendo el hilo entre ellas: la ventana sigue usable.
+     - Lo asignado sale de la revisión: pulsar otra vez no duplica nada. */
+  const MAX_REPARTO = 60;      // imágenes en una misma revisión (no es el límite de fotos por color)
+  const NINGUNO = "ninguno";   // destino elegido a mano: «Sin destino»
+  const SIN_DESTINO = "Sin destino (no se asigna)";
+  let procesandoReparto = false;
+
+  // abierto: imagen cuyo desplegable «Cambiar destino» está abierto (se conserva al repintar).
+  const reparto = () => lote.reparto || (lote.reparto = { items: [], estado: null, aplicado: false, abierto: null });
+  // ¿Tiene ya fotos? Cuentan las listas, las subidas y las que se están optimizando; no las que fallaron.
+  const tieneFoto = (c) => c.fotos.some((x) => x.estado !== "error");
+  function destinosPendientes() {
+    const L = fotos().LIMITES;
+    const lista = [];
+    for (const f of lote.fichas) {
+      if (!editable(f) || !f.seleccionada) continue;
+      f.colores.forEach((c, i) => { if (!tieneFoto(c) && c.fotos.length < L.fotosPorColor) lista.push({ ficha: f, color: c, indice: i }); });
+    }
+    return lista;
+  }
+  function nombreDestino(d) {
+    const nombreColor = d.color.color.trim();
+    return `Ficha ${numero(d.ficha)} · ${etiquetaFicha(d.ficha)} · Color ${d.indice + 1}${nombreColor ? ` · ${nombreColor}` : ""}`;
+  }
+  // Destino actual de un color (puede haber cambiado de ficha o de posición).
+  function destinoDe(claveColor) {
+    const ref = colorDe(claveColor);
+    return ref ? { ficha: ref.ficha, color: ref.color, indice: ref.ficha.colores.indexOf(ref.color) } : null;
+  }
+
+  /* Reparto actual: las imágenes con destino elegido a mano lo reservan; las demás, en el orden de la
+     revisión, toman los colores pendientes que quedan. Sin color libre, la imagen queda «sin destino». */
+  function calcularReparto() {
+    const r = reparto();
+    const pendientes = destinosPendientes();
+    const porClave = new Map(pendientes.map((d) => [d.color.clave, d]));
+    const reservados = new Set();
+    for (const it of r.items) {
+      if (!it.destino || it.destino === NINGUNO) continue;
+      if (porClave.has(it.destino) && !reservados.has(it.destino)) { reservados.add(it.destino); continue; }
+      it.destino = null;
+      r.estado = { texto: `El destino elegido para «${it.nombre}» ya no está pendiente (tiene fotos, se desmarcó o se quitó su ficha): vuelve al orden de la revisión.`, tipo: "aviso" };
+    }
+    const libres = pendientes.filter((d) => !reservados.has(d.color.clave));
+    const asignacion = new Map();
+    for (const it of r.items) {
+      if (it.destino === NINGUNO) asignacion.set(it.clave, null);
+      else if (it.destino) asignacion.set(it.clave, porClave.get(it.destino));
+      else asignacion.set(it.clave, libres.shift() || null);
+    }
+    const usados = new Set([...asignacion.values()].filter(Boolean).map((d) => d.color.clave));
+    return {
+      pendientes, asignacion,
+      sinFoto: pendientes.filter((d) => !usados.has(d.color.clave)),
+      sobrantes: r.items.filter((it) => !asignacion.get(it.clave))
+    };
+  }
+
+  function pintarReparto() {
+    const r = reparto();
+    const s = nodo("section", "editor-seccion importador-reparto");
+    s.id = "imp-reparto";
+    s.setAttribute("aria-labelledby", "imp-reparto-titulo");
+    const cabecera = nodo("div", "importador-reparto-cabecera");
+    const titulo = nodo("h3", "editor-seccion-titulo", "Fotos para varias fichas");
+    titulo.id = "imp-reparto-titulo";
+    titulo.tabIndex = -1;
+    const elegir = boton(r.items.length ? "Añadir más imágenes" : "Asignar fotos por lote", "reparto-elegir", "boton boton-secundario boton-compacto");
+    elegir.id = "imp-reparto-elegir";
+    const input = nodo("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "image/webp,image/jpeg,image/png";
+    input.className = "solo-lectores";
+    input.id = "imp-reparto-archivo";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.dataset.reparto = "nuevas";
+    cabecera.append(titulo, elegir, input);
+    const ayuda = nodo("p", "campo-ayuda importador-reparto-ayuda", "Elige varias fotos a la vez: cada una será la foto principal de un color que aún no tiene fotos, en el orden de las fichas marcadas y de sus colores. Antes de asignarlas revisas el orden y los destinos.");
+    ayuda.id = "imp-reparto-ayuda";
+    elegir.setAttribute("aria-describedby", ayuda.id);
+    const estado = nodo("p", `importador-reparto-estado${r.estado?.tipo === "aviso" ? " es-aviso" : ""}`, r.estado?.texto || "");
+    estado.id = "imp-reparto-estado";
+    estado.setAttribute("role", "status");
+    estado.hidden = !r.estado?.texto;
+    s.append(cabecera, ayuda, estado);
+    if (r.items.length) s.append(pintarRevisionReparto(r, calcularReparto()));
+    // calcularReparto pudo dejar un aviso (un destino que ya no está pendiente).
+    if (r.estado?.texto) { estado.textContent = r.estado.texto; estado.hidden = false; estado.classList.toggle("es-aviso", r.estado.tipo === "aviso"); }
+    return s;
+  }
+
+  function pintarRevisionReparto(r, plan) {
+    const caja = nodo("div", "importador-reparto-revision");
+    caja.setAttribute("role", "group");
+    caja.setAttribute("aria-labelledby", "imp-reparto-revision-titulo");
+    const h = nodo("h4", "importador-paso-titulo", "Revisa el reparto");
+    h.id = "imp-reparto-revision-titulo";
+    h.tabIndex = -1;
+    const procesando = r.items.filter((it) => it.estado === "procesando").length;
+    const errores = r.items.filter((it) => it.estado === "error").length;
+    const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+    const resumen = nodo("p", "importador-reparto-resumen",
+      `${plural(r.items.length, "imagen", "imágenes")} · ${plural(plan.pendientes.length, "color sin foto", "colores sin foto")} en las fichas marcadas.${procesando ? ` Optimizando: ${plural(procesando, "imagen pendiente", "imágenes pendientes")}…` : ""}`);
+    resumen.id = "imp-reparto-resumen";
+    resumen.setAttribute("aria-live", "polite");
+    const herramientas = nodo("div", "importador-reparto-herramientas");
+    herramientas.append(nodo("p", "campo-ayuda", "El orden de esta lista es el que se usa. Cámbialo con «Subir» y «Bajar» o elige el destino de una imagen."),
+      boton("Ordenar por nombre de archivo", "reparto-ordenar", "boton boton-texto boton-mini"));
+
+    const lista = nodo("ol", "importador-reparto-lista");
+    lista.setAttribute("aria-label", "Imágenes del reparto, en orden");
+    r.items.forEach((it, i) => lista.append(pintarItemReparto(r, plan, it, i)));
+
+    const avisos = nodo("div", "importador-reparto-avisos");
+    if (!plan.pendientes.length) {
+      avisos.append(nodo("p", "importador-reparto-aviso", "Todas las fichas marcadas ya tienen fotos en todos sus colores: no queda ningún destino. Marca otra ficha, quita una foto o descarta el reparto."));
+    } else if (plan.sinFoto.length) {
+      const p = nodo("div", "importador-reparto-aviso");
+      p.append(nodo("p", "", `Faltan imágenes: ${plural(plan.sinFoto.length, "color quedará", "colores quedarán")} sin foto.`));
+      const ul = nodo("ul", "importador-reparto-destinos");
+      for (const d of plan.sinFoto) ul.append(nodo("li", "", nombreDestino(d)));
+      p.append(ul);
+      avisos.append(p);
+    }
+    if (plan.sobrantes.length && plan.pendientes.length) {
+      avisos.append(nodo("p", "importador-reparto-aviso", `Sobran imágenes: ${plan.sobrantes.map((it) => `«${it.nombre}»`).join(", ")} ${plan.sobrantes.length === 1 ? "no tiene" : "no tienen"} destino. Elige uno, cámbialas de orden o quítalas.`));
+    }
+    if (errores) avisos.append(nodo("p", "importador-reparto-aviso es-error", `${plural(errores, "imagen no se puede usar", "imágenes no se pueden usar")}: ${errores === 1 ? "conserva su destino; reemplázala o quítala" : "conservan su destino; reemplázalas o quítalas"}.`));
+    avisos.hidden = !avisos.childElementCount;
+
+    const acciones = nodo("div", "importador-reparto-acciones");
+    const asignar = boton("Asignar fotos", "reparto-asignar", "boton boton-principal");
+    asignar.id = "imp-reparto-asignar";
+    const listos = r.items.filter((it) => it.estado === "lista" && plan.asignacion.get(it.clave)).length;
+    if (procesando || !listos) asignar.setAttribute("aria-disabled", "true");
+    asignar.setAttribute("aria-describedby", resumen.id);
+    acciones.append(asignar, boton("Descartar el reparto", "reparto-descartar", "boton boton-secundario"));
+    caja.append(h, resumen, herramientas, lista, avisos, acciones);
+    return caja;
+  }
+
+  function pintarItemReparto(r, plan, it, i) {
+    const li = nodo("li", `importador-reparto-item es-${it.estado}`);
+    li.dataset.item = it.clave;
+    const marco = nodo("div", "importador-reparto-miniatura");
+    if (it.vistaPrevia) {
+      const img = nodo("img");
+      img.src = it.vistaPrevia;
+      img.alt = "";
+      marco.append(img);
+    } else {
+      marco.append(nodo("span", "", it.estado === "error" ? "Sin vista" : "…"));
+    }
+    const posicion = nodo("span", "importador-reparto-posicion", String(i + 1));
+    posicion.setAttribute("aria-hidden", "true");
+    marco.append(posicion);
+    const info = nodo("div", "importador-reparto-info");
+    info.append(nodo("p", "importador-reparto-archivo", it.nombre));
+    const estados = { procesando: "Optimizando…", lista: it.info ? `Lista · ${it.info.ancho}×${it.info.alto} px · ${fotos().peso(it.info.pesoFinal)}` : "Lista", error: "No se puede usar" };
+    const estado = nodo("p", "importador-reparto-estado-item", estados[it.estado]);
+    if (it.estado === "error") estado.setAttribute("role", "alert");
+    info.append(estado);
+    if (it.mensaje) info.append(nodo("p", "editor-foto-mensaje", it.mensaje));
+
+    /* Destino: el que da el orden o el elegido a mano. Se cambia con opciones (no con un <select>: el de
+       WebKit en Windows inyecta un estilo interno que la política de seguridad del panel bloquea, y las
+       opciones son más cómodas al tacto). Solo un desplegable abierto a la vez. */
+    const destino = plan.asignacion.get(it.clave) || null;
+    const campoDestino = nodo("div", "importador-reparto-destino");
+    const textoDestino = nodo("p", "importador-reparto-destino-texto", "Destino: ");
+    textoDestino.append(nodo("strong", "", destino ? nombreDestino(destino) : SIN_DESTINO));
+    const cambiar = nodo("details", "importador-reparto-cambiar");
+    cambiar.dataset.item = it.clave;
+    cambiar.open = r.abierto === it.clave;
+    const resumen = nodo("summary", "", "Cambiar destino");
+    resumen.id = `imp-${it.clave}-cambiar`;
+    resumen.setAttribute("aria-label", `Cambiar el destino de ${it.nombre}`);
+    const grupo = nodo("fieldset", "editor-opciones importador-reparto-opciones");
+    grupo.append(nodo("legend", "", `Destino de ${it.nombre}`));
+    const lista = nodo("div", "importador-reparto-opciones-lista");
+    const opciones = [...plan.pendientes.map((d) => [d.color.clave, nombreDestino(d)]), [NINGUNO, SIN_DESTINO]];
+    opciones.forEach(([valor, textoOpcion], n) => {
+      const caja = nodo("label", "casilla");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = `imp-${it.clave}-destino`;
+      radio.id = `imp-${it.clave}-destino-${n}`;
+      radio.value = valor;
+      radio.checked = (destino ? destino.color.clave : NINGUNO) === valor;
+      radio.dataset.repartoDestino = it.clave;
+      caja.append(radio, nodo("span", "", textoOpcion));
+      lista.append(caja);
+    });
+    grupo.append(lista);
+    cambiar.append(resumen, grupo);
+    campoDestino.append(textoDestino, cambiar);
+    if (it.destino) {
+      const fila = nodo("p", "importador-reparto-manual");
+      fila.append(nodo("span", "importador-revisar", "Elegido a mano"), " ");
+      const volver = boton("Volver al orden", "reparto-orden", "boton boton-texto boton-mini", { item: it.clave });
+      volver.setAttribute("aria-label", `Volver al orden para ${it.nombre}`);
+      fila.append(volver);
+      campoDestino.append(fila);
+    }
+    info.append(campoDestino);
+
+    const acciones = nodo("div", "importador-reparto-botones");
+    const subir = boton("Subir", "reparto-subir", "boton boton-secundario boton-mini", { item: it.clave });
+    subir.setAttribute("aria-label", `Subir ${it.nombre} una posición`);
+    if (i === 0) subir.setAttribute("aria-disabled", "true");
+    const bajar = boton("Bajar", "reparto-bajar", "boton boton-secundario boton-mini", { item: it.clave });
+    bajar.setAttribute("aria-label", `Bajar ${it.nombre} una posición`);
+    if (i === r.items.length - 1) bajar.setAttribute("aria-disabled", "true");
+    acciones.append(subir, bajar);
+    if (it.estado === "error") {
+      const reemplazar = nodo("label", "boton boton-secundario boton-mini importador-reparto-reemplazar", "Reemplazar");
+      const archivo = nodo("input");
+      archivo.type = "file";
+      archivo.accept = "image/webp,image/jpeg,image/png";
+      archivo.className = "solo-lectores";
+      archivo.id = `imp-${it.clave}-reemplazar`;
+      archivo.dataset.reparto = "reemplazar";
+      archivo.dataset.item = it.clave;
+      archivo.setAttribute("aria-label", `Reemplazar ${it.nombre}`);
+      reemplazar.htmlFor = archivo.id;
+      reemplazar.append(archivo);
+      acciones.append(reemplazar);
+    }
+    const quitar = boton("Quitar", "reparto-quitar", "boton boton-texto boton-mini", { item: it.clave });
+    quitar.setAttribute("aria-label", `Quitar ${it.nombre} del reparto`);
+    acciones.append(quitar);
+    info.append(acciones);
+    li.append(marco, info);
+    return li;
+  }
+
+  // Repinta la sección conservando el foco (por id o por la acción y la imagen del botón enfocado).
+  function repintarReparto() {
+    const actual = $("#imp-reparto");
+    if (!actual || !lote) return;
+    const activo = document.activeElement;
+    const dentro = activo && actual.contains(activo);
+    const id = dentro ? activo.id : "";
+    const accion = dentro ? activo.dataset?.imp : "";
+    const item = dentro ? activo.dataset?.item : "";
+    actual.replaceWith(pintarReparto());
+    if (!dentro) return;
+    const destino = (id && document.getElementById(id))
+      || (accion && document.querySelector(`#imp-reparto [data-imp="${accion}"]${item ? `[data-item="${item}"]` : ""}`))
+      || $("#imp-reparto-titulo");
+    destino?.focus({ preventScroll: true });
+  }
+
+  function estadoReparto(textoEstado, tipo = "ok") {
+    reparto().estado = textoEstado ? { texto: textoEstado, tipo } : null;
+    repintarReparto();
+  }
+
+  // «Asignar fotos por lote»: abre el selector de archivos solo si hay algún color esperando foto.
+  function elegirReparto() {
+    if (!lote.fichas.some((f) => editable(f) && f.seleccionada)) { estadoReparto("Marca al menos una ficha con «Incluir en el guardado».", "aviso"); return; }
+    if (!destinosPendientes().length) { estadoReparto("Todas las fichas marcadas ya tienen fotos en todos sus colores: no hay a dónde asignar.", "aviso"); return; }
+    $("#imp-reparto-archivo")?.click();
+  }
+
+  function agregarAlReparto(archivos) {
+    const r = reparto();
+    let lista = [...archivos].filter((a) => a instanceof Blob);
+    if (!lista.length) return;
+    const libres = MAX_REPARTO - r.items.length;
+    let aviso = "";
+    if (lista.length > libres) {
+      aviso = `La revisión admite ${MAX_REPARTO} imágenes a la vez: se añadieron ${Math.max(0, libres)}. Asigna estas y elige las demás después.`;
+      lista = lista.slice(0, Math.max(0, libres));
+    }
+    for (const archivo of lista) r.items.push({ clave: nuevaClave("r"), nombre: archivo.name || "imagen sin nombre", archivo, version: 1, estado: "procesando", destino: null });
+    r.aplicado = false;
+    r.estado = aviso ? { texto: aviso, tipo: "aviso" } : null;
+    repintarReparto();
+    $("#imp-reparto-revision-titulo")?.focus({ preventScroll: true });
+    $("#imp-reparto")?.scrollIntoView({ block: "start" });
+    procesarReparto();
+  }
+
+  // Optimiza las imágenes de una en una (validación y WebP de fotos.js) y repinta cada una al terminar.
+  async function procesarReparto() {
+    if (procesandoReparto) return;
+    procesandoReparto = true;
+    const loteActual = lote;
+    try {
+      for (;;) {
+        if (!lote || lote !== loteActual) break;
+        const it = reparto().items.find((x) => x.estado === "procesando" && !x.enCurso);
+        if (!it) break;
+        it.enCurso = true;
+        const version = it.version;
+        let info = null;
+        let error = "";
+        try { info = await fotos().preparar(it.archivo); } catch (e) { error = e instanceof fotos().ErrorFoto ? e.message : "No pudimos procesar la imagen."; }
+        it.enCurso = false;
+        // Quitada, reemplazada o lote descartado mientras se optimizaba: este resultado ya no vale.
+        if (it.quitada || it.version !== version || lote !== loteActual) continue;
+        delete it.archivo;
+        if (info) {
+          it.info = info;
+          it.blob = info.blob;
+          it.vistaPrevia = URL.createObjectURL(info.blob);
+          it.estado = "lista";
+        } else {
+          it.estado = "error";
+          it.mensaje = error;
+        }
+        repintarReparto();
+        await new Promise((resolver) => setTimeout(resolver, 0)); // cede el hilo entre imagen e imagen
+      }
+    } finally {
+      procesandoReparto = false;
+    }
+  }
+
+  const itemDe = (claveItem) => reparto().items.find((x) => x.clave === claveItem);
+  function soltarItem(it) {
+    it.quitada = true;
+    if (it.vistaPrevia) URL.revokeObjectURL(it.vistaPrevia);
+  }
+
+  function moverItem(claveItem, paso) {
+    const r = reparto();
+    const i = r.items.findIndex((x) => x.clave === claveItem);
+    const j = i + paso;
+    if (i < 0 || j < 0 || j >= r.items.length) return;
+    [r.items[i], r.items[j]] = [r.items[j], r.items[i]];
+    r.aplicado = false;
+    r.estado = { texto: `«${r.items[j].nombre}» ahora es la ${j + 1}.ª imagen.`, tipo: "ok" };
+    repintarReparto();
+    // El foco sigue a la imagen movida; en un extremo pasa al otro botón.
+    const otro = paso < 0 ? "reparto-bajar" : "reparto-subir";
+    const mismo = paso < 0 ? "reparto-subir" : "reparto-bajar";
+    const enExtremo = paso < 0 ? j === 0 : j === r.items.length - 1;
+    document.querySelector(`#imp-reparto [data-imp="${enExtremo ? otro : mismo}"][data-item="${claveItem}"]`)?.focus({ preventScroll: false });
+  }
+
+  function elegirDestino(claveItem, valor) {
+    const r = reparto();
+    const it = itemDe(claveItem);
+    if (!it) return;
+    if (valor !== NINGUNO) for (const otro of r.items) if (otro !== it && otro.destino === valor) otro.destino = null;
+    it.destino = valor || null;
+    r.aplicado = false;
+    r.abierto = null;
+    const destino = calcularReparto().asignacion.get(it.clave);
+    r.estado = { texto: `«${it.nombre}» → ${destino ? nombreDestino(destino) : SIN_DESTINO}.`, tipo: "ok" };
+    repintarReparto();
+    document.getElementById(`imp-${it.clave}-cambiar`)?.focus({ preventScroll: true });
+  }
+
+  function quitarDelReparto(claveItem) {
+    const r = reparto();
+    const i = r.items.findIndex((x) => x.clave === claveItem);
+    if (i < 0) return;
+    const [it] = r.items.splice(i, 1);
+    soltarItem(it);
+    r.aplicado = false;
+    r.estado = { texto: `«${it.nombre}» se quitó del reparto.`, tipo: "ok" };
+    repintarReparto();
+    const siguiente = r.items[Math.min(i, r.items.length - 1)];
+    (siguiente ? document.querySelector(`#imp-reparto [data-imp="reparto-quitar"][data-item="${siguiente.clave}"]`) : $("#imp-reparto-elegir"))?.focus({ preventScroll: true });
+  }
+
+  function reemplazarEnReparto(claveItem, archivo) {
+    const it = itemDe(claveItem);
+    if (!it || !(archivo instanceof Blob)) return;
+    if (it.vistaPrevia) URL.revokeObjectURL(it.vistaPrevia);
+    Object.assign(it, { nombre: archivo.name || it.nombre, archivo, version: it.version + 1, estado: "procesando", mensaje: "", info: null, blob: null, vistaPrevia: null });
+    reparto().aplicado = false;
+    reparto().estado = { texto: `Reemplazada por «${it.nombre}»: conserva su destino.`, tipo: "ok" };
+    repintarReparto();
+    document.querySelector(`#imp-reparto [data-imp="reparto-quitar"][data-item="${it.clave}"]`)?.focus({ preventScroll: true });
+    procesarReparto();
+  }
+
+  function descartarReparto({ silencio = false } = {}) {
+    const r = lote?.reparto;
+    if (!r) return;
+    for (const it of r.items) soltarItem(it);
+    r.items = [];
+    r.aplicado = false;
+    r.estado = silencio ? null : { texto: "Reparto descartado: no se asignó ninguna foto.", tipo: "ok" };
+  }
+
+  /* «Asignar fotos»: aplica de una vez lo que está listo y tiene destino. Cada destino se comprueba otra
+     vez (el color sigue existiendo, su ficha sigue marcada y editable, y sigue sin fotos). Lo asignado sale
+     de la revisión; lo que falló, sobra o no tiene destino se queda para revisarlo. */
+  function asignarReparto() {
+    const r = reparto();
+    const plan = calcularReparto();
+    const procesando = r.items.filter((it) => it.estado === "procesando").length;
+    if (procesando) { estadoReparto(`Espera: ${procesando === 1 ? "queda 1 imagen" : `quedan ${procesando} imágenes`} por optimizar. Después pulsa «Asignar fotos».`, "aviso"); return; }
+    const listos = r.items.filter((it) => it.estado === "lista" && plan.asignacion.get(it.clave));
+    if (!listos.length) {
+      // Segunda pulsación (doble clic): lo asignado ya salió de la revisión y no se repite nada.
+      if (!r.aplicado) estadoReparto(plan.pendientes.length ? "No hay imágenes listas con destino para asignar." : "Todas las fichas marcadas ya tienen fotos en todos sus colores: no hay a dónde asignar.", "aviso");
+      return;
+    }
+    const tocadas = [];
+    const asignadas = [];
+    for (const it of listos) {
+      const d = destinoDe(plan.asignacion.get(it.clave).color.clave);
+      if (!d || !editable(d.ficha) || !d.ficha.seleccionada || tieneFoto(d.color)) continue;
+      d.color.fotos.unshift({ clave: nuevaClave("p"), estado: "lista", blob: it.blob, vistaPrevia: it.vistaPrevia, info: it.info, archivoLote: it.nombre });
+      d.ficha.pendiente = null;
+      d.ficha.errores = [];
+      if (!tocadas.includes(d.ficha)) tocadas.push(d.ficha);
+      asignadas.push(it);
+    }
+    r.items = r.items.filter((it) => !asignadas.includes(it));
+    r.aplicado = true;
+    const partes = [`${asignadas.length === 1 ? "Se asignó 1 foto principal" : `Se asignaron ${asignadas.length} fotos principales`} en ${tocadas.length === 1 ? `la ficha ${numero(tocadas[0])}` : `las fichas ${tocadas.map(numero).join(", ")}`}. Se subirán con «Guardar lote como oculto».`];
+    const quedan = calcularReparto();
+    if (quedan.sinFoto.length) partes.push(`${quedan.sinFoto.length === 1 ? "1 color sigue" : `${quedan.sinFoto.length} colores siguen`} sin foto.`);
+    if (r.items.length) partes.push(`${r.items.length === 1 ? "Queda 1 imagen" : `Quedan ${r.items.length} imágenes`} en la revisión (sin destino o que no se pueden usar).`);
+    r.estado = { texto: partes.join(" "), tipo: quedan.sinFoto.length || r.items.length ? "aviso" : "ok" };
+    for (const f of tocadas) repintarFicha(f);
+    repintarReparto();
+    mensaje(r.estado.texto, r.estado.tipo);
+    ($("#imp-reparto-asignar") || $("#imp-reparto-titulo"))?.focus({ preventScroll: true });
+  }
+
   async function existeObjeto(objeto) {
     const partes = objeto.split("/");
     const archivo = partes.pop();
@@ -761,7 +1381,8 @@
     exigir(f.categoria.trim() && f.categoria.trim().length <= C.LIM.categoria, `imp-${f.clave}-categoria`, "Escribe la categoría.");
     exigir(C.PUBLICOS.some(([v]) => v === f.publico), `imp-${f.clave}-publico-0`, "Elige el público: Hombre, Dama o Unisex.");
     if (coincidenciaLote(f)) errores.push({ campo: null, mensaje: "Decide si es otro color de la ficha con el mismo modelo (agrúpala) o una zapatilla distinta." });
-    if (coincidenciasCatalogo(f).length && !f.decisionCatalogo) {
+    // Una versión para otro público ya en el catálogo no pide decisión: es otra zapatilla.
+    if (relacionCatalogo(f).mismas.length && !f.decisionCatalogo) {
       errores.push({ campo: `imp-${f.clave}-decision`, mensaje: "Este modelo ya está en el catálogo: ábrelo en el editor o confirma que quieres crear otra ficha." });
     }
     if (f.colores.length > C.LIM.colores) errores.push({ campo: null, mensaje: `Como mucho ${C.LIM.colores} colores por zapatilla.` });
@@ -848,6 +1469,12 @@
     } finally {
       guardando = false;
       if (lote) {
+        // Una ficha guardada deja de ser editable y de recibir ajustes: si estaba elegida, se dice.
+        const salen = lote.destinos ? lote.fichas.filter((f) => !editable(f) && lote.destinos.has(f.clave)) : [];
+        if (salen.length) {
+          for (const f of salen) lote.destinos.delete(f.clave);
+          lote.avisoDestinos = `${salen.length === 1 ? "La ficha" : "Las fichas"} ${listaNumeros(salen)} ya ${salen.length === 1 ? "está guardada y deja" : "están guardadas y dejan"} de recibir ajustes.`;
+        }
         pintar();
         panel().recargar();
       }
@@ -961,10 +1588,27 @@
   // ------------------------------------------------------------------ agrupar, separar, quitar
   function agrupar(f, destino) {
     if (!editable(f) || !editable(destino) || f === destino) return;
+    // Etapa 19: solo fichas compatibles (mismo público). Versiones para públicos distintos no se mezclan.
+    if (!f.publico || f.publico !== destino.publico) {
+      mensaje(!f.publico || !destino.publico
+        ? "Elige el público de las dos fichas antes de agruparlas."
+        : `La ficha ${numero(f)} es para ${textoPublico(f.publico)} y la ${numero(destino)} para ${textoPublico(destino.publico)}: son versiones independientes y no se agrupan.`, "aviso");
+      return;
+    }
     if (destino.colores.length + f.colores.length > comun().LIM.colores) { mensaje(`Una zapatilla admite como mucho ${comun().LIM.colores} colores.`, "aviso"); return; }
     // Los colores cambian de zapatilla: sus fotos se subirán con la ruta de la ficha destino.
+    // Destinos de los ajustes elegidos a mano: la ficha que desaparece sale de la selección; si las dos no
+    // estaban igual de elegidas, se avisa (sin cambiar la selección por su cuenta).
+    if (lote.destinos) {
+      const estabaF = lote.destinos.delete(f.clave);
+      const estaDestino = lote.destinos.has(destino.clave);
+      lote.avisoDestinos = estabaF === estaDestino ? "" : estabaF
+        ? `La ficha ${numero(f)} (elegida para los ajustes) se agrupó con la ${numero(destino)}, que no está elegida: márcala si quieres ajustarla.`
+        : `Los colores de la ficha ${numero(f)} pasaron a la ${numero(destino)}, que está elegida para los ajustes.`;
+    }
     destino.colores.push(...f.colores);
     destino.pendiente = null;
+    aplicarRegla(destino); // los colores movidos toman el público de la ficha elegida
     destino.errores = [];
     lote.fichas = lote.fichas.filter((x) => x !== f);
     pintar();
@@ -986,6 +1630,7 @@
     // Separarla es decidir que es otra zapatilla: no se vuelve a proponer agruparla.
     nueva.distintaDe.add(ficha.clave);
     lote.fichas.splice(lote.fichas.indexOf(ficha) + 1, 0, nueva);
+    if (lote.destinos) lote.avisoDestinos = `La ficha ${numero(nueva)} (separada de la ${numero(ficha)}) es nueva y no está elegida para los ajustes: márcala si quieres ajustarla.`;
     pintar();
     document.getElementById(`imp-${nueva.clave}-titulo`)?.focus?.();
     document.getElementById(`imp-${nueva.clave}-modelo`)?.focus({ preventScroll: false });
@@ -1004,6 +1649,8 @@
     for (const c of f.colores) for (const x of c.fotos) { x.quitada = true; if (x.vistaPrevia) URL.revokeObjectURL(x.vistaPrevia); }
     for (const c of f.colores) limpiarSubidas(f, c.fotos);
     const i = lote.fichas.indexOf(f);
+    // Un aviso anterior (p. ej. «la ficha 4 es nueva») ya no vale: los números cambian al quitar una ficha.
+    lote.avisoDestinos = lote.destinos?.delete(f.clave) ? `Se quitó la ficha ${numero(f)} (${etiquetaFicha(f)}), que estaba elegida para los ajustes.` : "";
     lote.fichas = lote.fichas.filter((x) => x !== f);
     for (const o of lote.fichas) o.distintaDe.delete(f.clave);
     pintar();
@@ -1016,7 +1663,10 @@
     const f = fichaNueva();
     lote.fichas.push(f);
     $("#imp-fichas")?.append(pintarFicha(f));
+    // Con destinos elegidos a mano, la ficha nueva no se añade sola a la selección: se dice.
+    if (lote.destinos) lote.avisoDestinos = `La ficha ${numero(f)} es nueva y no está elegida para los ajustes: márcala si quieres ajustarla.`;
     repintarAjustes();
+    if (lote.reparto?.items.length) repintarReparto();
     pintarPie();
     const area = document.getElementById(`imp-${f.colores[0].clave}-texto`);
     document.getElementById(`imp-${f.clave}`)?.scrollIntoView({ block: "start" });
@@ -1051,7 +1701,8 @@
       mensaje(lote.resumenAjustes.texto, "aviso");
       return;
     }
-    const marcadas = lote.fichas.filter((f) => editable(f) && f.seleccionada);
+    // Etapa 19: los destinos se eligen en el propio bloque (independientes de «Incluir en el guardado»).
+    const marcadas = fichasDestino();
     const avisar = (texto, foco) => {
       lote.resumenAjustes = { texto, tipo: "aviso" };
       repintarAjustes();
@@ -1062,17 +1713,20 @@
       avisar("Elige al menos un ajuste: público, categoría, guía de tallas o importe a sumar al precio del proveedor.", "#imp-lote-publico input:checked");
       return;
     }
-    if (!marcadas.length) { avisar("Marca al menos una ficha con «Incluir en el guardado» para aplicar los ajustes.", '[data-imp="marcar-todas"]'); return; }
+    if (!marcadas.length) { avisar("Marca al menos una ficha en «Fichas que recibirán los ajustes».", "#imp-destinos input:not(:disabled)"); return; }
 
     let aplicados = 0;
     let manuales = 0;
     let sinProveedor = 0;
     for (const f of marcadas) {
-      if (publico) { f.publico = publico; f.editados.add("publico"); f.revisar.delete("publico"); }
+      if (publico) { f.publico = publico; f.editados.add("publico"); f.revisar.delete("publico"); aplicarRegla(f); }
       if (categoria) f.categoria = categoria;
       if (segmento !== null) f.segmento = segmento;
       if (margen !== null) {
         for (const c of f.colores) {
+          // El importe queda en el color: al elegir o cambiar después su precio del proveedor, su precio de
+          // venta lo sigue. Los colores de fichas fuera de los destinos no lo reciben.
+          c.margenAplicado = margen;
           if (c.ventaManual) { manuales += 1; continue; }
           const p = C.entero(c.proveedor);
           if (!Number.isFinite(p) || p <= 0) { sinProveedor += 1; c.revisar.add("venta"); continue; }
@@ -1083,8 +1737,8 @@
       }
       f.pendiente = null;
     }
-    if (margen !== null) lote.margenAplicado = margen;
-    marcadas.forEach(repintarFicha);
+    // Con otro público cambian también las coincidencias de las fichas no marcadas (versiones o agrupar).
+    (publico ? lote.fichas : marcadas).forEach(repintarFicha);
 
     const hechos = [];
     if (publico) hechos.push(`público ${C.PUBLICOS.find(([v]) => v === publico)[1]}`);
@@ -1094,7 +1748,7 @@
     const partes = [`${marcadas.length === 1 ? "1 ficha actualizada" : `${marcadas.length} fichas actualizadas`}: ${hechos.join(", ")}.`];
     if (manuales) partes.push(`${manuales === 1 ? "1 precio escrito a mano se conservó" : `${manuales} precios escritos a mano se conservaron`}.`);
     if (sinProveedor) partes.push(`${sinProveedor === 1 ? "1 color no tiene" : `${sinProveedor} colores no tienen`} precio del proveedor: su precio de venta queda por revisar.`);
-    partes.push("Se guardan con «Guardar lote como oculto».");
+    partes.push(`Actualizadas: ${marcadas.length === 1 ? "ficha" : "fichas"} ${listaNumeros(marcadas)}. Se guardan con «Guardar lote como oculto».`);
     lote.resumenAjustes = { texto: partes.join(" "), tipo: sinProveedor ? "aviso" : "ok" };
     repintarAjustes();
     mensaje(lote.resumenAjustes.texto, lote.resumenAjustes.tipo);
@@ -1126,12 +1780,30 @@
         break;
       }
       case "separar": separar(b.dataset.color); break;
-      case "marcar-todas": case "desmarcar-todas":
-        for (const x of lote.fichas) if (editable(x)) x.seleccionada = accion === "marcar-todas";
-        pintar();
+      case "destinos-todas": case "destinos-ninguna":
+        // Elegir todas o ninguna: cuenta como selección a mano (las fichas nuevas ya no se añaden solas).
+        lote.destinos = new Set(accion === "destinos-todas" ? lote.fichas.filter(editable).map((x) => x.clave) : []);
+        lote.avisoDestinos = "";
+        lote.resumenAjustes = null;
+        repintarAjustes();
         $(`[data-imp="${accion}"]`)?.focus();
         break;
       case "aplicar-ajustes": aplicarAjustes(); break;
+      case "reparto-elegir": elegirReparto(); break;
+      case "reparto-asignar": asignarReparto(); break;
+      case "reparto-descartar": descartarReparto(); repintarReparto(); $("#imp-reparto-elegir")?.focus({ preventScroll: true }); break;
+      case "reparto-ordenar": {
+        const r = reparto();
+        r.items.sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true, sensitivity: "base" }));
+        r.aplicado = false;
+        estadoReparto("Imágenes ordenadas por nombre de archivo.");
+        break;
+      }
+      case "reparto-subir": case "reparto-bajar":
+        if (b.getAttribute("aria-disabled") !== "true") moverItem(b.dataset.item, accion === "reparto-subir" ? -1 : 1);
+        break;
+      case "reparto-orden": elegirDestino(b.dataset.item, null); break;
+      case "reparto-quitar": quitarDelReparto(b.dataset.item); break;
       case "abrir-editor": window.GamaTallaEditor?.abrir(b.dataset.producto, b); break;
       case "comprobar": if (f) comprobar(f); break;
       case "foto-principal": case "foto-quitar": {
@@ -1174,6 +1846,17 @@
   function alEscribir(e) {
     if (!lote || guardando) return;
     const n = e.target;
+    if (n.dataset.destinoAjustes) {
+      // Destinos de «Aplicar ajustes»: independientes de «Incluir en el guardado» y del reparto de fotos.
+      const f = fichaDe(n.dataset.destinoAjustes);
+      if (!f || !editable(f)) return;
+      const destinos = fijarDestinos();
+      if (n.checked) destinos.add(f.clave); else destinos.delete(f.clave);
+      lote.avisoDestinos = "";
+      lote.resumenAjustes = null;
+      repintarAjustes();
+      return;
+    }
     if (n.dataset.lote) {
       if (n.type === "radio" && !n.checked) return;
       lote[n.dataset.lote] = n.value;
@@ -1187,14 +1870,21 @@
       f[k] = n.type === "checkbox" ? n.checked : n.value;
       f.pendiente = null;
       if (["marca", "modelo", "publico"].includes(k)) { f.editados.add(k); f.revisar.delete(k); }
-      if (k === "seleccionada") { repintarAjustes(); pintarPie(); return; }
+      if (k === "seleccionada") { repintarAjustes(); if (lote.reparto?.items.length) repintarReparto(); pintarPie(); return; }
       if (k === "marca" || k === "modelo") {
         // Título y coincidencias (de esta ficha y de las demás) dependen de la marca y el modelo.
         programar(`coincidencias-${f.clave}`, () => { repintarFicha(f); repintarOtras(f); }, 350);
         const t = document.getElementById(`imp-${f.clave}-titulo`);
-        if (t) t.textContent = `Ficha ${numero(f)} · ${nombreFicha(f)}`;
+        if (t) t.textContent = `Ficha ${numero(f)} · ${etiquetaFicha(f)}`;
       }
-      if (k === "publico") n.closest("fieldset")?.classList.remove("es-revisar");
+      if (k === "publico") {
+        n.closest("fieldset")?.classList.remove("es-revisar");
+        // «Todas las tallas»: el público decide las tallas propuestas (si no se escribieron a mano).
+        // El público decide además las tallas propuestas por la regla (si no se escribieron a mano), el título
+        // de la ficha y sus coincidencias con las demás (mismo público: agrupar; distinto: versiones).
+        aplicarRegla(f);
+        programar(`coincidencias-${f.clave}`, () => { repintarFicha(f); repintarOtras(f); }, 0);
+      }
       return;
     }
     if (n.dataset.cselector === "muestra") {
@@ -1251,7 +1941,29 @@
       const normal = mayus(n.value);
       if (n.value !== normal) { n.value = normal; alEscribir(e); }
     }
+    // Precio del proveedor elegido entre los del mensaje: cuenta como escrito a mano (se conserva al releer).
+    if (lote && n.dataset.cprecio && n.checked) {
+      const ref = colorDe(n.dataset.color);
+      if (!ref || !editable(ref.ficha) || guardando) return;
+      const { ficha: f, color: c } = ref;
+      c.proveedor = n.value;
+      c.editados.add("proveedor");
+      c.revisar.delete("precio");
+      f.pendiente = null;
+      if (!c.ventaManual) ventaAutomatica(c);
+      repintarFicha(f);
+      return;
+    }
+    if (lote && n.dataset.repartoDestino) { if (n.checked) elegirDestino(n.dataset.repartoDestino, n.value); return; }
     if (n.type !== "file" || !lote) return;
+    if (n.dataset.reparto) {
+      const elegidos = [...(n.files || [])];
+      n.value = "";
+      if (guardando || !elegidos.length) return;
+      if (n.dataset.reparto === "reemplazar") reemplazarEnReparto(n.dataset.item, elegidos[0]);
+      else agregarAlReparto(elegidos);
+      return;
+    }
     const archivos = [...(n.files || [])];
     n.value = "";
     const ref = colorDe(n.dataset.archivos);
@@ -1289,7 +2001,7 @@
 
   // ------------------------------------------------------------------ abrir y cerrar
   function hayPendiente() {
-    return Boolean(lote) && lote.fichas.some((f) => editable(f) && (f.colores.some((c) => c.texto.trim() || c.fotos.length || c.color.trim()) || f.modelo.trim()));
+    return Boolean(lote) && (Boolean(lote.reparto?.items.length) || lote.fichas.some((f) => editable(f) && (f.colores.some((c) => c.texto.trim() || c.fotos.length || c.color.trim()) || f.modelo.trim())));
   }
 
   async function abrir(disparador = null) {
@@ -1309,7 +2021,13 @@
     // Lote nuevo: el cuadro del mensaje recibe el foco (pegar es lo primero). Lote conservado: el título.
     const primero = lote.fichas[0]?.colores[0];
     const vacio = lote.fichas.length === 1 && primero && !primero.texto.trim() && !primero.fotos.length;
-    if (vacio) document.getElementById(`imp-${primero.clave}-texto`)?.focus();
+    if (vacio) {
+      // Etapa 19: los bloques para varias fichas van arriba; el cuadro del mensaje (lo primero que se hace)
+      // se trae entero a la vista, también en celular.
+      const area = document.getElementById(`imp-${primero.clave}-texto`);
+      area?.focus({ preventScroll: true });
+      area?.closest(".importador-mensaje")?.scrollIntoView({ block: "nearest" });
+    }
     else $("#importador-titulo").focus();
     if (formaMuestra === null) {
       formaMuestra = await comun().capacidadForma();
@@ -1330,6 +2048,7 @@
   }
 
   function descartar() {
+    descartarReparto({ silencio: true });
     for (const f of lote?.fichas || []) for (const c of f.colores) {
       for (const x of c.fotos) { x.quitada = true; if (x.vistaPrevia) URL.revokeObjectURL(x.vistaPrevia); }
       limpiarSubidas(f, c.fotos);
@@ -1342,9 +2061,12 @@
     if (!lote) { cerrar(); return; }
     if (guardando) { mensaje("Espera a que termine el guardado en curso.", "aviso"); return; }
     const sinGuardar = lote.fichas.filter((f) => editable(f) && (f.colores.some((c) => c.texto.trim() || c.fotos.length) || f.modelo.trim())).length;
-    if (!sinGuardar) { descartar(); return; }
+    const porAsignar = lote.reparto?.items.length || 0;
+    if (!sinGuardar && !porAsignar) { descartar(); return; }
     mensaje(""); // el pie solo muestra la pregunta: en pantallas bajas no quita sitio al contenido
-    $("#importador-salida-texto").textContent = `${sinGuardar === 1 ? "Hay una ficha sin guardar" : `Hay ${sinGuardar} fichas sin guardar`}. Puedes cerrar y seguir después (el lote se conserva mientras no recargues la página) o descartarlo.`;
+    const pendientes = [sinGuardar ? (sinGuardar === 1 ? "una ficha sin guardar" : `${sinGuardar} fichas sin guardar`) : "",
+      porAsignar ? (porAsignar === 1 ? "una imagen sin asignar" : `${porAsignar} imágenes sin asignar`) : ""].filter(Boolean).join(" y ");
+    $("#importador-salida-texto").textContent = `Hay ${pendientes}. Puedes cerrar y seguir después (el lote se conserva mientras no recargues la página) o descartarlo.`;
     $("#importador-salida").hidden = false;
     $("#importador-botones").hidden = true;
     $('[data-imp="seguir"]').focus();
@@ -1365,8 +2087,21 @@
     dialogo.addEventListener("input", alEscribir);
     dialogo.addEventListener("change", alCambiar);
     for (const tipo of ["dragenter", "dragover", "dragleave", "drop"]) dialogo.addEventListener(tipo, alArrastrar);
-    dialogo.addEventListener("cancel", (e) => { e.preventDefault(); intentarCerrar(); });
-    dialogo.addEventListener("toggle", (e) => { if (lote && e.target.id === "imp-ajustes") lote.ajustesAbiertos = e.target.open; }, true);
+    // Solo el «cancel» del propio diálogo (Escape). El de un selector de archivos que se cierra sin elegir
+    // nada (Chromium lo lanza en el <input type="file"> y sube hasta aquí) no es «cerrar el importador».
+    dialogo.addEventListener("cancel", (e) => { if (e.target !== dialogo) return; e.preventDefault(); intentarCerrar(); });
+    dialogo.addEventListener("toggle", (e) => {
+      if (!lote) return;
+      if (e.target.id === "imp-ajustes") lote.ajustesAbiertos = e.target.open;
+      // «Cambiar destino» del reparto: uno abierto a la vez.
+      if (e.target.classList?.contains("importador-reparto-cambiar")) {
+        const r = reparto();
+        if (e.target.open) {
+          r.abierto = e.target.dataset.item;
+          document.querySelectorAll("#imp-reparto .importador-reparto-cambiar[open]").forEach((d) => { if (d !== e.target) d.open = false; });
+        } else if (r.abierto === e.target.dataset.item) r.abierto = null;
+      }
+    }, true);
     window.addEventListener("beforeunload", (e) => { if (hayPendiente()) { e.preventDefault(); e.returnValue = ""; } });
   }
 

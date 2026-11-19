@@ -1,4 +1,4 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17 y 18
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18 y 19
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
@@ -11,8 +11,9 @@ El botón **«Importar desde WhatsApp»**, junto a «Agregar zapatilla», prepar
 vez a partir de las publicaciones del proveedor. Cada publicación se presenta en este orden:
 **«Pega aquí el mensaje de WhatsApp»** (visible y con el foco al abrir), **«Fotos de esta
 publicación»**, **«Datos reconocidos»** (editables; lo dudoso lleva «Revisar») y **«Ajustes
-adicionales»** (categoría, guía de tallas y cómo mostrar el color). «Ajustes para varias fichas» es un
-bloque plegable, debajo de las publicaciones.
+adicionales»** (categoría, guía de tallas y cómo mostrar el color). Orden de la ventana (19):
+**«Ajustes para varias fichas»** (bloque plegable y compacto), **«Fotos para varias fichas»** y después
+las fichas. El bloque de ajustes conserva sus valores y si está abierto o cerrado al añadir publicaciones.
 
 1. Pega el **mensaje** de la publicación. Se lee **en el navegador** (`texto-proveedor.js`): marca
    (lista de marcas conocidas y las del catálogo), modelo, público (Hombre, Dama, Unisex), precio en
@@ -41,8 +42,14 @@ bloque plegable, debajo de las publicaciones.
    revisar, no se publica) y **precio de venta** (el que se guarda).
 4. **Ajustes para varias fichas** (bloque plegable): se configuran **Público** (Hombre, Dama, Unisex),
    **Categoría**, **Tabla de la guía de tallas** (incluido «Sin indicar») y **Sumar al precio del
-   proveedor**, y una sola acción, **«Aplicar todos los ajustes»**, los aplica a las fichas editables
-   marcadas con «Incluir en el guardado». «Sin cambiar» o un campo vacío conservan lo de cada ficha.
+   proveedor**, y una sola acción, **«Aplicar ajustes a N fichas»**, los aplica a las fichas elegidas
+   en **«Fichas que recibirán los ajustes»** (19): una casilla por ficha editable (número, marca, modelo
+   y público), «Elegir todas» y «Quitar selección», con el recuento. Mientras no se elija nada son todas;
+   una vez elegidas a mano, las fichas nuevas o separadas no se añaden solas y un aviso junto al bloque
+   lo dice (igual al agrupar, quitar o guardar una ficha elegida). Es independiente de «Incluir en el
+   guardado» y del reparto de fotos. «Sin cambiar» o un campo vacío conservan lo de cada ficha.
+   El importe sumado queda en cada color que lo recibió: una ficha fuera de los destinos no lo hereda
+   aunque después se relea su mensaje o cambie su precio del proveedor.
    Los valores se validan antes de tocar ninguna ficha (el error aparece junto a su control). El
    precio de venta = proveedor + importe se calcula siempre desde el del proveedor (aplicarlo dos veces
    no lo acumula); los escritos a mano se conservan; un color sin precio del proveedor queda con su
@@ -74,6 +81,73 @@ la abrió.
 
 Cerrar con fichas sin guardar ofrece «Cerrar y conservar el lote» (se conserva mientras no recargues
 la página, también si la sesión vence) o «Descartar el lote».
+
+### Lectura del mensaje: público combinado y «todas las tallas» (19)
+
+- Cada dato sale de la línea **completo, con sus conectores**: «DAMA 👸 Y CABALLERO 🤴», «para hombre o
+  mujer», «y todas las tallas». Lo que queda es el modelo **tal como lo escribió el proveedor**
+  («REEBOK PRINCENSA 💰$105.000 DAMA 👸 Y CABALLERO 🤴 TODAS LAS TALLAS🔥» → modelo PRINCENSA).
+- **Público:** se suma lo que dice toda la publicación, también en líneas distintas o separado por
+  emojis. Caballero y Dama (u Hombre y Mujer, en cualquier orden) o «Unisex» → **Unisex**.
+- **Números de modelo:** sin «talla» ni «euro» delante, una talla empieza entre 30 y 50, así que
+  «Air Max 90» o «Club C 85» se quedan en el modelo.
+- **«Todas las tallas»** usa la regla del proveedor, centralizada en `REGLAS_PROVEEDOR`
+  (`texto-proveedor.js`): Dama → 36 a 39; Hombre/Caballero → 36 a 44; Unisex (o Caballero y Dama) →
+  36 a 44. Una nota breve lo indica («Tallas propuestas por «todas las tallas» (Unisex: 36 a 44)»).
+  Sin público, no se propone nada y se pide elegirlo; al elegirlo (en la ficha o con «Aplicar todos los
+  ajustes») se proponen las tallas de ese público. Si el mensaje trae también tallas numéricas, se usan
+  esas y se explica la diferencia. Unas tallas escritas a mano no se tocan. Las tallas siguen naciendo
+  **por revisar** al guardar. La regla no cambia la guía de tallas ni el público.
+- Una frase de contacto en su propia línea («Dinos y te ayudamos sin falta», «Estamos atentos…») se
+  omite como el teléfono; también «Aparta la tuya», «Aprovecha y pídela →» junto al teléfono.
+- **Marcas:** además de la lista base (que ahora incluye **On**), se reconocen las del catálogo (también
+  las creadas a mano en el panel) y las escritas a mano en otras fichas del lote. Siempre por palabras
+  completas y la más larga primero («New Balance» antes que «Balance»). Una marca de una o dos letras
+  como ON solo cuenta como primera palabra de la línea («Vans Slip On» es Vans). Si la marca está sola
+  en su línea, el modelo es la línea siguiente. «EUR 36 AL 44» se lee como tallas.
+- **«Numeración dama»** (o mujer) fija el público Dama y propone 36 a 39; **«Numeración hombre»** (o
+  caballero) fija Hombre y propone 36 a 44; las dos en la misma publicación, Unisex y 36 a 44. Admite
+  tildes, mayúsculas, emojis y que «Numeración» y el público estén en líneas seguidas. Las palabras están
+  en `REGLAS_PROVEEDOR.numeracion` y los rangos son los mismos de «todas las tallas». Unas tallas escritas
+  («Numeración dama: 37; 38») mandan: se usan solo esas.
+- **Varios precios** («💥$125.000 … DISPONIBLE $115.000»): no se elige ninguno solo. Debajo del precio del
+  proveedor aparecen **«Precios del mensaje»** para elegir el del proveedor; hasta entonces queda
+  «Revisar». La elección cuenta como corrección a mano (se conserva al volver a leer el mensaje) y el
+  precio de venta escrito a mano no cambia. Marca, modelo, público y tallas se leen igual.
+
+### Versiones por público (19)
+
+Dos publicaciones del mismo modelo para públicos distintos (NIKE 7 CAMARAS Dama y Hombre) son **dos
+zapatillas independientes**. El modelo se escribe igual en su campo; el título de la ficha añade el
+público («Ficha 2 · NIKE 7 CAMARAS · Hombre»), y así también los destinos del reparto de fotos.
+- Mismo modelo y **mismo público**: se propone «Agrupar como color de la ficha N» o «Son zapatillas
+  distintas». «Agrupar con otra ficha» solo ofrece fichas del mismo público.
+- Mismo modelo y **público distinto**: un aviso informativo («Versión para Hombre de …; la ficha 1 es la
+  versión para Dama») y se guardan por separado, sin pedir ninguna decisión.
+- **Falta el público** en una de las dos: se pide elegirlo antes de decidir.
+- **Catálogo:** si el modelo ya existe para el mismo público (o sin público), se pide decidir como
+  antes; si solo existe para otro público, se informa («Se creará una zapatilla independiente para
+  Dama») y se puede guardar sin marcar nada. La lista muestra el público de cada zapatilla existente.
+
+### Asignar fotos por lote (19)
+
+Arriba del importador, **«Fotos para varias fichas» → «Asignar fotos por lote»** permite elegir
+varias imágenes a la vez y repartirlas como **fotos principales** de los colores que aún no tienen
+fotos, en este orden: fichas en pantalla y, dentro de cada una, sus colores. Solo cuentan las fichas
+editables marcadas con «Incluir en el guardado»; un color con fotos (también una que se está
+optimizando) se salta. Si no queda ningún color sin foto, se dice y no se abre el selector.
+
+Antes de aplicar se muestra **«Revisa el reparto»**: miniatura, nombre del archivo y destino (ficha,
+modelo y color) de cada imagen. El orden de la lista es el que se usa: «Subir»/«Bajar» (teclado y
+celular) u «Ordenar por nombre de archivo». «Cambiar destino» fija a mano el destino de una imagen
+(«Volver al orden» lo deshace). Se avisa de los colores que quedarán sin foto y de las imágenes sin
+destino. Las imágenes se optimizan de una en una con la validación y la conversión a WebP de siempre
+(límites por archivo; una foto por color); una que falla **conserva su destino** y se puede
+**reemplazar** o quitar, y las siguientes no se corren. Los destinos usan el identificador de cada
+color: agrupar o separar fichas durante la revisión no los cambia. **«Asignar fotos»** aplica todo de
+una vez (lo asignado sale de la revisión: pulsar dos veces no duplica nada); lo que falló o sobra se
+queda para revisarlo. Las fotos van al borrador: se suben con «Guardar lote como oculto», y «Quitar
+foto» y «Hacer principal» siguen funcionando. La revisión admite hasta 60 imágenes a la vez.
 
 ## Cómo mostrar cada color (18)
 
@@ -277,7 +351,9 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
 - **«Agregar zapatilla»** está siempre arriba del tablero (y en el aviso del catálogo vacío).
   **«Editar»** abre cada zapatilla. El editor ocupa toda la pantalla en el celular y es un panel
   centrado en el escritorio; Escape o «Cancelar» piden confirmación si hay cambios sin guardar, y el
-  navegador avisa antes de abandonar la página.
+  navegador avisa antes de abandonar la página. Cerrar el selector de fotos sin elegir ninguna no es
+  salir (etapa 19): su evento «cancel» burbujea hasta el diálogo y se ignora; el editor conserva
+  campos, fotos, posición y foco.
 - **Modelo:** nombre, marca, categoría, referencia del proveedor (puede repetirse: no es el
   identificador), tabla de la guía de tallas (hombre o mujer), orden, descripción, «Destacada» y
   «Nuevo ingreso».
@@ -361,11 +437,39 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
    en todos los filtros que le correspondan: puede tener tallas en varios estados a la vez.
 2. Pulsa las tallas que quieras, **de uno o varios modelos y colores** (etapa 18): cada pulsación
    selecciona o quita esa talla y conserva las demás, sin teclas modificadoras. La selección se guarda
-   por el UUID real de cada talla (la 40 de un color no es la 40 de otro). Debajo de cada color aparece
-   el detalle de sus tallas elegidas y abajo la barra de acciones, con un resumen («4 tallas
-   seleccionadas · 2 modelos · 3 colores»). **«Seleccionar tallas visibles»** (encima de la lista)
-   añade todas las que se ven; **«Quitar selección»** la vacía. Buscar o filtrar **conserva** la
-   selección y dice cuántas tallas quedan fuera de la vista. Al perder el acceso se limpia.
+   por el UUID real de cada talla (la 40 de un color no es la 40 de otro). Abajo aparece la barra de
+   acciones con el total («4 tallas seleccionadas · 2 modelos · 3 colores»). **«Seleccionar tallas
+   visibles»** (encima de la lista) añade todas las que se ven; **«Quitar selección»** la vacía. Buscar
+   o filtrar **conserva** la selección y dice cuántas tallas quedan fuera de la vista. Al perder el
+   acceso se limpia.
+   - **«Seleccionar tallas» en cada modelo** (etapa 19): un menú con *Todas las tallas*, *Tallas
+     activas*, *Tallas desactivadas*, *Tallas agotadas* y *Tallas por revisar*, cada una con su
+     cantidad («Ninguna» si no hay; elegirla lo dice y no cambia nada). Cada opción **define** la
+     selección dentro de ese modelo y conserva la de los demás; después se puede seguir marcando y
+     desmarcando talla a talla. Activa/desactivada es el indicador `activa`; agotada y por revisar son
+     el mismo estado que muestra el panel (el que calcula Supabase, con la vigencia vencida incluida;
+     para lo que la tienda no muestra se aplica la misma regla que `fn_estado_publico` a lo guardado).
+     Funciona con ratón, teclado (flechas, Inicio, Fin, Intro, Escape, que devuelve el foco al botón)
+     y pantalla táctil; un clic fuera lo cierra.
+   - **Barra compacta** (etapa 19): total, «Ver selección», «Cambiar estado» y «Quitar selección». En
+     celular las seis acciones aparecen al pulsar «Cambiar estado»; en escritorio están siempre a la
+     vista. **«Ver selección»** lista lo elegido por modelo, color y código; cada talla muestra su estado
+     y, al desplegarla, el estado guardado, la vigencia y la procedencia; «Ir al color» lleva a ella.
+     Seleccionar ya no añade bloques entre las tarjetas: la lista no cambia de altura al pulsar. Los dos
+     plegables viven dentro de la barra (nunca una ventana encima de otra) y Escape los cierra. El
+     tablero deja libre abajo el alto **medido** de la barra (y del aviso de resultado), así la última
+     talla siempre se alcanza; respeta el área segura inferior.
+   - **Foto de cada color** (etapa 19): cada fila de color muestra la primera foto de SU galería (en su
+     orden), en una miniatura de tamaño fijo con la foto completa (`object-fit: contain`) y carga
+     diferida; «Sin foto» si no tiene. Al cambiar la foto principal se ve tras «Actualizar» o al volver
+     del editor. En celular los colores y sus tallas usan todo el ancho de la tarjeta.
+   - **Cada modelo, una tarjeta** (etapa 19): borde exterior `--linea-fuerte` con el radio de las
+     superficies y una sombra mínima, que contiene cabecera, botones, colores y tallas; más espacio
+     entre modelos. Los separadores entre colores (`--linea`) son más suaves que ese borde.
+   - **Búsqueda y pulsaciones** (etapa 19): la búsqueda se aplica 120 ms después de escribir. Si en ese
+     momento hay una talla pulsada (puntero abajo, o Espacio, que actúa al soltar), el repintado espera a
+     que termine la pulsación: antes, la talla se sustituía a mitad del clic y el navegador lo
+     descartaba. Tras repintar, el foco vuelve a la misma talla (o botón) si lo tenía.
 3. Elige la acción. Un diálogo detalla qué se modificará, **agrupado por modelo y color**, con sus
    códigos y tallas, explica el efecto y pide confirmación:
 
@@ -385,9 +489,20 @@ node supabase/pruebas/reproducir/ciclo_respaldo_17.mjs --destino-workdir "<desti
   (reintentar no repite las aplicadas). Con una respuesta perdida se consulta el estado actual y no
   queda nada preparado para repetir. Mientras se procesa, todo queda bloqueado.
 
+- **Volver al lugar de trabajo** (etapa 19): al abrir una acción se guarda la última talla con la que
+  trabajaste (modelo, color y talla, por UUID) y dónde estaba en la pantalla. Tras guardar y releer, la
+  misma talla vuelve a quedar a la misma altura y recibe el foco, sin subir al inicio (mientras se
+  relee, la lista conserva su alto). Búsqueda y filtro se conservan. Si el cambio la saca del filtro
+  activo, queda el modelo más cercano en su lugar y el resultado lo explica («… ya no aparece con el
+  filtro …; te dejamos junto a …»). El resultado se muestra **fijo abajo**, encima de la barra, como
+  región de estado anunciada; si todo salió bien el detalle por talla queda plegado. Cancelar el
+  diálogo no mueve la página y devuelve el foco al botón de la acción (en celular, a «Cambiar estado»).
+  Lo mismo tras un fallo parcial o un cambio concurrente.
 - Las confirmaciones **reactivan** una talla desactivada (`activa = true`); el diálogo lo avisa antes.
   Ninguna acción publica un producto o un color ocultos.
-- El estado que ve el cliente lo sigue calculando Supabase; el panel no usa el reloj del navegador.
+- El estado que ve el cliente lo sigue calculando Supabase; el panel no usa el reloj del navegador
+  para él. Solo el menú «Seleccionar tallas» lo usa para agrupar las tallas que la tienda no muestra
+  (ocultas o desactivadas), con la misma regla que `fn_estado_publico`.
 - **Historial:** desde la etapa 17 cubre zapatillas, colores y tallas, con filtros (ver «Historial
   de cambios» arriba). Es solo lectura.
 
@@ -501,6 +616,30 @@ migración, historial, CSV y acceso; marca «MARCA DIECISIETE») y `tests/etapa1
 (tarjeta, Unisex y filtros con Supabase simulado). La migración se prueba desde las 14 anteriores
 con `supabase/pruebas/reproducir/datos_previos_17.sql` y `verificar_migracion_17.sql` (ver su
 README), y sus reglas con `supabase/pruebas/92_publico_obligatorio.sql`.
+
+Etapa 19: `tests/etapa19/lector.spec.js` (lector sin servidor: mensaje Reebok y variantes, público
+combinado, «todas las tallas», números de modelo y ejemplos anteriores) y `tests/etapa19/reparto.spec.js`
+(importador con el Supabase local: lectura en las fichas, regla según el público, reparto entre fichas
+y colores saltando una foto manual, agrupar durante la revisión, reordenar, destino a mano, sobrantes,
+faltantes, archivo inválido y reemplazo, doble clic, guardar y recargar, celular). Ajustes:
+`lector.spec.js` también cubre los mensajes Nike 7 CAMARAS, «numeración» con variantes y tallas
+explícitas, y varios precios; `tests/etapa19/versiones.spec.js` (orden de la ventana y estado del bloque
+de ajustes, elección y conservación del precio, versiones Dama/Hombre independientes, agrupar del mismo
+público, separar y volver a agrupar durante el reparto, ajustes en bloque, guardar y coincidencias con el
+catálogo por público). Marca ON y destinos: `lector.spec.js` (mensaje ON y variantes, ON solo como
+palabra completa al principio, marcas compuestas y marcas del catálogo) y `tests/etapa19/destinos.spec.js`
+(ON y una marca ficticia del catálogo en el importador; ajustes solo a las fichas 1 y 3, la 2 intacta al
+releer y al cambiar su proveedor, aplicación repetida, precios a mano, selección al repintar,
+independencia del guardado y del reparto, avisos al añadir, agrupar, separar y guardar, guardar y recargar).
+Tablero: `tests/etapa19/tablero.spec.js` (marca ficticia «MARCA TABLERO T19», nueve modelos): las seis
+acciones desde un modelo de abajo en escritorio y en celular (misma altura, foco, sin saltar arriba,
+resultado a la vista), selección entre modelos, cancelar, fallo parcial, salir del filtro activo, el
+menú por modelo con ratón, teclado y pantalla táctil, la foto de cada color (orden de la galería, «Sin
+foto», cambio de la principal), la barra en 360 × 560, 390 × 844 y escritorio, la separación entre
+modelos a 360, 390 y 1440 px, y una pulsación con la búsqueda por repintar (ratón y Espacio; sin la
+corrección el clic se pierde en los tres navegadores). Capturas en la carpeta temporal
+(`gama-talla-19-tablero`). `tests/etapa19/editor-cancelar.spec.js`: cerrar el selector de archivos del
+editor sin elegir conserva el editor; Escape sigue avisando de los cambios sin guardar.
 
 Etapa 18: `tests/etapa18/importador.spec.js` (los dos mensajes de ejemplo, lote con agrupación de
 colores y precio de venta, coincidencia con el catálogo, fallo parcial con reintento, selector con un

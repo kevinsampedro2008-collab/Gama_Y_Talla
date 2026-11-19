@@ -312,6 +312,10 @@
     catalogo = [];
     seleccion = new Set();
     accionAbierta = null;
+    lugar = null;
+    panelBarra = "";
+    pintarPanelesBarra();
+    cerrarMenuTallas();
     const dialogo = $("#dialogo-accion");
     if (dialogo?.open) dialogo.close();
     const lista = $("#lista-productos");
@@ -408,9 +412,15 @@
     `${leerFormaMuestra ? ",forma_muestra" : ""},fotos(ruta,orden,alt))`;
   const faltaFormaMuestra = (error) => String(error?.code) === "42703" && /forma_muestra/.test(error?.message || "");
 
-  async function cargarCatalogo({ conservarPosicion = false } = {}) {
+  /* Etapa 19: «conservarPosicion» ya no restaura un número de píxeles (los avisos, la selección y las
+     imágenes cambian las alturas): vuelve a poner la misma referencia (talla, color o modelo, por UUID)
+     a la misma altura de la pantalla. Mientras se relee, la lista conserva su alto para que el
+     navegador no recorte el desplazamiento. Devuelve true si se pintó el catálogo. */
+  async function cargarCatalogo({ conservarPosicion = false, ancla = null } = {}) {
     const mia = generacion;
-    const posicion = window.scrollY;
+    const referencia = conservarPosicion ? (ancla || capturarAncla()) : null;
+    const lista = $("#lista-productos");
+    if (referencia && lista) lista.style.minHeight = `${lista.offsetHeight}px`;
     limpiarCatalogoVisible();
     const estado = $("#tablero-estado");
     estado.textContent = "Cargando catálogo…";
@@ -424,7 +434,8 @@
 
       const respuestas = await Promise.all([
         leerPaginado(() => cliente.from("productos")
-          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,activo,orden,retirado_en," + columnasVariantesTablero())
+          // publico (etapa 19): el importador distingue las versiones de un mismo modelo para otro público.
+          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,publico,activo,orden,retirado_en," + columnasVariantesTablero())
           .order("orden").order("codigo_interno").order("id")),
         leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).order("variante_id").order("id")),
         leerPaginado(() => cliente.from("catalogo_publico").select("codigoInterno,variantes").order("orden").order("codigoInterno")),
@@ -434,14 +445,13 @@
       if (mia !== generacion) return;
       if (leerFormaMuestra && faltaFormaMuestra(respuestas[0].error)) {
         leerFormaMuestra = false;
-        await cargarCatalogo({ conservarPosicion });
-        return;
+        return await cargarCatalogo({ conservarPosicion, ancla: referencia });
       }
       const fallo = respuestas.find((r) => r.error);
       if (fallo) {
-        if (clasificar(fallo.error) === "sin-sesion") { await aplicarAcceso({ estado: "sin-sesion" }); return; }
+        if (clasificar(fallo.error) === "sin-sesion") { await aplicarAcceso({ estado: "sin-sesion" }); return false; }
         mostrarFalloCatalogo();
-        return;
+        return false;
       }
       const horas = Number(respuestas[3].data?.valor);
       vigenciaPredeterminada = Number.isInteger(horas) && horas >= 1 && horas <= 60 ? horas : 48;
@@ -449,8 +459,11 @@
       podarSeleccion();
       verificacionPendiente = false; // los datos vuelven a venir del servidor
       pintarCatalogo();
-      if (conservarPosicion) window.scrollTo(0, posicion);
+      if (lista) lista.style.minHeight = "";
+      if (referencia) restaurarAncla(referencia);
+      return true;
     } finally {
+      if (lista) lista.style.minHeight = "";
       if (mia === generacion) {
         $("#tablero").removeAttribute("aria-busy");
         $("#boton-actualizar").disabled = ocupado;
@@ -533,8 +546,32 @@
     pintarEstadoFiltros();
   }
 
+  /* Etapa 19 · Búsqueda con espera de 120 ms. Si al cumplirse hay una pulsación en curso sobre el
+     panel, se espera a que termine (el clic se completa sobre el control original y después se
+     repinta). Mismo enfoque que los repintados diferidos del importador. */
+  let pulsando = false;
+  function programarBusqueda(ms) {
+    clearTimeout(temporizadorBusqueda);
+    temporizadorBusqueda = setTimeout(() => {
+      if (pulsando) { programarBusqueda(60); return; }
+      pintarCatalogo();
+    }, ms);
+  }
+
+  // Control con foco dentro de la lista, para devolvérselo a su equivalente tras repintarla.
+  function controlEnfocado(lista) {
+    const activo = document.activeElement;
+    if (!activo || !lista.contains(activo)) return null;
+    if (activo.dataset.tallaId) return `.talla[data-talla-id="${CSS.escape(activo.dataset.tallaId)}"]`;
+    if (activo.dataset.menuTallas) return `[data-menu-tallas="${CSS.escape(activo.dataset.menuTallas)}"]`;
+    if (activo.dataset.accion === "editar-producto") return `[data-accion="editar-producto"][data-producto-id="${CSS.escape(activo.dataset.productoId)}"]`;
+    return null;
+  }
+
   function pintarCatalogo() {
+    cerrarMenuTallas(); // la lista se vuelve a crear: el menú abierto pertenecía a la anterior
     const lista = $("#lista-productos");
+    const conFoco = controlEnfocado(lista);
     const estado = $("#tablero-estado");
     const aviso = $("#tablero-aviso");
     aviso.hidden = true;
@@ -569,6 +606,7 @@
 
     // Etapa 18: la selección se conserva al buscar o filtrar; se dice cuántas tallas quedan fuera.
     lista.replaceChildren(...visibles.map(tarjetaProducto));
+    if (conFoco) lista.querySelector(conFoco)?.focus({ preventScroll: true });
     actualizarBarraAcciones();
     const fuera = fueraDeLaVista();
     const nota = fuera ? `${fuera === 1 ? "1 talla seleccionada queda" : `${fuera} tallas seleccionadas quedan`} fuera de la vista (búsqueda o filtro); sigue${fuera === 1 ? "" : "n"} seleccionada${fuera === 1 ? "" : "s"}. ` : "";
@@ -604,6 +642,7 @@
 
   function tarjetaProducto(p) {
     const li = nodo("li", "producto");
+    li.dataset.productoId = p.id; // etapa 19: identificador estable para volver al mismo modelo
     const articulo = nodo("article", "producto-articulo");
     const idTitulo = `producto-${p.id}`;
     articulo.setAttribute("aria-labelledby", idTitulo);
@@ -629,6 +668,7 @@
     if (p.referencia_proveedor) codigos.append(nodo("span", "producto-ref", `Ref. ${p.referencia_proveedor}`));
     const titulo = nodo("h2", "producto-nombre", p.nombre);
     titulo.id = idTitulo;
+    titulo.tabIndex = -1; // etapa 19: destino del foco si el color en el que se trabajaba desaparece
     const meta = nodo("p", "producto-meta", [p.marca, p.categoria].filter(Boolean).join(" · "));
     const publicado = nodo("p", `producto-estado ${p.retirado_en ? "es-retirado" : p.activo ? "es-publicado" : "es-oculto"}`,
       p.retirado_en ? "Retirado del catálogo" : p.activo ? "Publicado en la tienda" : "Oculto en la tienda");
@@ -638,29 +678,69 @@
     editar.dataset.productoId = p.id;
     editar.setAttribute("aria-label", `Editar ${p.nombre} (${p.codigo_interno})`);
     editar.disabled = ocupado;
-    cuerpo.append(codigos, titulo, meta, publicado, editar);
+    cuerpo.append(codigos, titulo, meta, publicado);
+
+    // Etapa 19: «Editar» y «Seleccionar tallas» en su propia fila (en celular, a todo el ancho).
+    const botones = nodo("div", "producto-botones");
+    botones.append(editar);
+    if (p.variantes.some((v) => v.tallas.length)) {
+      const menuCaja = nodo("div", "menu-tallas");
+      const abrir = nodo("button", "boton boton-secundario boton-compacto menu-tallas-boton", "Seleccionar tallas");
+      abrir.type = "button";
+      abrir.dataset.menuTallas = p.id;
+      abrir.setAttribute("aria-haspopup", "menu");
+      abrir.setAttribute("aria-expanded", "false");
+      abrir.setAttribute("aria-label", `Seleccionar tallas de ${p.nombre} (${p.codigo_interno})`);
+      abrir.disabled = ocupado || verificacionPendiente;
+      menuCaja.append(abrir);
+      botones.append(menuCaja);
+    }
 
     const variantes = nodo("ul", "variantes");
     variantes.setAttribute("aria-label", `Colores de ${p.nombre}`);
     if (!p.variantes.length) variantes.append(nodo("li", "variante-vacia", "Sin colores registrados."));
     for (const v of p.variantes) variantes.append(filaVariante(p, v));
-    cuerpo.append(variantes);
 
-    articulo.append(marco, cuerpo);
+    articulo.append(marco, cuerpo, botones, variantes);
     li.append(articulo);
     return li;
+  }
+
+  // Etapa 19: miniatura del color = primera foto de SU galería (ya ordenada por «orden»).
+  function miniaturaVariante(p, v) {
+    const caja = nodo("div", "variante-foto");
+    const foto = (v.fotos || [])[0];
+    const url = foto ? urlFoto(foto.ruta) : null;
+    if (!url) {
+      caja.classList.add("es-vacia");
+      caja.append(nodo("span", "variante-sin-foto", "Sin foto"));
+      return caja;
+    }
+    const img = document.createElement("img");
+    img.src = url;
+    img.alt = foto.alt || `${p.nombre} en color ${v.color}`;
+    img.width = 160;
+    img.height = 160;
+    img.loading = "lazy";
+    img.decoding = "async";
+    img.addEventListener("error", () => {
+      caja.classList.add("es-vacia");
+      caja.replaceChildren(nodo("span", "variante-sin-foto", "Foto no disponible"));
+    }, { once: true });
+    caja.append(img);
+    return caja;
   }
 
   function filaVariante(p, v) {
     const li = nodo("li", "variante");
     li.dataset.varianteId = v.id;
+    li.append(miniaturaVariante(p, v));
     const cabecera = nodo("div", "variante-cabecera");
     cabecera.append(nodo("span", "variante-color", v.color));
-    cabecera.append(nodo("span", "codigo codigo-suave", v.codigo_variante));
+    const datos = nodo("span", "variante-datos");
+    datos.append(nodo("span", "codigo codigo-suave", v.codigo_variante));
     // Referencia que ve el cliente (16.1): la propia si se escribió; si no, es el mismo código.
     const referencia = String(v.referencia_variante || "").trim();
-    // Etapa 16.2: el código del color es la referencia que ve el cliente; la del proveedor es aparte.
-    if (referencia && referencia !== v.codigo_variante) cabecera.append(nodo("span", "variante-referencia", `Ref. proveedor: ${referencia}`));
     const precio = nodo("span", "variante-precio");
     if (v.precio > 0) {
       precio.append(nodo("span", "", pesos.format(v.precio)));
@@ -672,7 +752,10 @@
     } else {
       precio.append(nodo("span", "variante-sin-precio", "Precio por confirmar"));
     }
-    cabecera.append(precio);
+    datos.append(precio);
+    cabecera.append(datos);
+    // Etapa 16.2: el código del color es la referencia que ve el cliente; la del proveedor es aparte.
+    if (referencia && referencia !== v.codigo_variante) cabecera.append(nodo("span", "variante-referencia", `Ref. proveedor: ${referencia}`));
     if (p.activo && !v.activa) cabecera.append(nodo("span", "variante-oculta", "Color oculto en la tienda"));
     li.append(cabecera);
     // 18: el color se muestra con su foto, pero no tiene ninguna: la tienda usa el círculo.
@@ -700,7 +783,6 @@
       tallas.append(item);
     }
     li.append(tallas);
-    if (v.tallas.some((t) => seleccion.has(t.id))) li.append(detalleSeleccion(v));
     return li;
   }
 
@@ -746,32 +828,295 @@
   }
   const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 
-  // Lo que ayuda a decidir: estado en la tienda, estado guardado, vigencia y procedencia.
-  function detalleSeleccion(v) {
-    const lista = nodo("ul", "detalle-seleccion");
-    lista.setAttribute("aria-label", `Detalle de las tallas seleccionadas de ${v.color}`);
-    for (const t of v.tallas.filter((x) => seleccion.has(x.id))) {
-      const item = nodo("li", "detalle-talla");
-      item.append(nodo("strong", "", `Talla ${t.talla}`));
-      const datos = [
-        `En la tienda: ${ESTADOS[t.efectivo].texto}`,
-        `Guardada como: ${(GUARDADOS[t.estado] || t.estado).toLowerCase()}`
-      ];
-      if (t.vigencia_desde) datos.push(`Vigencia: ${fecha(t.vigencia_desde)} → ${fecha(t.vence_en)} (${t.vigencia_horas} h)`);
-      if (t.origen) datos.push(`Procedencia: ${ORIGENES[t.origen] || t.origen}`);
-      if (t.publicado_en) datos.push(`Publicación original: ${fecha(t.publicado_en)}`);
-      if (!t.activa) datos.push("Talla desactivada");
-      item.append(nodo("span", "", datos.join(" · ")));
-      lista.append(item);
+  /* Etapa 19 · Estado de una talla para elegirla por grupos. Si la tienda la muestra, es el estado
+     efectivo que calcula Supabase (catalogo_publico, con la vigencia ya evaluada). Si no la muestra
+     (modelo, color o talla ocultos), se interpreta lo guardado con la MISMA regla que
+     fn_estado_publico: agotada nunca vence; por revisar; confirmada solo si la vigencia está en curso. */
+  function estadoTalla(t) {
+    if (t.efectivo !== "OCULTA") return t.efectivo;
+    if (t.estado === "AGOTADA") return "AGOTADO";
+    if (t.estado === "REVISAR" || !t.vigencia_desde || !t.vence_en) return "POR_REVISAR";
+    const ahora = Date.now();
+    return Date.parse(t.vigencia_desde) <= ahora && ahora < Date.parse(t.vence_en) ? "DISPONIBLE" : "POR_REVISAR";
+  }
+
+  // Lo que ayuda a decidir: estado en la tienda, estado guardado, vigencia y procedencia (plegable).
+  function detalleTalla(t) {
+    const item = nodo("li", "detalle-talla");
+    const plegable = nodo("details", "detalle-talla-plegable");
+    const resumen = nodo("summary", "detalle-talla-resumen");
+    resumen.append(nodo("strong", "", `Talla ${t.talla}`), nodo("span", "", ESTADOS[t.efectivo].texto));
+    const datos = [
+      `En la tienda: ${ESTADOS[t.efectivo].texto}`,
+      `Guardada como: ${(GUARDADOS[t.estado] || t.estado).toLowerCase()}`
+    ];
+    if (t.vigencia_desde) datos.push(`Vigencia: ${fecha(t.vigencia_desde)} → ${fecha(t.vence_en)} (${t.vigencia_horas} h)`);
+    if (t.origen) datos.push(`Procedencia: ${ORIGENES[t.origen] || t.origen}`);
+    if (t.publicado_en) datos.push(`Publicación original: ${fecha(t.publicado_en)}`);
+    if (!t.activa) datos.push("Talla desactivada");
+    const cuerpo = nodo("ul", "detalle-talla-datos");
+    for (const d of datos) cuerpo.append(nodo("li", "", d));
+    plegable.append(resumen, cuerpo);
+    item.append(plegable);
+    return item;
+  }
+
+  // «Ver selección»: el detalle por modelo, color y talla vive en la barra, no entre las tarjetas.
+  function pintarDetalleSeleccion(elegidas) {
+    const caja = $("#seleccion-detalle");
+    if (!caja || caja.hidden) return;
+    const grupos = nodo("ul", "seleccion-grupos");
+    for (const { producto, variante, tallas } of elegidas.grupos) {
+      const grupo = nodo("li", "seleccion-grupo");
+      const cabecera = nodo("div", "seleccion-grupo-cabecera");
+      const nombre = nodo("p", "seleccion-grupo-nombre");
+      nombre.append(nodo("strong", "", `${producto.nombre} · ${variante.color}`), " ", nodo("span", "codigo", variante.codigo_variante));
+      const ir = nodo("button", "boton boton-texto boton-compacto", "Ir al color");
+      ir.type = "button";
+      ir.dataset.accion = "ir-al-color";
+      ir.dataset.varianteId = variante.id;
+      ir.setAttribute("aria-label", `Ir a ${producto.nombre} · ${variante.color} en el catálogo`);
+      cabecera.append(nombre, ir);
+      const lista = nodo("ul", "detalle-seleccion");
+      lista.setAttribute("aria-label", `Tallas seleccionadas de ${producto.nombre} · ${variante.color}`);
+      for (const t of tallas) lista.append(detalleTalla(t));
+      grupo.append(cabecera, lista);
+      grupos.append(grupo);
     }
-    return lista;
+    const fuera = fueraDeLaVista();
+    caja.replaceChildren(grupos);
+    if (fuera) caja.prepend(nodo("p", "seleccion-detalle-nota", `${fuera === 1 ? "1 talla está" : `${fuera} tallas están`} fuera de la vista por la búsqueda o el filtro; sigue${fuera === 1 ? "" : "n"} seleccionada${fuera === 1 ? "" : "s"}.`));
+  }
+
+  // ------------------------------------------------- lugar de trabajo (etapa 19)
+  /* El último modelo, color y talla con los que se trabajó. Al terminar una acción (o cancelarla) se
+     vuelve ahí: se mide la posición en pantalla ANTES de abrir la acción y, tras releer y repintar,
+     se desplaza lo justo para que la misma referencia quede en el mismo sitio. Todo por UUID. */
+  let lugar = null; // { productoId, nombre, varianteId, tallaId, control: "talla" | "menu" }
+
+  const enLista = (selector) => document.querySelector(`#lista-productos ${selector}`);
+  const tarjetaEnLista = (id) => (id ? enLista(`li[data-producto-id="${CSS.escape(id)}"]`) : null);
+  const filaEnLista = (id) => (id ? enLista(`.variante[data-variante-id="${CSS.escape(id)}"]`) : null);
+  const tallaEnLista = (id) => (id ? enLista(`.talla[data-talla-id="${CSS.escape(id)}"]`) : null);
+
+  function recordarTalla(boton) {
+    const encontrado = buscarTalla(boton.dataset.tallaId);
+    if (!encontrado) return;
+    lugar = { productoId: encontrado.producto.id, nombre: encontrado.producto.nombre, varianteId: encontrado.variante.id, tallaId: encontrado.talla.id, control: "talla" };
+  }
+
+  // Elemento de referencia de un lugar: la talla; si ya no está, su color; si no, su modelo.
+  function elementoDeLugar(l) {
+    if (!l) return null;
+    return tallaEnLista(l.tallaId) || filaEnLista(l.varianteId) || tarjetaEnLista(l.productoId);
+  }
+
+  // Qué hay en pantalla ahora: la referencia (el lugar, si se ve; si no, lo primero visible) y su altura.
+  function capturarAncla() {
+    const tarjetas = [...document.querySelectorAll("#lista-productos > li[data-producto-id]")];
+    if (!tarjetas.length) return null;
+    const alto = window.innerHeight;
+    const visible = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < alto; };
+    let referencia = null;
+    const propio = elementoDeLugar(lugar);
+    if (propio && visible(propio)) referencia = { ...lugar, top: propio.getBoundingClientRect().top };
+    if (!referencia) {
+      const tarjeta = tarjetas.find(visible) || tarjetas.find((t) => t.getBoundingClientRect().top >= 0) || tarjetas[tarjetas.length - 1];
+      const fila = [...tarjeta.querySelectorAll(".variante[data-variante-id]")].find(visible);
+      const el = fila || tarjeta;
+      referencia = { productoId: tarjeta.dataset.productoId, varianteId: fila?.dataset.varianteId || null, tallaId: null, top: el.getBoundingClientRect().top };
+    }
+    return { referencia, foco: lugar ? { ...lugar } : null, orden: tarjetas.map((t) => t.dataset.productoId) };
+  }
+
+  function desplazarA(el, top) {
+    const delta = el.getBoundingClientRect().top - top;
+    if (Math.abs(delta) >= 1) window.scrollTo(window.scrollX, window.scrollY + delta);
+  }
+
+  // El modelo más cercano que sigue en la lista: el siguiente y, si no hay, el anterior.
+  function vecinoEnLista(orden, productoId) {
+    const i = orden.indexOf(productoId);
+    const candidatos = i < 0 ? orden : [...orden.slice(i + 1), ...orden.slice(0, i).reverse()];
+    for (const id of candidatos) { const t = tarjetaEnLista(id); if (t) return t; }
+    return document.querySelector("#lista-productos > li[data-producto-id]");
+  }
+
+  // Por qué un modelo ya no aparece (filtro, búsqueda o ya no existe).
+  function motivoAusencia(productoId, nombre) {
+    const p = catalogo.find((x) => x.id === productoId);
+    if (!p) return `«${nombre}» ya no está en el catálogo`;
+    const criterio = FILTROS.find((f) => f.id === filtro) || FILTROS[0];
+    const consulta = $("#buscar").value.trim();
+    if (!criterio.cumple(p)) return `«${p.nombre}» ya no aparece con el filtro «${criterio.texto}»`;
+    if (consulta) return `«${p.nombre}» ya no coincide con la búsqueda «${consulta}»`;
+    return `«${p.nombre}» ya no aparece en la lista`;
+  }
+
+  /* Devuelve la vista a la referencia y, si se pide, el foco al lugar de trabajo (sin desplazar).
+     Si el modelo dejó de aparecer, queda el más cercano y se devuelve una explicación breve. */
+  function restaurarAncla(ancla, { enfocar = false } = {}) {
+    if (!ancla) return "";
+    const { referencia, foco, orden } = ancla;
+    let destino = elementoDeLugar(referencia);
+    if (!destino) destino = vecinoEnLista(orden, referencia.productoId);
+    if (destino) {
+      desplazarA(destino, referencia.top);
+      // Segunda pasada tras el siguiente fotograma (imágenes o fuentes que terminan de colocarse),
+      // solo si la persona no se ha desplazado entretanto.
+      const y = window.scrollY;
+      requestAnimationFrame(() => { if (window.scrollY === y && destino.isConnected) desplazarA(destino, referencia.top); });
+    }
+    if (!enfocar) return "";
+    let nota = "";
+    let objetivo = null;
+    if (foco) {
+      const tarjeta = tarjetaEnLista(foco.productoId);
+      if (tarjeta) {
+        if (foco.control === "menu") objetivo = tarjeta.querySelector("[data-menu-tallas]");
+        objetivo = objetivo || tallaEnLista(foco.tallaId) || filaEnLista(foco.varianteId)?.querySelector(".talla[data-talla-id]") || tarjeta.querySelector(".producto-nombre");
+      } else {
+        const vecino = vecinoEnLista(orden, foco.productoId);
+        nota = `${motivoAusencia(foco.productoId, foco.nombre)}; ${vecino ? `te dejamos junto a «${vecino.querySelector(".producto-nombre")?.textContent || "el modelo más cercano"}»` : "no queda ningún modelo a la vista"}.`;
+        objetivo = vecino?.querySelector(".producto-nombre") || null;
+      }
+    }
+    if (!objetivo && destino) objetivo = destino.closest("li[data-producto-id]")?.querySelector(".producto-nombre") || null;
+    if (!objetivo && !document.querySelector("#lista-productos > li")) objetivo = $("#tablero-aviso button");
+    if (objetivo && !objetivo.disabled) objetivo.focus({ preventScroll: true });
+    return nota;
+  }
+
+  // Tras una acción (aplicada, parcial, con error o con cambio concurrente): releer, repintar y volver
+  // al lugar de trabajo. Si el modelo ya no aparece (p. ej. por el filtro), se explica en el resultado.
+  async function volverAlLugar(accion) {
+    const pintado = await cargarCatalogo({ conservarPosicion: true, ancla: accion.ancla });
+    if (!pintado) return;
+    const nota = restaurarAncla(accion.ancla, { enfocar: true });
+    if (nota) {
+      const caja = $("#resultado-accion");
+      caja.append(nodo("p", "resultado-nota", nota));
+      caja.hidden = false;
+    }
+  }
+
+  // Cancelar el diálogo: la página no se mueve y el foco vuelve al botón que abrió la acción (o, en
+  // celular, a «Cambiar estado», porque las seis acciones se pliegan al elegir una).
+  function alCancelarAccion(a) {
+    restaurarAncla(a.ancla);
+    const visible = (b) => b instanceof HTMLButtonElement && b.isConnected && !b.disabled && b.getClientRects().length > 0;
+    const objetivo = [a.disparador, $("#boton-cambiar-estado")].find(visible);
+    if (objetivo) objetivo.focus({ preventScroll: true });
+    else restaurarAncla(a.ancla, { enfocar: true });
   }
 
   function alternarTalla(boton) {
     if (ocupado || verificacionPendiente) return;
     const { tallaId } = boton.dataset;
     if (seleccion.has(tallaId)) seleccion.delete(tallaId); else seleccion.add(tallaId);
+    recordarTalla(boton);
     refrescarSeleccionVisible();
+  }
+
+  // ------------------------------------------- menú «Seleccionar tallas» (etapa 19)
+  /* Por modelo: cada opción DEFINE la selección dentro de ese modelo (quita las suyas y pone las que
+     cumplen) y conserva las de los demás. Activa/desactivada = indicador «activa»; agotada y por
+     revisar = estadoTalla (el mismo estado que muestra el panel, con la vigencia vencida incluida). */
+  const OPCIONES_TALLAS = [
+    { id: "todas", texto: "Todas las tallas", cumple: () => true, hecho: (n) => (n === 1 ? "su única talla" : `sus ${n} tallas`) },
+    { id: "activas", texto: "Tallas activas", cumple: (t) => t.activa, hecho: (n) => plural(n, "talla activa", "tallas activas") },
+    { id: "desactivadas", texto: "Tallas desactivadas", cumple: (t) => !t.activa, hecho: (n) => plural(n, "talla desactivada", "tallas desactivadas") },
+    { id: "agotadas", texto: "Tallas agotadas", cumple: (t) => estadoTalla(t) === "AGOTADO", hecho: (n) => plural(n, "talla agotada", "tallas agotadas") },
+    { id: "revisar", texto: "Tallas por revisar", cumple: (t) => estadoTalla(t) === "POR_REVISAR", hecho: (n) => plural(n, "talla por revisar", "tallas por revisar") }
+  ];
+  let menuTallas = null; // { productoId, boton, panel }
+
+  function cerrarMenuTallas({ enfocar = false } = {}) {
+    if (!menuTallas) return;
+    const { boton, panel } = menuTallas;
+    menuTallas = null;
+    panel.remove();
+    boton.setAttribute("aria-expanded", "false");
+    boton.removeAttribute("aria-controls");
+    if (enfocar && boton.isConnected && !boton.disabled) boton.focus({ preventScroll: true });
+  }
+
+  function abrirMenuTallas(boton, primero = "primera") {
+    if (ocupado || verificacionPendiente) return;
+    cerrarMenuTallas();
+    const p = catalogo.find((x) => x.id === boton.dataset.menuTallas);
+    if (!p) return;
+    const todas = p.variantes.flatMap((v) => v.tallas);
+    const panel = nodo("div", "menu-tallas-panel");
+    panel.id = `menu-tallas-${p.id}`;
+    const titulo = nodo("p", "menu-tallas-titulo");
+    titulo.id = `menu-tallas-titulo-${p.id}`;
+    titulo.append("Seleccionar tallas de ", nodo("strong", "", p.nombre), " ", nodo("span", "codigo", p.codigo_interno));
+    const lista = nodo("ul", "menu-tallas-lista");
+    lista.setAttribute("role", "menu");
+    lista.setAttribute("aria-labelledby", titulo.id);
+    for (const o of OPCIONES_TALLAS) {
+      const cuantas = todas.filter(o.cumple).length;
+      const item = nodo("li");
+      item.setAttribute("role", "none");
+      const opcion = nodo("button", "menu-tallas-opcion");
+      opcion.type = "button";
+      opcion.tabIndex = -1;
+      opcion.setAttribute("role", "menuitem");
+      opcion.dataset.opcionTallas = o.id;
+      opcion.setAttribute("aria-label", `Seleccionar ${o.texto.toLowerCase()} (${cuantas || "ninguna"})`);
+      opcion.append(nodo("span", "menu-tallas-texto", o.texto), nodo("span", "menu-tallas-cuantas", cuantas ? String(cuantas) : "Ninguna"));
+      if (!cuantas) opcion.setAttribute("aria-disabled", "true");
+      item.append(opcion);
+      lista.append(item);
+    }
+    const nota = nodo("p", "menu-tallas-nota");
+    nota.setAttribute("role", "status");
+    panel.append(titulo, lista, nota);
+    boton.after(panel);
+    boton.setAttribute("aria-expanded", "true");
+    boton.setAttribute("aria-controls", panel.id);
+    menuTallas = { productoId: p.id, boton, panel };
+    const opciones = [...lista.querySelectorAll("[role='menuitem']")];
+    (primero === "ultima" ? opciones[opciones.length - 1] : opciones[0]).focus({ preventScroll: true });
+    panel.scrollIntoView({ block: "nearest" });
+  }
+
+  function elegirOpcionTallas(opcion) {
+    if (!menuTallas || ocupado || verificacionPendiente) return;
+    const o = OPCIONES_TALLAS.find((x) => x.id === opcion.dataset.opcionTallas);
+    const p = catalogo.find((x) => x.id === menuTallas.productoId);
+    if (!o || !p) return;
+    if (opcion.getAttribute("aria-disabled") === "true") {
+      menuTallas.panel.querySelector(".menu-tallas-nota").textContent = `${p.nombre} no tiene ${o.texto.toLowerCase()}: no hay nada que seleccionar.`;
+      return;
+    }
+    const todas = p.variantes.flatMap((v) => v.tallas);
+    const otras = [...seleccion].filter((id) => !todas.some((t) => t.id === id)).length;
+    for (const t of todas) seleccion.delete(t.id);
+    const elegidas = todas.filter(o.cumple);
+    for (const t of elegidas) seleccion.add(t.id);
+    lugar = { productoId: p.id, nombre: p.nombre, varianteId: elegidas[0]?.variante_id || null, tallaId: elegidas[0]?.id || null, control: "menu" };
+    cerrarMenuTallas({ enfocar: true });
+    refrescarSeleccionVisible();
+    const resto = todas.length - elegidas.length;
+    $("#tablero-estado").textContent = `${p.nombre}: ${elegidas.length === 1 ? "seleccionada" : "seleccionadas"} ${o.hecho(elegidas.length)}` +
+      `${resto ? ` (${resto === 1 ? "la otra talla del modelo queda" : `las otras ${resto} del modelo quedan`} sin seleccionar)` : ""}.` +
+      (otras ? ` ${otras === 1 ? "Se conserva 1 talla" : `Se conservan ${otras} tallas`} de otros modelos.` : "");
+  }
+
+  function teclaMenuTallas(e) {
+    if (!menuTallas) return;
+    const opciones = [...menuTallas.panel.querySelectorAll("[role='menuitem']")];
+    const i = opciones.indexOf(document.activeElement);
+    let destino = null;
+    if (e.key === "ArrowDown") destino = opciones[(i + 1) % opciones.length];
+    else if (e.key === "ArrowUp") destino = opciones[(i - 1 + opciones.length) % opciones.length];
+    else if (e.key === "Home") destino = opciones[0];
+    else if (e.key === "End") destino = opciones[opciones.length - 1];
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); cerrarMenuTallas({ enfocar: true }); return; }
+    else if (e.key === "Tab") { cerrarMenuTallas(); return; }
+    if (destino) { e.preventDefault(); destino.focus({ preventScroll: true }); destino.scrollIntoView({ block: "nearest" }); }
   }
 
   function seleccionarVisibles() {
@@ -785,17 +1130,69 @@
       : "Todas las tallas visibles ya estaban seleccionadas.";
   }
 
-  // Actualiza la selección sin repintar la lista: el foco se queda en la talla pulsada.
+  // Actualiza la selección sin repintar la lista: el foco se queda en la talla pulsada. Etapa 19:
+  // tampoco cambia la altura de nada en el catálogo (el detalle está en «Ver selección»).
   function refrescarSeleccionVisible() {
     document.querySelectorAll("#lista-productos .talla[data-talla-id]").forEach((b) => {
       b.setAttribute("aria-pressed", String(seleccion.has(b.dataset.tallaId)));
     });
-    document.querySelectorAll("#lista-productos .detalle-seleccion").forEach((n) => n.remove());
-    document.querySelectorAll("#lista-productos .variante[data-variante-id]").forEach((fila) => {
-      const encontrado = buscarVariante(fila.dataset.varianteId);
-      if (encontrado && encontrado.variante.tallas.some((t) => seleccion.has(t.id))) fila.append(detalleSeleccion(encontrado.variante));
-    });
     actualizarBarraAcciones();
+  }
+
+  // ------------------------------------------------- barra de acciones (etapa 19)
+  /* Compacta: total, «Ver selección», «Cambiar estado» y «Quitar selección». Los dos plegables viven
+     DENTRO de la barra (no son ventanas encima de otras) y solo uno está abierto a la vez. En
+     escritorio las seis acciones se ven siempre; en celular, al pulsar «Cambiar estado». */
+  let panelBarra = ""; // "" | "seleccion" | "acciones"
+
+  function abrirPanelBarra(nombre) {
+    panelBarra = panelBarra === nombre ? "" : nombre;
+    pintarPanelesBarra();
+    if (panelBarra === "acciones") $("#barra-acciones-botones button:not(:disabled)")?.focus({ preventScroll: true });
+  }
+  function cerrarPanelBarra({ enfocar = false } = {}) {
+    const antes = panelBarra;
+    panelBarra = "";
+    pintarPanelesBarra();
+    if (enfocar && antes) $(antes === "seleccion" ? "#boton-ver-seleccion" : "#boton-cambiar-estado")?.focus({ preventScroll: true });
+  }
+  function pintarPanelesBarra() {
+    const barra = $("#barra-acciones");
+    if (!barra) return;
+    barra.dataset.panel = panelBarra;
+    $("#boton-ver-seleccion")?.setAttribute("aria-expanded", String(panelBarra === "seleccion"));
+    $("#boton-cambiar-estado")?.setAttribute("aria-expanded", String(panelBarra === "acciones"));
+    const detalle = $("#seleccion-detalle");
+    if (detalle) {
+      detalle.hidden = panelBarra !== "seleccion";
+      if (detalle.hidden) detalle.replaceChildren();
+      else { const elegidas = tallasSeleccionadas(); if (elegidas) pintarDetalleSeleccion(elegidas); }
+    }
+  }
+
+  // «Ir al color» desde «Ver selección»: cierra el plegable y lleva a ese color (si está a la vista).
+  function irAlColor(varianteId) {
+    cerrarPanelBarra();
+    const fila = filaEnLista(varianteId);
+    if (!fila) {
+      $("#tablero-estado").textContent = "Ese color está fuera de la vista por la búsqueda o el filtro; sus tallas siguen seleccionadas.";
+      $("#boton-ver-seleccion")?.focus({ preventScroll: true });
+      return;
+    }
+    fila.scrollIntoView({ block: "center" });
+    const talla = [...fila.querySelectorAll(".talla[data-talla-id]")].find((b) => seleccion.has(b.dataset.tallaId)) || fila.querySelector(".talla[data-talla-id]");
+    if (talla) { recordarTalla(talla); talla.focus({ preventScroll: true }); }
+  }
+
+  // Alto real de lo que está fijo abajo (resultado + barra): el catálogo deja ese sitio libre y el
+  // foco con teclado nunca queda tapado (scroll-padding). Se mide, no se adivina.
+  function vigilarDock() {
+    const dock = $("#dock-inferior");
+    if (!dock) return;
+    const aplicar = () => document.documentElement.style.setProperty("--alto-dock", `${Math.ceil(dock.getBoundingClientRect().height)}px`);
+    if ("ResizeObserver" in window) new ResizeObserver(aplicar).observe(dock);
+    window.addEventListener("resize", aplicar);
+    aplicar();
   }
 
   function quitarSeleccion() {
@@ -818,27 +1215,33 @@
       herramientas.querySelectorAll("button").forEach((b) => { b.disabled = ocupado || verificacionPendiente; });
     }
     const elegidas = tallasSeleccionadas();
+    const dock = $("#dock-inferior");
     if (!elegidas) {
       barra.hidden = true;
+      if (panelBarra) { panelBarra = ""; pintarPanelesBarra(); }
       document.body.classList.remove("con-seleccion");
+      dock?.classList.remove("con-barra");
       return;
     }
-    const { grupos, total, modelos, colores } = elegidas;
+    const { total, modelos, colores } = elegidas;
     const fuera = fueraDeLaVista();
-    const detalle = grupos.slice(0, 3).map((g) => `${g.producto.nombre} · ${g.variante.color} (${g.variante.codigo_variante}): ${g.tallas.map((t) => t.talla).join(", ")}`);
-    if (grupos.length > 3) detalle.push(`y ${plural(grupos.length - 3, "color más", "colores más")}`);
-    $("#seleccion-resumen").textContent =
-      `${plural(total, "talla seleccionada", "tallas seleccionadas")} · ${plural(modelos, "modelo", "modelos")} · ${plural(colores, "color", "colores")}` +
-      `${fuera ? ` · ${fuera} fuera de la vista` : ""} — ${detalle.join("; ")}`;
+    // Total destacado; modelos, colores y lo que queda fuera de la vista, en una segunda línea en celular.
+    const resumen = $("#seleccion-resumen");
+    const detalle = nodo("span", "barra-acciones-detalle");
+    detalle.append(nodo("span", "barra-acciones-sep", " · "), `${plural(modelos, "modelo", "modelos")} · ${plural(colores, "color", "colores")}${fuera ? ` · ${fuera} fuera de la vista` : ""}`);
+    resumen.replaceChildren(nodo("strong", "barra-acciones-total", plural(total, "talla seleccionada", "tallas seleccionadas")), detalle);
     barra.querySelectorAll("button").forEach((b) => { b.disabled = ocupado || verificacionPendiente; });
     barra.hidden = false;
     document.body.classList.add("con-seleccion");
+    dock?.classList.add("con-barra");
+    if (panelBarra === "seleccion") pintarDetalleSeleccion(elegidas);
   }
 
   function marcarOcupado(si) {
     ocupado = si;
-    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #boton-nuevo, #filtros button, #barra-acciones button, #seleccion-herramientas button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
-      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, #barra-acciones button, #seleccion-herramientas button")); });
+    if (si) cerrarMenuTallas();
+    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #lista-productos [data-menu-tallas], #boton-nuevo, #filtros button, #barra-acciones button, #seleccion-herramientas button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
+      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, [data-menu-tallas], #barra-acciones button, #seleccion-herramientas button")); });
     $("#barra-acciones")?.setAttribute("aria-busy", String(si));
     document.querySelectorAll("#dialogo-accion button").forEach((b) => { b.disabled = si; });
   }
@@ -940,7 +1343,7 @@
   // Etiqueta de una talla en un mensaje: con su color cuando la selección tiene varios.
   const etiquetaTalla = (t, varios) => (varios ? `${t.talla} de ${t.variante.color}` : t.talla);
 
-  function abrirAccion(tipo) {
+  function abrirAccion(tipo, boton = null) {
     if (ocupado || verificacionPendiente) return;
     const elegidas = tallasSeleccionadas();
     if (!elegidas) {
@@ -954,7 +1357,10 @@
       producto: { id: producto.id, nombre: producto.nombre, codigo: producto.codigo_interno, activo: producto.activo },
       variante: { id: variante.id, color: variante.color, codigo: variante.codigo_variante, activa: variante.activa }
     })));
-    accionAbierta = { tipo, tallas, grupos: grupos.length, modelos, total };
+    // Etapa 19: dónde estaba la persona y qué pulsó, para volver ahí al terminar o al cancelar.
+    accionAbierta = { tipo, tallas, grupos: grupos.length, modelos, total, ancla: capturarAncla(), disparador: boton || document.activeElement, ejecutada: false };
+    cerrarMenuTallas();
+    if (panelBarra) cerrarPanelBarra(); // la acción elegida lleva a su confirmación: nada queda abierto debajo
     const varios = grupos.length > 1;
 
     $("#dialogo-titulo").textContent = def.titulo;
@@ -1174,6 +1580,7 @@
     if (!accion || ocupado) return;
     const parametros = leerParametros(accion.tipo);
     if (!parametros) return;
+    accion.ejecutada = true; // al cerrarse el diálogo ya no es una cancelación
 
     const mia = generacion;
     const def = ACCIONES[accion.tipo];
@@ -1208,7 +1615,7 @@
           tipo: "aviso"
         });
         marcarOcupado(false);
-        await cargarCatalogo({ conservarPosicion: true });
+        await volverAlLugar(accion);
         return;
       }
 
@@ -1293,7 +1700,7 @@
       seleccion = sinConfirmar.length ? new Set() : new Set(resultados.filter((r) => r.resultado === "fallida" || r.resultado === "no-intentada").map((r) => r.id));
       marcarOcupado(false);
       if (!verificacionPendiente) {
-        await cargarCatalogo({ conservarPosicion: true });
+        await volverAlLugar(accion);
       } else {
         // No se pintan los estados anteriores como si siguieran vigentes.
         seleccion = new Set();
@@ -1304,8 +1711,9 @@
           accion: { texto: "Actualizar", alPulsar: () => cargarCatalogo() },
           rol: "alert"
         });
+        // El resultado está en el aviso fijo de abajo: recibe el foco sin mover la página.
+        $("#resultado-accion").focus({ preventScroll: true });
       }
-      $("#resultado-accion").focus();
     } finally {
       // Siempre se libera, también si la sesión o el permiso se perdieron por el camino.
       marcarOcupado(false);
@@ -1373,17 +1781,26 @@
   function anunciarResultado({ titulo, texto = "", lineas = [], tipo = "ok" }) {
     const caja = $("#resultado-accion");
     caja.className = `resultado-accion es-${tipo}`;
-    const cerrar = nodo("button", "boton boton-texto boton-compacto", "Cerrar aviso");
+    const cerrar = nodo("button", "boton boton-texto boton-compacto resultado-cerrar", "Cerrar aviso");
     cerrar.type = "button";
     cerrar.dataset.accion = "cerrar-resultado";
-    const partes = [nodo("h2", "", titulo)];
+    // Etapa 19: el aviso vive fijo abajo; se mantiene compacto. Si todo salió bien, el detalle por
+    // talla queda plegado; si algo falló o no se confirmó, se ve entero.
+    const cabecera = nodo("div", "resultado-cabecera");
+    cabecera.append(nodo("h2", "", titulo), cerrar);
+    const partes = [cabecera];
     if (texto) partes.push(nodo("p", "", texto));
     if (lineas.length) {
       const lista = nodo("ul", "resultado-lineas");
       for (const l of lineas) lista.append(nodo("li", "", l));
-      partes.push(lista);
+      if (tipo === "ok") {
+        const plegable = nodo("details", "resultado-detalle");
+        plegable.append(nodo("summary", "", `Ver detalle por talla (${lineas.length})`), lista);
+        partes.push(plegable);
+      } else {
+        partes.push(lista);
+      }
     }
-    partes.push(cerrar);
     caja.replaceChildren(...partes);
     caja.hidden = false;
   }
@@ -1775,17 +2192,39 @@
     $("#boton-ver-clave").addEventListener("click", alternarClave);
     $("#boton-ver-clave").setAttribute("aria-label", "Mostrar contraseña");
     $("#formulario-buscar").addEventListener("submit", (e) => e.preventDefault());
-    $("#buscar").addEventListener("input", () => {
-      clearTimeout(temporizadorBusqueda);
-      temporizadorBusqueda = setTimeout(pintarCatalogo, 120);
-    });
+    $("#buscar").addEventListener("input", () => programarBusqueda(120));
+    // Etapa 19: una pulsación en curso (puntero abajo, o Espacio, que activa al soltar) retrasa el
+    // repintado de la búsqueda hasta soltar; así el control pulsado no se sustituye a mitad del clic.
+    document.addEventListener("pointerdown", () => { pulsando = true; }, true);
+    for (const tipo of ["pointerup", "pointercancel"]) window.addEventListener(tipo, () => { pulsando = false; }, true);
+    document.addEventListener("keydown", (e) => { if (e.key === " " && e.target.closest?.("#lista-productos button")) pulsando = true; }, true);
+    window.addEventListener("keyup", (e) => { if (e.key === " ") pulsando = false; }, true);
+    window.addEventListener("blur", () => { pulsando = false; });
     $("#formulario-accion").addEventListener("submit", ejecutarAccion);
     // Mientras se aplica un cambio, el diálogo no se cierra con Escape.
     $("#dialogo-accion").addEventListener("cancel", (e) => { if (ocupado) e.preventDefault(); });
-    $("#dialogo-accion").addEventListener("close", () => { if (!ocupado) accionAbierta = null; });
+    $("#dialogo-accion").addEventListener("close", () => {
+      if (ocupado) return;
+      const abierta = accionAbierta;
+      accionAbierta = null;
+      if (abierta && !abierta.ejecutada) alCancelarAccion(abierta);
+    });
+    // Etapa 19: tocar o pulsar fuera del menú «Seleccionar tallas» lo cierra (sin mover el foco). Con
+    // «pointerdown» y no «click»: en Safari de iOS tocar una zona no interactiva no genera «click».
+    document.addEventListener("pointerdown", (e) => {
+      if (menuTallas && !menuTallas.panel.contains(e.target) && !menuTallas.boton.contains(e.target)) cerrarMenuTallas();
+    });
     document.addEventListener("click", (e) => {
       const talla = e.target.closest("#lista-productos .talla[data-talla-id]");
       if (talla) { alternarTalla(talla); return; }
+      const abrirMenu = e.target.closest("#lista-productos [data-menu-tallas]");
+      if (abrirMenu) {
+        if (menuTallas?.boton === abrirMenu) cerrarMenuTallas({ enfocar: true });
+        else abrirMenuTallas(abrirMenu);
+        return;
+      }
+      const opcion = e.target.closest(".menu-tallas-panel [data-opcion-tallas]");
+      if (opcion) { elegirOpcionTallas(opcion); return; }
       const botonFiltro = e.target.closest("#filtros [data-filtro]");
       if (botonFiltro) { if (!ocupado) { filtro = botonFiltro.dataset.filtro; pintarCatalogo(); } return; }
       const accion = e.target.closest("[data-accion]")?.dataset.accion;
@@ -1796,9 +2235,12 @@
       else if (accion === "historial-mas") { if (!ocupado) cargarHistorial(false); }
       else if (accion === "historial-filtro") { if (!ocupado) elegirFiltroHistorial(e.target.closest("[data-historial-filtro]").dataset.historialFiltro); }
       else if (accion === "exportar") { if (!ocupado) exportarCatalogo(); }
-      else if (accion in ACCIONES) abrirAccion(accion);
+      else if (accion in ACCIONES) abrirAccion(accion, e.target.closest("[data-accion]"));
       else if (accion === "deseleccionar") { if (!ocupado) quitarSeleccion(); }
       else if (accion === "seleccionar-visibles") seleccionarVisibles();
+      else if (accion === "ver-seleccion") { if (!ocupado) abrirPanelBarra("seleccion"); }
+      else if (accion === "cambiar-estado") { if (!ocupado) abrirPanelBarra("acciones"); }
+      else if (accion === "ir-al-color") irAlColor(e.target.closest("[data-variante-id]").dataset.varianteId);
       else if (accion === "cancelar-dialogo") cerrarDialogo();
       else if (accion === "cerrar-resultado") { const caja = $("#resultado-accion"); caja.hidden = true; caja.replaceChildren(); }
       else if (accion === "nuevo-producto") { if (!ocupado) abrirEditor(null, e.target.closest("[data-accion]")); }
@@ -1810,6 +2252,28 @@
       }
       else if (accion === "editar-producto") { const b = e.target.closest("[data-producto-id]"); if (!ocupado) abrirEditor(b.dataset.productoId, b); }
     });
+    // Etapa 19: teclado del menú por modelo y de los plegables de la barra.
+    document.addEventListener("keydown", (e) => {
+      const boton = e.target.closest?.("#lista-productos [data-menu-tallas]");
+      if (boton && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        abrirMenuTallas(boton, e.key === "ArrowUp" ? "ultima" : "primera");
+        return;
+      }
+      if (menuTallas && menuTallas.panel.contains(e.target)) { teclaMenuTallas(e); return; }
+      if (e.key === "Escape" && panelBarra && !document.querySelector("dialog[open]")) {
+        e.preventDefault();
+        cerrarPanelBarra({ enfocar: true });
+      }
+    });
+    // Si el foco sale del menú (Tab, clic en otro sitio), el menú se cierra.
+    document.addEventListener("focusout", (e) => {
+      if (!menuTallas || !menuTallas.panel.contains(e.target)) return;
+      const hacia = e.relatedTarget;
+      if (hacia && (menuTallas.panel.contains(hacia) || menuTallas.boton === hacia)) return;
+      if (hacia) cerrarMenuTallas();
+    });
+    vigilarDock();
     document.addEventListener("visibilitychange", revisarAlVolver);
     window.addEventListener("focus", revisarAlVolver);
 

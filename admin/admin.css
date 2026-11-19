@@ -320,8 +320,11 @@ body[data-vista="ingreso"] { background: #0b0b0b; }
   gap: var(--e-5);
   max-width: var(--ancho-max);
   margin-inline: auto;
-  padding: var(--e-6) var(--margen) var(--e-7);
+  /* Etapa 19: debajo queda libre el alto real de lo fijo abajo (resultado y barra), medido en admin.js. */
+  padding: var(--e-6) var(--margen) calc(var(--e-7) + var(--alto-dock, 0px));
 }
+/* El foco con teclado y «scrollIntoView» nunca dejan una talla tapada por lo fijo de abajo. */
+html { scroll-padding-bottom: calc(var(--alto-dock, 0px) + var(--e-3)); }
 .tablero-cabecera { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--e-4); }
 .tablero-titulo {
   font-size: clamp(2.25rem, 1.6rem + 3vw, 3.75rem);
@@ -355,14 +358,19 @@ body[data-vista="ingreso"] { background: #0b0b0b; }
 .tablero-aviso[role="alert"] h2 { color: var(--error); }
 
 /* ------------------------------------------------------------ productos */
-.productos { display: grid; gap: var(--e-3); }
+.productos { display: grid; gap: var(--e-5); }
+/* Etapa 19: cada modelo es una tarjeta con borde propio (contiene cabecera, botones, colores y tallas)
+   y una sombra mínima; el separador entre colores (--linea) es más suave que el borde exterior. */
 .producto-articulo {
   display: grid;
   grid-template-columns: 5.5rem minmax(0, 1fr);
-  gap: var(--e-4);
+  gap: var(--e-3) var(--e-4);
+  align-items: start;
   padding: var(--e-4);
   background: var(--superficie);
+  border: 1px solid var(--linea-fuerte);
   border-radius: var(--r-superficie);
+  box-shadow: 0 1px 2px rgb(20 20 20 / 0.06);
 }
 .producto-foto {
   display: grid;
@@ -375,6 +383,14 @@ body[data-vista="ingreso"] { background: #0b0b0b; }
 .producto-foto img { width: 100%; height: 100%; object-fit: cover; }
 .producto-sin-foto { padding: var(--e-2); font-size: 0.8125rem; color: var(--tinta-2); text-align: center; }
 .producto-cuerpo { display: grid; gap: var(--e-1); min-width: 0; }
+/* Etapa 19: en celular, los botones y los colores van a todo el ancho de la tarjeta (antes dejaban
+   vacía la columna de la foto); desde 768 px siguen en la columna del texto. */
+.producto-foto { grid-column: 1; grid-row: 1; }
+.producto-cuerpo { grid-column: 2; grid-row: 1; }
+.producto-botones { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.producto-articulo > .variantes { grid-column: 1 / -1; margin-top: 0; }
+.producto-nombre:focus { outline: none; }
+.producto-nombre:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
 .producto-codigos { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-3); font-size: 0.9375rem; color: var(--tinta-2); }
 .codigo { font-family: var(--fuente-mono); font-size: 0.875rem; font-weight: 500; color: var(--tinta); }
 .codigo-suave { color: var(--tinta-2); }
@@ -386,9 +402,32 @@ body[data-vista="ingreso"] { background: #0b0b0b; }
 
 .variantes { display: grid; gap: var(--e-4); margin-top: var(--e-3); grid-column: 1 / -1; }
 .producto-cuerpo .variantes { grid-column: auto; }
-.variante { display: grid; gap: var(--e-2); padding-top: var(--e-3); border-top: 1px solid var(--linea); }
-.variante-cabecera { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--e-1) var(--e-3); }
-.variante-color { font-weight: 700; }
+/* Etapa 19: miniatura del color a la izquierda de su nombre, código y precio; las tallas debajo, a
+   todo el ancho. La miniatura tiene tamaño fijo (nada salta al cargar) y muestra la foto entera. */
+.variante {
+  display: grid;
+  grid-template-columns: 4rem minmax(0, 1fr);
+  gap: var(--e-2) var(--e-3);
+  align-items: center;
+  padding-top: var(--e-3);
+  border-top: 1px solid var(--linea);
+}
+.variante > :not(.variante-foto, .variante-cabecera) { grid-column: 1 / -1; }
+.variante-foto {
+  display: grid;
+  place-items: center;
+  width: 4rem;
+  height: 4rem;
+  overflow: hidden;
+  border-radius: var(--r-control);
+  background: var(--papel-2);
+}
+.variante-foto img { width: 100%; height: 100%; object-fit: contain; }
+.variante-foto.es-vacia { border: 1px dashed var(--linea-fuerte); background: var(--papel); }
+.variante-sin-foto { padding: 2px; font-size: 0.6875rem; line-height: 1.15; color: var(--tinta-2); text-align: center; }
+.variante-cabecera { display: grid; gap: 2px; min-width: 0; }
+.variante-datos { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px var(--e-3); }
+.variante-color { font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 .variante-referencia { font-family: var(--fuente-mono); font-size: 0.875rem; color: var(--tinta); overflow-wrap: anywhere; }
 .variante-precio { display: inline-flex; flex-wrap: wrap; gap: var(--e-2); font-variant-numeric: tabular-nums; }
 .variante-antes { color: var(--tinta-2); }
@@ -415,7 +454,11 @@ body[data-vista="ingreso"] { background: #0b0b0b; }
 .talla-oculta { background: transparent; border: 1px dashed var(--linea-fuerte); color: var(--tinta-2); }
 
 @media (min-width: 768px) {
-  .producto-articulo { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--e-5); padding: var(--e-5); }
+  .producto-articulo { grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--e-3) var(--e-5); padding: var(--e-5); }
+  .producto-foto { grid-row: 1 / span 3; }
+  .producto-botones, .producto-articulo > .variantes { grid-column: 2; }
+  .variante { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .variante-foto { width: 4.5rem; height: 4.5rem; }
 }
 @media (min-width: 1024px) {
   .producto-articulo { grid-template-columns: 9rem minmax(0, 1fr); }
@@ -449,29 +492,85 @@ button.talla:focus-visible { outline-offset: 5px; }
 .filtro[aria-pressed="true"] { background: var(--tinta); border-color: var(--tinta); color: #fff; }
 .filtro:disabled { cursor: not-allowed; opacity: 0.6; }
 
-.detalle-seleccion { display: grid; gap: var(--e-2); padding: var(--e-3) var(--e-4); background: var(--papel); border-radius: var(--r-control); }
-.detalle-talla { display: grid; gap: 2px; font-size: 0.9375rem; }
-.detalle-talla span { color: var(--tinta-2); }
+/* Etapa 19: el detalle de las tallas seleccionadas está en «Ver selección» (ver «dock» más abajo). */
 
-/* Barra de acciones: fija abajo, sobre todo en el celular; respeta el área segura. */
-body.con-seleccion .tablero { padding-bottom: 14rem; }
-.barra-acciones {
+/* Etapa 19 · Lo fijo abajo («dock»): el resultado de la última acción y la barra de la selección,
+   apilados en un solo bloque (nunca dos capas encima del catálogo). Respeta el área segura. */
+.dock {
   position: fixed;
   inset: auto 0 0 0;
   z-index: 10;
+  display: grid;
+  pointer-events: none;
+}
+.dock > * { pointer-events: auto; }
+.barra-acciones {
   background: var(--tinta);
   color: #fff;
   padding-bottom: env(safe-area-inset-bottom);
 }
 .barra-acciones-interior {
   display: grid;
-  gap: var(--e-3);
+  gap: var(--e-2);
   max-width: var(--ancho-max);
   margin-inline: auto;
   padding: var(--e-3) var(--margen);
 }
-.barra-acciones-resumen { font-weight: 600; overflow-wrap: anywhere; }
+.barra-acciones-cabecera { display: flex; align-items: center; gap: var(--e-2) var(--e-3); min-width: 0; }
+.barra-acciones-resumen { flex: 1 1 auto; min-width: 0; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+.barra-acciones-total { font-weight: 700; }
+.barra-acciones-quitar { flex: none; padding-inline: var(--e-2); }
+.barra-acciones-controles { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2); }
 .barra-acciones-botones { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2); }
+.barra-acciones [aria-expanded="true"] { box-shadow: inset 0 0 0 2px #fff; }
+/* Celular: modelos y colores en una segunda línea; las seis acciones solo con «Cambiar estado». */
+@media (max-width: 767px) {
+  .barra-acciones-detalle { display: block; color: rgb(255 255 255 / 0.78); font-size: 0.875rem; }
+  .barra-acciones-sep { display: none; }
+  .barra-acciones:not([data-panel="acciones"]) .barra-acciones-botones { display: none; }
+  .barra-acciones-botones { padding-top: var(--e-2); border-top: 1px solid rgb(255 255 255 / 0.2); }
+  .barra-acciones-botones .boton { min-height: 3rem; }
+}
+/* «Ver selección»: modelo · color (código) y cada talla con su estado; lo demás en un plegable. */
+.seleccion-detalle {
+  max-height: min(50dvh, 26rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: var(--e-3);
+  border-radius: var(--r-control);
+  background: var(--superficie);
+  color: var(--tinta);
+}
+.seleccion-detalle-nota { margin-bottom: var(--e-2); font-size: 0.875rem; color: var(--tinta-2); }
+.seleccion-grupos { display: grid; gap: var(--e-3); }
+.seleccion-grupo { display: grid; gap: var(--e-1); }
+.seleccion-grupo + .seleccion-grupo { padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+.seleccion-grupo-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0 var(--e-2); }
+.seleccion-grupo-nombre { min-width: 0; overflow-wrap: anywhere; }
+.seleccion-grupo-nombre .codigo { color: var(--tinta-2); }
+.barra-acciones .seleccion-detalle .boton-texto { color: var(--tinta); }
+.barra-acciones .seleccion-detalle .boton-texto:hover:not(:disabled) { background: var(--papel-2); }
+.barra-acciones .seleccion-detalle :focus-visible { outline-color: var(--foco); }
+.detalle-seleccion { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); }
+.detalle-talla { min-width: 0; }
+.detalle-talla:has(> [open]) { flex-basis: 100%; }
+.detalle-talla-resumen {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--e-2);
+  min-height: 2.75rem;
+  padding: 0 var(--e-3);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--r-control);
+  cursor: pointer;
+  list-style: none;
+  font-size: 0.9375rem;
+}
+.detalle-talla-resumen::-webkit-details-marker { display: none; }
+.detalle-talla-resumen span { color: var(--tinta-2); }
+.detalle-talla-resumen::after { content: "+"; font-weight: 700; color: var(--tinta-2); }
+.detalle-talla-plegable[open] > .detalle-talla-resumen::after { content: "\2212"; }
+.detalle-talla-datos { display: grid; gap: 2px; margin: var(--e-2) 0 var(--e-1); padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); font-size: 0.875rem; color: var(--tinta-2); }
 .barra-acciones .boton-principal { background: var(--cobalto); }
 .barra-acciones .boton-principal:hover:not(:disabled) { background: var(--cobalto-oscuro); }
 .barra-acciones .boton-secundario { background: transparent; border-color: rgb(255 255 255 / 0.4); color: #fff; }
@@ -479,20 +578,41 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
 .barra-acciones .boton-texto { color: #fff; }
 .barra-acciones .boton-texto:hover:not(:disabled) { background: rgb(255 255 255 / 0.1); }
 .barra-acciones :focus-visible { outline-color: #fff; }
+/* Escritorio: resumen en una línea con «Ver selección» y «Quitar selección»; las seis acciones a la
+   vista en la fila de abajo («Cambiar estado» no hace falta). */
 @media (min-width: 768px) {
-  body.con-seleccion .tablero { padding-bottom: 9rem; }
-  .barra-acciones-botones { display: flex; flex-wrap: wrap; }
+  .barra-acciones-interior { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--e-4); }
+  .barra-acciones-cabecera { grid-column: 1; grid-row: 1; }
+  .barra-acciones-controles { grid-column: 2; grid-row: 1; display: flex; }
+  #boton-cambiar-estado { display: none; }
+  .barra-acciones-botones { grid-column: 1 / -1; display: flex; flex-wrap: wrap; }
+  .seleccion-detalle { grid-column: 1 / -1; }
 }
 
-/* Resultado de la última acción */
+/* Resultado de la última acción. Etapa 19: fijo abajo, encima de la barra (si la hay), para leerlo
+   sin subir la página; si es largo se desplaza por dentro. */
 .resultado-accion {
   display: grid;
   gap: var(--e-2);
   justify-items: start;
-  padding: var(--e-4) var(--e-5);
+  width: min(calc(100% - 2 * var(--margen)), 48rem);
+  max-height: min(40dvh, 22rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0 auto var(--e-2);
+  padding: var(--e-3) var(--e-4);
+  border: 1px solid var(--linea-fuerte);
   border-radius: var(--r-superficie);
   background: var(--superficie);
+  box-shadow: 0 12px 32px -12px rgb(20 20 20 / 0.35);
 }
+.dock:not(.con-barra) .resultado-accion { margin-bottom: max(var(--e-3), env(safe-area-inset-bottom)); }
+.resultado-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--e-2) var(--e-3); width: 100%; }
+.resultado-cabecera h2 { padding-top: var(--e-2); }
+.resultado-cerrar { flex: none; margin: 0 calc(-1 * var(--e-2)) 0 0; }
+.resultado-detalle summary { min-height: 2.75rem; display: flex; align-items: center; cursor: pointer; font-weight: 600; font-size: 0.9375rem; }
+.resultado-detalle[open] summary { min-height: 2rem; }
+.resultado-accion .resultado-nota { font-weight: 600; color: var(--tinta); }
 .resultado-accion.es-ok { background: var(--cobalto-suave); }
 .resultado-accion.es-aviso { background: #fff4e0; }
 .resultado-accion h2 { font-size: 1.125rem; font-weight: 700; line-height: 1.25; }
@@ -595,7 +715,7 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
    cuerpo se desplaza. Mismos tokens que el resto del panel.
    ===================================================================== */
 .producto-estado.es-retirado { color: var(--tinta-2); }
-.producto-editar { justify-self: start; margin-top: var(--e-2); }
+.producto-editar { justify-self: start; }
 
 .editor {
   width: 100vw;
@@ -854,7 +974,7 @@ body.con-seleccion .tablero { padding-bottom: 14rem; }
   .filtros .filtro { flex: 1 1 auto; }
   .leyenda { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e-2) var(--e-3); font-size: 0.875rem; }
   /* Lista: separación clara entre tarjetas, colores y tallas. */
-  .productos { gap: var(--e-4); }
+  .productos { gap: var(--e-5); }
   .producto-articulo { padding: var(--e-4); }
   .variantes { gap: var(--e-5); }
   .variante { gap: var(--e-3); padding-top: var(--e-4); }
@@ -1132,15 +1252,156 @@ html.con-dialogo, html.con-dialogo body { overflow: hidden; }
    ===================================================================== */
 .seleccion-herramientas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); margin-block: var(--e-2); }
 .seleccion-ayuda { margin: 0; flex: 1 1 18rem; color: var(--tinta-2); font-size: 0.9375rem; }
-/* La barra crece con 7 acciones: el tablero deja sitio para no tapar la última zapatilla. */
-body.con-seleccion .tablero { padding-bottom: 22rem; }
-@media (min-width: 768px) { body.con-seleccion .tablero { padding-bottom: 11rem; } }
-/* Resumen compacto: en celular, como mucho tres líneas (el detalle completo está en el diálogo). */
-@media (max-width: 767px) {
-  .barra-acciones-resumen { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden; }
-}
+/* Etapa 19: el sitio que deja libre el tablero es el alto medido del dock (ver .tablero). */
 /* Diálogo: qué se modificará, agrupado por modelo y color. */
 .dialogo-alcance { margin: 0; font-weight: 600; }
 .dialogo-grupos { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
 .dialogo-grupo { display: grid; gap: 2px; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); overflow-wrap: anywhere; }
 .dialogo-grupo span { color: var(--tinta-2); font-size: 0.9375rem; }
+
+/* =====================================================================
+   Etapa 19 · Asignar fotos por lote en el importador
+   ===================================================================== */
+.importador-reparto { gap: var(--e-3); }
+/* Campo de archivo oculto medido dentro de su cabecera (no alarga la zona desplazable del diálogo). */
+.importador-reparto-cabecera { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-4); }
+.importador-reparto-cabecera h3 { margin-right: auto; }
+.importador-reparto-ayuda { margin: 0; }
+.importador-reparto-estado { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--cobalto-suave); font-weight: 600; }
+.importador-reparto-estado.es-aviso { background: #fff4e0; color: #5c3b00; }
+.importador-reparto-revision { display: grid; gap: var(--e-3); padding-top: var(--e-3); border-top: 1px solid var(--linea); min-width: 0; }
+.importador-reparto-resumen { margin: 0; font-weight: 600; }
+.importador-reparto-herramientas { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); }
+.importador-reparto-herramientas .campo-ayuda { flex: 1 1 16rem; margin: 0; }
+.importador-reparto-lista { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+@media (min-width: 900px) { .importador-reparto-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.importador-reparto-item {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  gap: var(--e-3);
+  align-items: start;
+  padding: var(--e-2);
+  border: 1px solid var(--linea);
+  border-radius: var(--r-control);
+  background: var(--superficie);
+  min-width: 0;
+}
+.importador-reparto-item.es-error { border-color: var(--error); background: var(--error-suave); }
+.importador-reparto-miniatura { position: relative; display: grid; place-items: center; width: 4.5rem; aspect-ratio: 1; border-radius: var(--r-control); background: var(--papel-2); overflow: hidden; color: var(--tinta-2); font-size: 0.75rem; text-align: center; }
+.importador-reparto-miniatura img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.importador-reparto-posicion { position: absolute; top: 2px; left: 2px; min-width: 1.375rem; padding: 0 4px; border-radius: 4px; background: var(--tinta); color: #fff; font-family: var(--fuente-mono); font-size: 0.75rem; font-weight: 700; line-height: 1.375rem; text-align: center; }
+.importador-reparto-info { display: grid; gap: var(--e-1); min-width: 0; }
+.importador-reparto-info > * { min-width: 0; overflow-wrap: anywhere; }
+.importador-reparto-archivo { margin: 0; font-family: var(--fuente-mono); font-size: 0.8125rem; font-weight: 600; }
+.importador-reparto-estado-item { margin: 0; font-size: 0.875rem; color: var(--tinta-2); }
+.importador-reparto-item.es-error .importador-reparto-estado-item { color: #8e1c1c; font-weight: 600; }
+.importador-reparto-destino { display: grid; gap: 2px; min-width: 0; }
+.importador-reparto-destino-texto { margin: 0; font-size: 0.9375rem; }
+.importador-reparto-cambiar summary { display: inline-flex; align-items: center; min-height: 2.75rem; font-size: 0.875rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.importador-reparto-cambiar summary:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-reparto-opciones { padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); }
+.importador-reparto-opciones legend { font-size: 0.875rem; }
+.importador-reparto-opciones-lista { display: grid; gap: 0; }
+.importador-reparto-opciones .casilla { min-height: 2.75rem; overflow-wrap: anywhere; }
+.importador-reparto-manual { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1); margin: 0; }
+.importador-reparto-botones { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.importador-reparto-botones [aria-disabled="true"] { opacity: 0.45; cursor: not-allowed; }
+.importador-reparto-reemplazar { position: relative; display: inline-flex; align-items: center; cursor: pointer; }
+.importador-reparto-reemplazar:focus-within { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-reparto-avisos { display: grid; gap: var(--e-2); }
+.importador-reparto-aviso { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fff4e0; color: #5c3b00; font-weight: 600; }
+.importador-reparto-aviso.es-error { background: var(--error-suave); color: #8e1c1c; }
+.importador-reparto-aviso p { margin: 0; }
+.importador-reparto-destinos { margin: var(--e-1) 0 0; padding-left: 1.25em; font-weight: 400; }
+.importador-reparto-acciones { display: flex; flex-wrap: wrap; gap: var(--e-2); padding-top: var(--e-3); border-top: 1px solid var(--linea); }
+.importador-reparto-acciones [aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.importador-foto-origen { color: var(--tinta-2); }
+@media (max-width: 479px) {
+  .importador-reparto-cabecera .boton, .importador-reparto-acciones .boton { width: 100%; }
+  .importador-reparto-botones .boton { flex: 1 1 auto; }
+}
+
+/* =====================================================================
+   Etapa 19 · Ajustes: versiones por público, precios candidatos y orden de la ventana
+   ===================================================================== */
+/* Mismo modelo para otro público: información, no un problema. Falta el público: pendiente. */
+.importador-coincidencia.es-version { background: var(--cobalto-suave); color: var(--tinta); }
+.importador-coincidencia.es-version .campo-ayuda { color: var(--tinta-2); font-weight: 400; }
+.importador-coincidencia.es-pendiente { background: var(--papel); color: var(--tinta); box-shadow: inset 4px 0 0 #b26a00; }
+/* Precios del mensaje: se elige el del proveedor. */
+.importador-precios { padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); }
+.importador-precios.es-revisar { box-shadow: inset 0 0 0 1px #b26a00; background: #fffaf0; }
+.importador-precios .casilla { min-height: 2.75rem; font-family: var(--fuente-mono); }
+/* Ajustes para varias fichas: primer bloque, compacto mientras está plegado. */
+.importador .editor-cuerpo > details.importador-ajustes:not([open]) { padding-block: var(--e-2); }
+/* Fichas que recibirán los ajustes: una casilla por ficha, independiente de «Incluir en el guardado». */
+.importador-destinos-cabecera { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); }
+.importador-destinos-lista { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
+@media (min-width: 900px) { .importador-destinos-lista { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--e-4); } }
+.importador-destinos-lista .casilla { min-height: 2.75rem; align-items: center; overflow-wrap: anywhere; }
+.importador-destinos-lista input:disabled + span { color: var(--tinta-2); }
+.importador-destinos-aviso { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fff4e0; color: #5c3b00; font-weight: 600; }
+
+/* =====================================================================
+   Etapa 19 · Menú «Seleccionar tallas» por modelo
+   Se despliega bajo su botón, dentro de la tarjeta; dice de qué modelo es y cuántas tallas tiene
+   cada opción («Ninguna» si no hay).
+   ===================================================================== */
+.menu-tallas { position: relative; }
+.menu-tallas-panel {
+  position: absolute;
+  top: calc(100% + var(--e-1));
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: var(--e-2);
+  width: min(21rem, calc(100vw - 2 * var(--margen) - 2 * var(--e-4)));
+  padding: var(--e-3);
+  border: 1px solid var(--linea-fuerte);
+  border-radius: var(--r-superficie);
+  background: var(--superficie);
+  box-shadow: 0 16px 36px -14px rgb(20 20 20 / 0.4);
+}
+.menu-tallas-titulo { font-size: 0.9375rem; line-height: 1.3; overflow-wrap: anywhere; }
+.menu-tallas-titulo .codigo { color: var(--tinta-2); white-space: nowrap; }
+.menu-tallas-boton { -webkit-tap-highlight-color: transparent; }
+.menu-tallas-boton[aria-expanded="true"] { background: var(--papel-2); border-color: var(--tinta); }
+.menu-tallas-lista { display: grid; gap: 2px; }
+.menu-tallas-opcion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--e-3);
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0 var(--e-3);
+  border: 0;
+  border-radius: var(--r-control);
+  background: transparent;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-tallas-opcion:hover, .menu-tallas-opcion:focus-visible { background: var(--papel-2); }
+.menu-tallas-opcion:focus-visible { outline: 2px solid var(--foco); outline-offset: -2px; }
+.menu-tallas-cuantas {
+  flex: none;
+  min-width: 2rem;
+  padding: 0 var(--e-2);
+  border-radius: 999px;
+  background: var(--papel-2);
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.menu-tallas-opcion[aria-disabled="true"] { color: var(--tinta-2); cursor: default; }
+.menu-tallas-opcion[aria-disabled="true"] .menu-tallas-cuantas { background: transparent; font-weight: 500; font-style: italic; }
+.menu-tallas-nota:empty { display: none; }
+.menu-tallas-nota { font-size: 0.875rem; color: var(--tinta-2); }
+/* Celular: «Seleccionar tallas» ocupa el resto de la fila, junto a «Editar». */
+@media (max-width: 767px) {
+  .menu-tallas { flex: 1 1 auto; }
+  .menu-tallas-boton { width: 100%; }
+  .menu-tallas-panel { left: auto; right: 0; }
+}

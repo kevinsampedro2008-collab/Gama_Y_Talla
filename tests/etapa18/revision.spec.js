@@ -127,12 +127,13 @@ test('importador: el mensaje primero, luego fotos, datos y ajustes; añadir enfo
   });
   expect(orden).toBe(true);
   await expect(color(f1, 0).locator('.importador-fotos legend')).toHaveText('Fotos de esta publicación');
-  // Los ajustes por lote, plegados y debajo de las publicaciones.
+  // Los ajustes por lote, plegados. Etapa 19 (pedido del usuario): al principio, antes de las fotos por
+  // lote y de las publicaciones (antes iban debajo de las publicaciones).
   const ajustes = importador(page).locator('#imp-ajustes');
   await expect(ajustes).not.toHaveAttribute('open', '');
-  await expect(ajustes.getByRole('button', { name: 'Aplicar todos los ajustes' })).toBeHidden();
-  const ajustesDespues = await page.evaluate(() => document.querySelector('#imp-fichas').compareDocumentPosition(document.querySelector('#imp-ajustes')) & Node.DOCUMENT_POSITION_FOLLOWING);
-  expect(ajustesDespues).toBeTruthy();
+  await expect(ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ })).toBeHidden();
+  const ajustesAntes = await page.evaluate(() => document.querySelector('#imp-ajustes').compareDocumentPosition(document.querySelector('#imp-fichas')) & Node.DOCUMENT_POSITION_FOLLOWING);
+  expect(ajustesAntes).toBeTruthy();
 
   // Publicación 1 con dos fotos; lo dudoso queda «Revisar».
   await area1.fill('New Balance REV IMP P18\nBlanco\nUnisex $200.000\nTalla 37');
@@ -176,7 +177,7 @@ test('importador: el mensaje primero, luego fotos, datos y ajustes; añadir enfo
   await ajustes.getByLabel('Categoría', { exact: true }).fill('Urbanas');
   await ajustes.getByRole('radio', { name: 'Mujer' }).check();
   await ajustes.getByLabel('Sumar al precio del proveedor (COP)').fill('40000');
-  await ajustes.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(c1.getByLabel(/^Precio de venta/)).toHaveValue('240000');
   await expect(f1.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('URBANAS');
 
@@ -184,7 +185,8 @@ test('importador: el mensaje primero, luego fotos, datos y ajustes; añadir enfo
   const cuerpo = importador(page).locator('.editor-cuerpo');
   await cuerpo.evaluate((n) => { n.scrollTop = n.scrollHeight; });
   const final = await page.evaluate(() => {
-    const ultimo = document.querySelector('#imp-ajustes').getBoundingClientRect();
+    // Etapa 19: el último bloque es «Añadir otra publicación» (los ajustes pasaron al principio).
+    const ultimo = document.querySelector('#importador .importador-agregar').getBoundingClientRect();
     const pie = document.querySelector('#importador .editor-pie').getBoundingClientRect();
     return { hueco: pie.top - ultimo.bottom, cuerpoFinal: document.querySelector('#importador .editor-cuerpo').getBoundingClientRect().bottom, pieArriba: pie.top };
   });

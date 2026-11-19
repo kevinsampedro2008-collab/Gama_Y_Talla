@@ -80,6 +80,9 @@ test.beforeEach(async ({ page }) => {
   await ingresar(page, admin);
   await expect(page.locator('#tablero')).not.toHaveAttribute('aria-busy', 'true');
   await page.getByLabel('Buscar por código interno, referencia, marca o modelo').fill('SEL');
+  // Etapa 19: la búsqueda se aplica 120 ms después; si el catálogo local solo tiene estos dos modelos,
+  // «2 tarjetas» se cumple antes de ese repintado. Se espera la línea que pinta la propia búsqueda.
+  await expect(page.locator('#tablero-estado')).toContainText(/^2 de \d+ zapatillas a la vista/);
   await expect(page.locator('#lista-productos > li')).toHaveCount(2);
 });
 
@@ -120,8 +123,10 @@ test('seleccionar y quitar tallas de varios modelos y colores; misma numeración
   await expect(talla(page, 'beige', '40')).toHaveAttribute('aria-pressed', 'false');
   await expect(talla(page, 'negro', '40')).toHaveAttribute('aria-pressed', 'true');
   await expect(resumen(page)).toContainText('4 tallas seleccionadas');
-  // Cada color con tallas elegidas muestra su detalle.
-  await expect(page.locator('.detalle-seleccion')).toHaveCount(3);
+  // Cada color con tallas elegidas muestra su detalle (etapa 19: dentro de «Ver selección»).
+  await barra(page).getByRole('button', { name: 'Ver selección' }).click();
+  await expect(page.locator('#seleccion-detalle .detalle-seleccion')).toHaveCount(3);
+  await barra(page).getByRole('button', { name: 'Ver selección' }).click();
   await page.setViewportSize({ width: 1440, height: 900 });
   await talla(page, 'beige', '42').scrollIntoViewIfNeeded();
   await capturar(page, browserName, `seleccion-entre-modelos-${browserName}-1440.png`);

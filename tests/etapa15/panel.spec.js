@@ -173,8 +173,9 @@ test('administrador: presentación y búsqueda con datos ficticios', async ({ pa
   const tallas = primero.locator('.variante').first().locator('.talla');
   await expect(tallas).toHaveText(['40 1/3, por revisar', '40,5, disponible', '41, disponible', '42, agotada', '43, no visible en la tienda']);
   await expect(primero.locator('.variante').nth(1).locator('.talla')).toHaveText(['40, no visible en la tienda']);
-  await expect(primero.locator('img')).toHaveJSProperty('complete', true);
-  expect(await primero.locator('img').evaluate((i) => i.naturalWidth)).toBeGreaterThan(0);
+  // Etapa 19: además de la portada, cada color muestra su foto; aquí se comprueba la portada.
+  await expect(primero.locator('.producto-foto img')).toHaveJSProperty('complete', true);
+  expect(await primero.locator('.producto-foto img').evaluate((i) => i.naturalWidth)).toBeGreaterThan(0);
 
   const segundo = lista.filter({ hasText: p2.codigo_interno });
   await expect(segundo).toContainText('Precio por confirmar');

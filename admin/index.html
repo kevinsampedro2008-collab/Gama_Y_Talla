@@ -144,9 +144,6 @@
         </div>
       </div>
 
-      <!-- Resultado de la última acción de disponibilidad: se conserva tras recargar los datos. -->
-      <div class="resultado-accion" id="resultado-accion" role="status" aria-live="polite" tabindex="-1" hidden></div>
-
       <section class="historial" id="historial" aria-labelledby="historial-titulo" hidden>
         <div class="historial-cabecera">
           <h2 id="historial-titulo">Historial de cambios</h2>
@@ -195,18 +192,33 @@
       <ul class="productos" id="lista-productos" aria-label="Zapatillas del catálogo"></ul>
     </main>
 
-    <!-- Acciones sobre las tallas seleccionadas (etapa 18: de uno o varios modelos y colores). -->
-    <div class="barra-acciones" id="barra-acciones" role="region" aria-label="Acciones de disponibilidad" hidden>
-      <div class="barra-acciones-interior">
-        <p class="barra-acciones-resumen" id="seleccion-resumen"></p>
-        <div class="barra-acciones-botones">
-          <button class="boton boton-principal boton-compacto" type="button" data-accion="proveedor">Confirmó el proveedor</button>
-          <button class="boton boton-secundario boton-compacto" type="button" data-accion="publicacion">Nueva publicación</button>
-          <button class="boton boton-secundario boton-compacto" type="button" data-accion="agotada">Marcar agotada</button>
-          <button class="boton boton-secundario boton-compacto" type="button" data-accion="revisar">Dejar por revisar</button>
-          <button class="boton boton-secundario boton-compacto" type="button" data-accion="activar">Activar tallas</button>
-          <button class="boton boton-secundario boton-compacto" type="button" data-accion="desactivar">Desactivar tallas</button>
-          <button class="boton boton-texto boton-compacto" type="button" data-accion="deseleccionar">Quitar selección</button>
+    <!-- Etapa 19: lo fijo abajo. El resultado de la última acción queda a la vista sin subir la página
+         (se conserva tras recargar los datos) y, debajo, la barra de la selección. -->
+    <div class="dock" id="dock-inferior">
+      <div class="resultado-accion" id="resultado-accion" role="status" aria-live="polite" tabindex="-1" hidden></div>
+
+      <!-- Acciones sobre las tallas seleccionadas (etapa 18: de uno o varios modelos y colores).
+           Etapa 19: barra compacta; el detalle está en «Ver selección» y, en celular, las seis
+           acciones aparecen al pulsar «Cambiar estado». -->
+      <div class="barra-acciones" id="barra-acciones" role="region" aria-label="Acciones de disponibilidad" data-panel="" hidden>
+        <div class="barra-acciones-interior">
+          <div class="barra-acciones-cabecera">
+            <p class="barra-acciones-resumen" id="seleccion-resumen"></p>
+            <button class="boton boton-texto boton-compacto barra-acciones-quitar" type="button" data-accion="deseleccionar">Quitar selección</button>
+          </div>
+          <div class="barra-acciones-controles">
+            <button class="boton boton-secundario boton-compacto" id="boton-ver-seleccion" type="button" data-accion="ver-seleccion" aria-expanded="false" aria-controls="seleccion-detalle">Ver selección</button>
+            <button class="boton boton-principal boton-compacto" id="boton-cambiar-estado" type="button" data-accion="cambiar-estado" aria-expanded="false" aria-controls="barra-acciones-botones">Cambiar estado</button>
+          </div>
+          <div class="barra-acciones-botones" id="barra-acciones-botones" role="group" aria-label="Cambiar el estado de las tallas seleccionadas">
+            <button class="boton boton-principal boton-compacto" type="button" data-accion="proveedor">Confirmó el proveedor</button>
+            <button class="boton boton-secundario boton-compacto" type="button" data-accion="publicacion">Nueva publicación</button>
+            <button class="boton boton-secundario boton-compacto" type="button" data-accion="agotada">Marcar agotada</button>
+            <button class="boton boton-secundario boton-compacto" type="button" data-accion="revisar">Dejar por revisar</button>
+            <button class="boton boton-secundario boton-compacto" type="button" data-accion="activar">Activar tallas</button>
+            <button class="boton boton-secundario boton-compacto" type="button" data-accion="desactivar">Desactivar tallas</button>
+          </div>
+          <div class="seleccion-detalle" id="seleccion-detalle" role="region" aria-label="Tallas seleccionadas por modelo y color" hidden></div>
         </div>
       </div>
     </div>

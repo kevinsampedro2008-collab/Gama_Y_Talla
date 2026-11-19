@@ -103,7 +103,7 @@ async function pegar(colorLoc, textoPublicacion) {
 async function abrirAjustes(page) {
   const ajustes = importador(page).locator('#imp-ajustes');
   if (!(await ajustes.evaluate((d) => d.open))) await ajustes.locator('summary').click();
-  await expect(ajustes.getByRole('button', { name: 'Aplicar todos los ajustes' })).toBeVisible();
+  await expect(ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ })).toBeVisible();
 }
 const radioPublico = (f, nombre) => f.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: nombre, exact: true });
 // Marca y Categoría tienen sugerencias (rol combobox); Modelo es un cuadro de texto: se buscan por etiqueta.
@@ -223,13 +223,13 @@ test('agrupa colores, fija el precio de venta, guarda oculto y la tienda mezcla 
   await importador(page).getByLabel('Categoría', { exact: true }).fill('Urbanas');
   await importador(page).locator('.importador-ajustes').getByRole('radio', { name: 'Mujer' }).check();
   await importador(page).getByLabel('Sumar al precio del proveedor (COP)').fill('40000');
-  await importador(page).getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(color(f, 0).getByLabel(/^Precio de venta/)).toHaveValue('240000');
   await expect(color(f, 2).getByLabel(/^Precio de venta/)).toHaveValue('250000');
   await color(f, 1).getByLabel(/^Precio de venta/).fill('245000');
   await expect(color(f, 1).locator('#' + await color(f, 1).getByLabel(/^Precio de venta/).getAttribute('aria-describedby'))).toContainText('escrito a mano');
   // Volver a aplicar el valor del lote no pisa el precio escrito a mano.
-  await importador(page).getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(importador(page).locator('#importador-resultado')).toContainText('en 2 colores. 1 precio escrito a mano se conservó.');
   await expect(color(f, 1).getByLabel(/^Precio de venta/)).toHaveValue('245000');
   await expect(campoFicha(f, 'Categoría')).toHaveValue('URBANAS');
@@ -421,7 +421,7 @@ test('fallo parcial: una ficha rechazada y otra con la respuesta perdida; se com
   await abrirAjustes(page);
   await importador(page).getByLabel('Categoría', { exact: true }).fill('Running');
   await importador(page).getByLabel('Sumar al precio del proveedor (COP)').fill('30000');
-  await importador(page).getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
 
   // Lote B: el servidor lo rechaza. 1080: la petición LLEGA al servidor pero la respuesta se pierde.
   let rechazos = 0; let perdidas = 0;

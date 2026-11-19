@@ -74,8 +74,10 @@ test('selección: por UUID, de varios colores y modelos; se conserva al buscar y
   await expect(talla(page, 'negro', '40')).toHaveAttribute('aria-pressed', 'true');
   await expect(talla(page, 'negro', '40')).toBeFocused();
   await expect(page.locator('#seleccion-resumen')).toContainText('2 tallas seleccionadas');
-  await expect(page.locator('#seleccion-resumen')).toContainText('38, 40');
-  await expect(page.locator('.detalle-seleccion li')).toHaveCount(2);
+  // Etapa 19: el detalle por modelo, color y talla está en «Ver selección».
+  await barra(page).getByRole('button', { name: 'Ver selección' }).click();
+  await expect(page.locator('#seleccion-detalle .detalle-talla')).toHaveText([/^Talla 38/, /^Talla 40/]);
+  await barra(page).getByRole('button', { name: 'Ver selección' }).click();
 
   // Etapa 18: otro color se SUMA a la selección (la misma numeración en otro color es otra talla).
   await talla(page, 'verde', '40').click();
@@ -626,6 +628,8 @@ test('disposición y capturas: selección y diálogo en los cinco anchos', async
     expect(d.desborde, `sin desborde horizontal a ${ancho}px`).toBe(0);
     expect(d.pequenos, `controles de al menos 40px a ${ancho}px`).toEqual([]);
     await page.screenshot({ path: path.join(CAPTURAS, `${test.info().project.name}-${ancho}-seleccion.png`) });
+    // Etapa 19: en celular las seis acciones están detrás de «Cambiar estado».
+    if (ancho < 768) await accion(page, 'Cambiar estado').click();
     await accion(page, 'Nueva publicación').click();
     await expect(dialogo(page)).toBeVisible();
     await expect(dialogo(page).getByLabel('Fecha de la publicación')).toBeFocused();

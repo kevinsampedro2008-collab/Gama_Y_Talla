@@ -248,28 +248,31 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   await expect(bloque.getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: 'Sin cambiar' })).toBeChecked();
   await expect(bloque.getByRole('group', { name: /Tabla de la guía de tallas/ }).getByRole('radio', { name: 'Sin cambiar' })).toBeChecked();
   // Nada configurado: indicación clara, nada cambia.
-  await bloque.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await bloque.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(bloque.locator('#imp-ajustes-estado')).toContainText('Elige al menos un ajuste');
   // Valor inválido: error junto a su control y ninguna ficha cambia.
   await bloque.getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: 'Unisex' }).check();
   await bloque.getByLabel('Sumar al precio del proveedor (COP)').fill('40.000,5');
-  await bloque.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await bloque.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(bloque.locator('#imp-margen-error')).toContainText('pesos enteros');
   await expect(bloque.getByLabel('Sumar al precio del proveedor (COP)')).toHaveAttribute('aria-invalid', 'true');
   await expect(bloque.getByLabel('Sumar al precio del proveedor (COP)')).toBeFocused();
   await expect(a.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: 'Hombre', exact: true })).toBeChecked();
   // Sin fichas marcadas: indicación clara.
   await bloque.getByLabel('Sumar al precio del proveedor (COP)').fill('40000');
-  await bloque.getByRole('button', { name: 'Desmarcar todas' }).click();
-  await bloque.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  // Etapa 19: los destinos de los ajustes se eligen en el bloque, aparte de «Incluir en el guardado».
+  await bloque.getByRole('button', { name: 'Quitar selección' }).click();
+  await bloque.getByRole('button', { name: 'Aplicar ajustes a 0 fichas' }).click();
   await expect(bloque.locator('#imp-ajustes-estado')).toContainText('Marca al menos una ficha');
   await expect(a.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: 'Hombre', exact: true })).toBeChecked();
-  await a.getByLabel('Incluir en el guardado').check();
-  await b.getByLabel('Incluir en el guardado').check();
+  // Destinos: A y B (C no recibe ajustes; además está fuera del guardado).
+  await bloque.getByRole('checkbox', { name: /^Ficha 1 · / }).click();
+  await bloque.getByRole('checkbox', { name: /^Ficha 2 · / }).click();
+  await expect(bloque.getByRole('button', { name: 'Aplicar ajustes a 2 fichas' })).toBeVisible();
 
   // Público Unisex, guía «Sin indicar» (elegida expresamente), +40.000; categoría vacía = se conserva.
   await bloque.getByRole('group', { name: /Tabla de la guía de tallas/ }).getByRole('radio', { name: /^Sin indicar/ }).check();
-  await bloque.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await bloque.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   const estado = bloque.locator('#imp-ajustes-estado');
   await expect(estado).toContainText('2 fichas actualizadas: público Unisex, guía de tallas «Sin indicar», precio de venta = proveedor + $');
   await expect(estado).toContainText('en 1 color');
@@ -292,7 +295,7 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   await bloque.getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: 'Sin cambiar' }).check();
   await bloque.getByRole('group', { name: /Tabla de la guía de tallas/ }).getByRole('radio', { name: 'Sin cambiar' }).check();
   await bloque.getByLabel('Categoría', { exact: true }).fill('Urbanas');
-  await bloque.getByRole('button', { name: 'Aplicar todos los ajustes' }).click();
+  await bloque.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(color(a, 0).getByLabel(/^Precio de venta/)).toHaveValue('240000');
   for (const f of [a, b]) {
     await expect(f.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('URBANAS');

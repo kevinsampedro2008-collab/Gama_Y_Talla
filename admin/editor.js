@@ -1948,8 +1948,10 @@
     dialogo.addEventListener("input", alEscribir);
     dialogo.addEventListener("change", alCambiar);
     dialogo.addEventListener("keydown", alTeclear);
-    // Escape no cierra sin preguntar: se trata como «Cancelar».
-    dialogo.addEventListener("cancel", (e) => { e.preventDefault(); intentarCerrar(); });
+    // Escape no cierra sin preguntar: se trata como «Cancelar». Etapa 19: solo el «cancel» del propio
+    // diálogo. El de un selector de archivos cerrado sin elegir fotos también burbujea hasta aquí y no
+    // es un intento de salir: se ignora (el editor sigue igual, con sus campos, fotos, posición y foco).
+    dialogo.addEventListener("cancel", (e) => { if (e.target !== dialogo) return; e.preventDefault(); intentarCerrar(); });
     document.addEventListener("click", (e) => {
       const b = e.target.closest("#editor-borrador [data-editor]");
       if (!b) return;
