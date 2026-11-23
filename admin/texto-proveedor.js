@@ -254,6 +254,9 @@
   const TODAS_LAS_TALLAS = /(?<!\p{L})(?:(?:y|e|en|con)\s+)?(?:todas\s+(?:las\s+)?(?:tallas|numeraciones)|toda\s+la\s+(?:numeraci[oó]n|talla)|tallas\s+completas|numeraci[oó]n\s+completa)(?:\s+disponibles?)?(?!\p{L})/giu;
 
   const RELLENO = /\b(?:precio|valor|solo|desde|cop|pesos|par)\b/gi;
+  /* Etapa 21: lo que acompaña a un precio cuando es su CONDICIÓN («DISPONIBLE POR CAJA $85.000», «X MAYOR»):
+     no es modelo ni color. El importe se sigue leyendo (con varios, se elige uno a mano). */
+  const CONDICION_PRECIO = /^(?:disponible\s+)?(?:precio\s+)?(?:(?:al\s+)?por|x)\s+(?:caja|cajas|mayor|docena|docenas|paquete|lote|unidad|unidades|par|pares)$|^(?:mayorista|al mayor)$/;
   // Conectores y signos sueltos que quedan en los bordes tras quitar los datos («PRINCENSA Y», «- 603»).
   const BORDES = /^(?:(?:y|para|con)\s+|[\s.\-–—])+|(?:\s+(?:y|e|o|de|para|en|con)|[\s.\-–—])+$/giu;
 
@@ -552,9 +555,11 @@
       if (etiquetaColor) { color = color || etiquetaColor[1].trim(); continue; }
 
       // Precios: todos los de la línea. Si el mensaje trae varios distintos, no se elige ninguno solo.
+      let conPrecio = false;
       for (const p of leerPrecios(linea)) {
         if (!precios.includes(p.valor)) precios.push(p.valor);
         linea = linea.replace(p.texto, " ");
+        conPrecio = true;
       }
       // «Numeración dama/hombre» y «todas las tallas» (con su conector): la regla decide las tallas al final.
       if (comp.numeracionPublico) {
@@ -599,6 +604,7 @@
       if (!restante || clave(restante).length < 2) continue;
       if (PROMO.test(clave(restante))) { omitido.promocional += 1; continue; }
       if (FRASE_CONTACTO.test(restante) && !buscarMarca(restante, listaMarcas)) { omitido.contacto += 1; continue; }
+      if (conPrecio && CONDICION_PRECIO.test(clave(restante))) continue;
       if (soloColores(restante)) { color = color || restante; continue; }
       candidatas.push(restante);
     }
@@ -854,6 +860,8 @@
     REGLAS_PROVEEDOR, tallasPorRegla, notaRegla, NOTA_SIN_PUBLICO,
     // Etapa 20: perfiles de proveedor y utilidades del pegado de varias publicaciones.
     PERFIL_GENERAL, LIMITES_PERFIL, normalizarPerfil, perfilInicial, esGeneral, rangoPara, publicoValido,
-    contieneExpresion, marcaAlInicio, tienePrecio, esContacto, limpiarLinea
+    contieneExpresion, marcaAlInicio, tienePrecio, esContacto, limpiarLinea,
+    // Etapa 21: tallas EU que admite el catálogo (para explicar incompatibilidades, p. ej. calzado infantil).
+    LIMITES_TALLA: Object.freeze({ min: TALLA_MIN, max: TALLA_MAX })
   });
 })();

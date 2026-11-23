@@ -30,6 +30,9 @@
   const VERSION = 1;
   const BYTES_ORIGINAL_MAX = 15 * 1024 * 1024; // el mismo límite de entrada de fotos.js
   const BYTES_FINAL_MAX = 1024 * 1024;          // el bucket admite 1 MiB
+  // Etapa 21: imagen de TRABAJO extraída de un catálogo PDF (clase «pdf»). No es una foto final: puede ser
+  // WebP o JPEG y pesar más de 1 MiB; al añadirla al lote, fotos.js la prepara como cualquier original.
+  const BYTES_PDF_MAX = 15 * 1024 * 1024;
   const RESPALDO_MAX = 400 * 1024 * 1024;       // archivo de respaldo
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -255,15 +258,17 @@
     const fotos = [];
     const vistas = new Set();
     for (const [i, f] of datos.fotos.entries()) {
-      if (!f || !UUID.test(String(f.ref)) || vistas.has(f.ref) || !["final", "original"].includes(f.clase) || typeof f.base64 !== "string") throw new ErrorRespaldo(`La foto ${i + 1} del respaldo no es válida.`);
+      if (!f || !UUID.test(String(f.ref)) || vistas.has(f.ref) || !["final", "original", "pdf"].includes(f.clase) || typeof f.base64 !== "string") throw new ErrorRespaldo(`La foto ${i + 1} del respaldo no es válida.`);
       vistas.add(f.ref);
       let bytes;
       try { bytes = deBase64(f.base64); } catch { throw new ErrorRespaldo(`La foto ${i + 1} del respaldo está dañada.`); }
-      if (!bytes.length || bytes.length > (f.clase === "final" ? BYTES_FINAL_MAX : BYTES_ORIGINAL_MAX)) throw new ErrorRespaldo(`La foto ${i + 1} del respaldo está vacía o es demasiado grande.`);
+      const maximo = { final: BYTES_FINAL_MAX, original: BYTES_ORIGINAL_MAX, pdf: BYTES_PDF_MAX }[f.clase];
+      if (!bytes.length || bytes.length > maximo) throw new ErrorRespaldo(`La foto ${i + 1} del respaldo está vacía o es demasiado grande.`);
       const tipo = { webp: "image/webp", jpeg: "image/jpeg", png: "image/png" };
       const blob = new Blob([bytes]);
       const real = firma ? await firma(blob) : "webp";
-      if (!real || (f.clase === "final" && real !== "webp")) throw new ErrorRespaldo(`La foto ${i + 1} del respaldo no es una imagen admitida.`);
+      // Final: solo WebP (lo que se sube). Original: JPEG, PNG o WebP. Imagen del PDF: WebP o JPEG (lo que genera la extracción).
+      if (!real || (f.clase === "final" && real !== "webp") || (f.clase === "pdf" && !["webp", "jpeg"].includes(real))) throw new ErrorRespaldo(`La foto ${i + 1} del respaldo no es una imagen admitida.`);
       fotos.push({ ref: f.ref, clase: f.clase, nombre: String(f.nombre || "").slice(0, 200), blob: new Blob([bytes], { type: tipo[real] }) });
     }
     const numero = (n) => (Number.isInteger(n) && n >= 0 && n < 100000 ? n : 0);
@@ -322,7 +327,7 @@
     disponible, abrirBase, fallo: () => fallo,
     listarPerfiles, guardarPerfil, eliminarPerfil,
     listarBorradores, guardarBorrador, leerBorrador, reclamar, eliminarBorrador, existe, estimar,
-    empaquetar, leerRespaldo, importar, escuchar, avisar,
+    empaquetar, leerRespaldo, importar, escuchar, avisar, BYTES_PDF_MAX,
     ErrorCuota, ErrorConflicto, ErrorRespaldo, FORMATO, VERSION, UUID, esCuota
   });
 })();

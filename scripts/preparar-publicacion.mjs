@@ -51,10 +51,13 @@ const ARCHIVOS = [
   // Etapa 18: lectura de las publicaciones del proveedor e importador por lotes.
   'admin/texto-proveedor.js', 'admin/importador.js',
   // Etapa 20: separar varias publicaciones y borradores/perfiles locales del importador.
-  'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js'
+  'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js',
+  // Etapa 21: lectura de catálogos PDF del proveedor (PDF.js se carga solo al usarla).
+  'admin/catalogo-pdf.js'
 ];
 // Carpetas completas: el SDK del panel y three.js (con Draco), que la escena importa por import map.
-const CARPETAS = ['admin/vendor/supabase-js-2.118.0', 'assets/vendor/three-0.165.0'];
+// Etapa 21: PDF.js fijado (pdf.min.mjs, su worker, licencia y nota de origen).
+const CARPETAS = ['admin/vendor/supabase-js-2.118.0', 'admin/vendor/pdfjs-dist-6.4.299', 'assets/vendor/three-0.165.0'];
 // Recursos versionados por contenido: [origen, plantilla del destino con {h}, referencia a reescribir].
 const VERSIONADOS = [
   ['assets/images/models/optimized/af1-model-high.glb', 'assets/images/models/optimized/af1-model-high.{h}.glb'],
@@ -189,8 +192,16 @@ export function construir({ raiz = RAIZ_REPO, salida, env = process.env } = {}) 
 // archivos versionados de _headers existen y son los únicos «immutable».
 export function verificarPaquete(destino, versionados) {
   const problemas = [];
-  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js', 'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js']
+  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js', 'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js', 'admin/catalogo-pdf.js']
     .filter((f) => fs.existsSync(path.join(destino, f)));
+  // Etapa 21: catalogo-pdf.js carga PDF.js por import() desde su carpeta de vendor: debe estar en el paquete.
+  const lectorPdf = path.join(destino, 'admin/catalogo-pdf.js');
+  if (fs.existsSync(lectorPdf)) {
+    const version = /VERSION_PDFJS = "([0-9.]+)"/.exec(fs.readFileSync(lectorPdf, 'utf8'))?.[1];
+    for (const f of ['pdf.min.mjs', 'pdf.worker.min.mjs']) {
+      if (!version || !fs.existsSync(path.join(destino, `admin/vendor/pdfjs-dist-${version}/${f}`))) problemas.push(`admin/catalogo-pdf.js carga vendor/pdfjs-dist-${version}/${f} y no está en el paquete.`);
+    }
+  }
   // 18: todo <script src> y <link href> local de las dos páginas existe en el paquete (un archivo
   // nuevo que se olvida en la lista de copia rompería el panel sin que nada más lo detecte).
   for (const pagina of ['index.html', 'admin/index.html']) {

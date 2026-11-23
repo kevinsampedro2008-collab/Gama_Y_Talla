@@ -1,4 +1,4 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19 y 20
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19, 20 y 21
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
@@ -319,6 +319,154 @@ en este navegador · hora»** o el error.
 - **Ojo:** los borradores viven solo en este navegador y con este usuario. Borrar los datos del
   navegador (o usar una ventana privada) los elimina: exporta un respaldo para conservarlos o
   llevarlos a otro equipo.
+
+### Importar catálogo PDF (21)
+
+**«Importar catálogo PDF»**, junto a «Pegar varias publicaciones», convierte los catálogos PDF del
+proveedor en fichas del lote. Todo se lee **en este navegador** (`admin/catalogo-pdf.js` con PDF.js):
+revisar documentos no escribe en Supabase ni cambia productos del catálogo. Solo **«Añadir al lote»**
+crea fichas, que se guardan como siempre con «Guardar lote como oculto».
+
+**Documentos y papel.** Se eligen uno o varios PDF y cada uno recibe un papel, corregible:
+- **Descripciones, fotografías y precios de venta sugeridos** («Novedades»): descripción y foto de cada
+  tarjeta, y el precio del recuadro bajo la descripción como **venta sugerida**.
+- **Precios del proveedor** («Precios»): el **coste**, con su condición.
+- **Descripciones y fotografías** (el catálogo sin precios): complementario.
+
+El papel se propone por el **contenido** (tarjetas con importe destacado → venta; solo importes →
+proveedor; sin importes → descripciones). El nombre del archivo solo desempata y el orden de selección no
+cuenta. Cada papel corresponde a un solo documento. Si falta alguno se trabaja con lo que hay y se dice
+qué queda pendiente (coste, venta sugerida o descripciones). El documento principal de la revisión es
+el de venta; sin él, el de descripciones; sin ninguno, el de precios.
+
+**Tarjetas.** Una tarjeta es un recuadro dibujado con **una** foto dentro.
+- **Texto:** el que cae dentro del recuadro; nunca se mezcla con columnas, filas ni productos vecinos.
+  Lo que va sobre la foto («NUEVO») es un adorno.
+- **Fuera de las tarjetas:** la portada (un recuadro con varias fotos), las cabeceras, los números de
+  página y la despedida. Cada documento dice qué páginas no tienen tarjetas y por qué.
+- **Se conserva** la página, la posición, el texto original y el documento de procedencia de cada una.
+- **La foto** es la imagen **original embebida** (sus píxeles, sin la etiqueta de precio ni la página).
+  Se guarda en WebP (o JPEG) de alta calidad y, al añadirla, `fotos.js` la optimiza como cualquier otra.
+- **Sin recuadros:** si la página no los trae, se reconstruye la tarjeta con la foto y el texto de
+  debajo, y se marca para revisar.
+- **PDF escaneado:** si las páginas son imágenes completas sin texto, se explica que no se pueden
+  reconstruir las tarjetas con seguridad.
+
+**Relación entre documentos: por la foto.**
+- **Huellas:** cada foto tiene una huella exacta (SHA-256 de sus píxeles) y otra gris de 16×16. Los
+  identificadores internos del PDF y el orden no cuentan: el cruce funciona aunque cambie el orden de
+  páginas o productos.
+- **Solo la exacta se usa sola:** los mismos píxeles en una única tarjeta del otro documento, y en ninguna
+  otra tarjeta principal. Es lo único que aporta coste, descripción u otros datos sin preguntar. La tarjeta
+  que se usa es la que el resultado señala como `elegida` (la de la huella exacta), nunca «la primera de
+  la lista»: una foto distinta con la misma huella gris puede ir antes, y cambiar el orden de las
+  candidatas no cambia el resultado. Dos tarjetas con la misma foto exacta siguen siendo ambiguas.
+- **La aproximada es una propuesta:** la huella gris también reconoce una foto recodificada, pero dos fotos
+  distintas pueden dar la misma (rojo puro y un verde medio tienen el mismo gris). Una candidata solo por
+  la huella gris queda **«Revisar»**, con las dos fotos lado a lado para compararlas, **«Sí, es la misma»** y
+  **«No corresponde»**. Hasta decidir, de esa tarjeta no se usa nada: ni el coste ni la descripción, tampoco
+  al añadir al lote. La decisión se guarda con la tarjeta (repintar, recargar, borrador y respaldo) y se
+  puede cambiar. Es independiente de la confirmación de fechas distintas.
+- **Varias tarjetas posibles** (la misma foto repetida): queda **«Revisar»** con sus fotos y textos para
+  elegir una o ninguna. Nunca se asigna un precio sin una correspondencia segura.
+- **Sin correspondencia:** se dice, y sus datos quedan pendientes. Las tarjetas de otros documentos sin
+  pareja se listan aparte.
+- **Fechas distintas:** si los documentos son de fechas distintas (leídas de la portada), sus precios no
+  se usan hasta confirmar que son la misma edición.
+
+**Calzado, otros artículos y dudosos.** Se clasifica la **descripción**; los precios se enlazan después.
+Una tarjeta de precios que solo trae un importe nunca se descarta por no decir tallas.
+- **Señales de calzado:** EU, EUR o Euro con numeración, «Tallas» con números, «Numeración», «TODAS LAS
+  TALLAS» y palabras de calzado.
+- **Señales de otros artículos:** camiseta, conjunto, talla única, tallas S/M/L/XL, gafas, reloj, consola…
+- **La marca nunca decide:** una camiseta Nike es ropa y un reloj Boss es un reloj. Tampoco «Euro» sin
+  tallas.
+- **Vistas:** **Calzado**, **Excluidos** (otros artículos, que no se añaden por omisión), **Dudosos**
+  (señales contradictorias o ninguna, varias correspondencias, sin correspondencia, otra fecha, varios
+  importes o incompatibles) y **Todas**. La clasificación se corrige a mano por tarjeta.
+
+En los catálogos reales del 23-11-2026 se leen 78 tarjetas y 78 fotos en cada versión, que se cruzan
+78 a 78 por huella exacta. 57 son de calzado (41 con EU/Euro y 16 con «TODAS LAS TALLAS») y 21 son otros
+artículos.
+
+**Precios: tres datos separados.**
+- **Precio del proveedor** (coste): solo para revisar, nunca se publica ni pasa a descripciones o
+  imágenes. Cada importe conserva su condición. En «PRECIO $95.000 / DISPONIBLE POR CAJA $85.000» se ven
+  los dos, el segundo como condicionado. Ninguno se elige solo (ni el menor): queda «Revisar» y se elige
+  en la ficha, donde cada opción muestra su condición.
+- **Venta sugerida** del PDF, con las notas del documento («Precios sujetos a disponibilidad de tallas»).
+- **Precio de venta elegido**: el único que se guarda en el catálogo. En la revisión se elige:
+  - **Adoptar el sugerido tal cual.** Cuenta como escrito a mano: no se le suma ningún ajuste, y volver
+    a leer el texto, cambiar el perfil, «Aplicar ajustes» o recuperar el borrador no lo cambian.
+  - **Calcularlo después** con «Ajustes para varias fichas» (proveedor + importe). La ficha ofrece
+    «Usar el precio sugerido».
+
+Ejemplos comprobados: Nike Winflo 12 tiene un coste de 95.000 y una venta sugerida de 134.900; Hugo Boss
+de la página 12, de 125.000 y 174.900. Nunca se inventa un importe que el PDF no trae.
+
+**Datos de la ficha.** Se reutilizan el lector y los perfiles de la etapa 20.
+- **Equivalencias explícitas y acotadas en el título:**
+  - Como primera palabra: «AD» = ADIDAS, «NB» = NEW BALANCE, «BOSS» = HUGO BOSS.
+  - En cualquier posición: «HOM», «HOMBRE», «CABALLERO» = Hombre, «DAMA», «MUJER» = Dama y
+    «NIÑ@», «NIÑO», «NIÑA», «INFANTIL», «KIDS» = infantil.
+- **Se retiran del modelo** el prefijo «NUEVO» y el público. El color también, cuando la estructura es
+  clara (MODELO PÚBLICO COLOR, solo con nombres de color). Ante la duda, el texto queda en el modelo.
+- **«HUGO BOSS» sola** deja el modelo **pendiente**: varios modelos distintos se titulan así y nunca se
+  agrupan solos.
+- **Tallas:** las explícitas mandan sobre la regla del perfil («Dama EU 36 AL 40» da 36 a 40, no 36 a 39).
+  «TODAS LAS TALLAS» usa la regla del perfil según el público.
+- **«NUEVO», «DISPONIBLE» y la fecha** no confirman tallas ni renuevan vigencias: las tallas nacen «por
+  revisar», como siempre.
+- **Calzado infantil** (EU 28 a 35): se conserva con toda su información y no se añade por omisión. Se
+  explica que el catálogo actual solo tiene públicos Hombre, Dama y Unisex y tallas EU 30–50. Si se
+  añade, sus tallas 28–35 quedan tal cual y la ficha no se guarda hasta decidir; nunca se convierte en
+  calzado de adulto en silencio.
+- **El lector común** ya no toma la condición de un precio («POR CAJA», «X MAYOR») como modelo. Vale
+  también para WhatsApp.
+
+**Asociaciones** (por tarjeta): **«Otra zapatilla»** (por omisión), **«Otro color de la misma
+zapatilla que la tarjeta N»** (otro color con su foto, tallas y precios) y **«Otra fotografía del mismo
+color que la tarjeta N»** (la foto va a la galería de ese color). Se propone la tarjeta anterior
+incluida. Un destino inexistente, no marcado o circular se explica antes de añadir. Los contadores
+separan tarjetas, fichas, colores y fotografías.
+
+**Añadir al lote.** Solo crea lo marcado y no añadido aún: un segundo clic o un reintento no duplica
+nada. Cada color guarda su procedencia (documentos, página y tarjeta), el texto original y el texto
+preparado para el lector. Después siguen disponibles los ajustes para varias fichas, categorías, fotos,
+círculo o miniatura, correcciones y «Guardar lote como oculto», con sus comprobaciones de guardados
+parciales y respuestas perdidas.
+
+**Borrador y respaldo.** Se guarda todo lo de la importación: los documentos (sin el PDF), las tarjetas,
+las fotos (una sola vez por huella aunque esté en los tres documentos), las elecciones, los precios y las
+asociaciones.
+- **Imágenes de trabajo:** las fotos extraídas del PDF se guardan con una clase propia, «pdf», distinta de
+  las fotos finales. Son WebP o, si el navegador no genera WebP, JPEG, y pueden pesar hasta 15 MB
+  (`BYTES_PDF_MAX` en `borradores.js`).
+- **Al importar un respaldo** se comprueba la firma real de cada imagen y su tamaño. Las fotos finales
+  siguen exigiendo WebP de hasta 1 MiB, y los originales, JPEG, PNG o WebP de hasta 15 MB.
+- **Compatibilidad:** los respaldos anteriores, sin la clase «pdf», se siguen importando igual. Un panel
+  anterior a esta corrección no lee un respaldo que contenga imágenes de clase «pdf». Se recupera tras recargar desde «Continuar» y viaja en «Exportar respaldo». Un PDF ya leído
+se reconoce por su contenido (SHA-256) y no se vuelve a leer. **«Cerrar la importación»** descarta la
+revisión pendiente y conserva las fichas añadidas.
+
+**Avance y cancelación.** Se lee página a página, cediendo el hilo entre páginas, con el avance de la
+tanda a la vista («documento 2 de 3: página 5 de 22»). Ninguna página queda renderizada: se usan su texto,
+sus trazados y la foto embebida, y cada página se libera al terminar. **«Cancelar la lectura»** detiene la
+tanda: lo ya leído se conserva y el documento en curso no se añade.
+
+**Límites:** hasta 3 PDF por importación (uno por papel), de 40 MB y 120 páginas cada uno, 60 imágenes por
+página, 400 tarjetas por documento (y 400 fichas por lote) y fotos de hasta 25 megapíxeles. Esta entrega
+se basa en el formato de los catálogos del proveedor: recuadros, foto JPEG y texto con fuentes estándar.
+
+**Dependencia:** `admin/vendor/pdfjs-dist-6.4.299/` contiene PDF.js 6.4.299 (Apache-2.0) fijado y sin
+modificar: `pdf.min.mjs`, su worker, la licencia y un LEEME con la integridad npm y el SHA-256 de cada
+archivo.
+- **Carga:** se pide con `import()` solo al leer el primer PDF.
+- **Opciones:** sin evaluar código, sin fuentes del sistema, sin descargas extra, e imágenes decodificadas
+  por PDF.js (los mismos píxeles en cualquier navegador).
+- **CSP:** se añadió `worker-src 'self'`.
+- **Build:** el paquete la copia y comprueba que esté.
+- **Sin servicios externos:** ninguna IA ni clave de API.
 
 ## Cómo mostrar cada color (18)
 
@@ -870,3 +1018,34 @@ Para ver el panel con muchos productos se pueden cargar en local los 28 **ejempl
 proyecto remoto. Usan un solo
 proceso (`--workers=1`): el servidor de Python no aguanta conexiones en paralelo. Las capturas se
 guardan en la carpeta temporal del sistema (`gama-talla-15a-capturas`), fuera del repositorio.
+
+Etapa 21: también contra el **entorno aislado** (8770):
+
+```bash
+SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa21 --workers=1
+# Con los PDF reales (no están en el repositorio): carpeta donde están, y capturas fuera del repositorio.
+GT_PDF_REALES=<carpeta> GT_CAPTURAS_REALES=<carpeta de capturas> SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa21/reales.spec.js --workers=1
+```
+
+- **`tests/etapa21/catalogo-pdf.spec.js`** usa catálogos PDF **sintéticos**, generados en
+  `ayudas21.js` con la misma estructura y contenido ficticio:
+  - **Lector:** tarjetas, portada y despedida fuera, papel por contenido, cruce por foto con orden
+    cambiado, foto recodificada (propuesta), ambigua y sin pareja, importes general y por caja, equivalencias del
+    título, clasificación por señales, la condición de un precio en el lector común y PDF escaneado o no
+    válido.
+  - **Importador:** vistas, contadores, infantil, asociaciones, añadir sin duplicar, coste y venta
+    separados, ajuste sin doble margen, releer y guardar como oculto. También el borrador con documentos,
+    fotos y decisiones tras recargar, el PDF repetido, fechas distintas, celular, y avance y cancelación.
+- **`tests/etapa21/correspondencias-respaldo.spec.js`** cubre las correcciones de la revisión:
+  - Dos fotos distintas con la misma huella gris dan una propuesta y nunca una «exacta». Al añadirlas al
+    lote no entra su coste.
+  - La exacta es la elegida en cualquier orden de las candidatas (las seis permutaciones), y en el
+    importador, con el documento de precios en los dos órdenes, el coste, el texto preparado y la
+    procedencia son los de la tarjeta exacta.
+  - Exportar e importar un respaldo con imágenes del PDF en JPEG (forzado sin depender del navegador) y una
+    de más de 1 MiB: vuelven las fotos, los destinos, las decisiones y los precios, y se añaden al lote.
+  - Una foto final en JPEG sigue rechazándose.
+- **`tests/etapa21/reales.spec.js`** solo corre con `GT_PDF_REALES` y no guarda nada. Comprueba 78/78/78
+  tarjetas y fotos, los papeles, el cruce 78 a 78, el calzado (57: 41 + 16), los ejemplos de precios, la
+  caja, el calzado infantil y la Dama 36–40. Con `GT_CAPTURAS_REALES`, además, captura la revisión en el
+  importador.

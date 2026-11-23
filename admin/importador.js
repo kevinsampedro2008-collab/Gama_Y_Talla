@@ -29,6 +29,12 @@
  *  - Antes de cada escritura en Supabase (subir fotos, fn_admin_guardar_producto) se guarda el borrador
  *    con los nombres de archivo y la operación: tras una recarga se comprueba (solo lectura) qué se
  *    completó antes de repetir nada.
+ *
+ * Etapa 21
+ *  - «Importar catálogo PDF» (catalogo-pdf.js): documentos con papel (venta sugerida, precios del
+ *    proveedor, descripciones), revisión por tarjeta y «Añadir al lote». Coste, condiciones y venta
+ *    sugerida quedan separados; el precio de venta elegido es el único que se guarda (el coste nunca se
+ *    publica). Adoptar el sugerido cuenta como escrito a mano: ningún ajuste ni relectura lo cambia.
  */
 (() => {
   "use strict";
@@ -116,7 +122,10 @@
       precios: [], notaPrecios: "",
       // Importe sumado al precio del proveedor por «Aplicar ajustes» A ESTE COLOR (null = nunca se le aplicó).
       // Es del color, no del lote: un color de una ficha fuera de los destinos no lo hereda nunca.
-      margenAplicado: null
+      margenAplicado: null,
+      // Etapa 21: procedencia en el catálogo PDF, sus importes (coste con condiciones, venta sugerida) y de
+      // dónde sale el precio de venta: "" (automático o vacío), "manual" o "sugerido" (adoptado del PDF).
+      procedencia: "", pdf: null, origenVenta: ""
     };
   }
 
@@ -384,7 +393,7 @@
     }
     // Etapa 19: primero lo que afecta a varias fichas (ajustes plegables y fotos por lote), después las fichas.
     // Etapa 20: delante, el proveedor y el pegado de varias publicaciones.
-    cuerpo.replaceChildren(pintarEntrada(), ...(lote.pegado ? [pintarPegado()] : []), pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
+    cuerpo.replaceChildren(pintarEntrada(), ...(lote.pegado ? [pintarPegado()] : []), ...(lote.pdf ? [pintarPdf()] : []), pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
     pintarPie();
     programarGuardado();
   }
@@ -711,7 +720,7 @@
 
     // 1. El mensaje: lo primero que se ve al abrir.
     const mensajeCaja = nodo("div", "campo importador-mensaje");
-    const etiqueta = nodo("label", "importador-mensaje-etiqueta", "Pega aquí el mensaje de WhatsApp");
+    const etiqueta = nodo("label", "importador-mensaje-etiqueta", c.procedencia ? "Texto preparado desde el catálogo PDF" : "Pega aquí el mensaje de WhatsApp");
     etiqueta.htmlFor = `imp-${c.clave}-texto`;
     const area = nodo("textarea");
     area.id = `imp-${c.clave}-texto`;
@@ -726,6 +735,13 @@
     ayudaMensaje.id = `imp-${c.clave}-texto-ayuda`;
     area.setAttribute("aria-describedby", ayudaMensaje.id);
     if (c.encabezado) mensajeCaja.append(nodo("p", "importador-encabezado", `Mensaje de WhatsApp: ${c.encabezado}`));
+    // Etapa 21: de qué documentos y tarjetas sale este color (solo para revisar: no se publica).
+    if (c.procedencia) {
+      const nota = nodo("p", "importador-encabezado importador-procedencia", c.procedencia);
+      nota.id = `imp-${c.clave}-procedencia`;
+      mensajeCaja.append(nota);
+    }
+    if (c.pdf?.incompatible) mensajeCaja.append(nodo("p", "editor-nota importador-pdf-incompatible", c.pdf.incompatible));
     // Etapa 20: color preparado desde la publicación de la ficha («(2 colores)»).
     if (c.preparado && !c.texto.trim()) {
       const nota = nodo("p", "importador-preparado", "Color preparado desde la publicación de esta ficha: propone sus tallas y su precio del proveedor. Escribe su nombre y añade sus fotos; si el proveedor envió un mensaje propio para este color, pégalo aquí.");
@@ -790,6 +806,15 @@
       campo({ id: `imp-${c.clave}-venta`, etiqueta: "Precio de venta (COP)", valor: c.venta, modo: "numeric", obligatorio: true, revisar: c.revisar.has("venta"),
         ayuda: textoVenta(c), datos: { color: c.clave, ccampo: "venta" } }));
     datos.push(filaA, filaB);
+    // Etapa 21: precio de venta sugerido por el catálogo PDF, aparte del coste y del precio elegido.
+    if (c.pdf?.ventaSugerida) {
+      const sugerido = nodo("div", "importador-sugerido");
+      sugerido.id = `imp-${c.clave}-sugerido`;
+      const usado = comun().entero(c.venta) === c.pdf.ventaSugerida;
+      sugerido.append(nodo("p", "campo-ayuda", `Venta sugerida del catálogo PDF: ${formatoPesos(c.pdf.ventaSugerida)}${c.pdf.notasVenta?.length ? ` (${c.pdf.notasVenta.join(" ")})` : ""}.${usado && c.origenVenta === "sugerido" ? " Adoptada tal cual." : ""}`));
+      if (!usado && editable(f)) sugerido.append(boton(`Usar el precio sugerido (${formatoPesos(c.pdf.ventaSugerida)})`, "pdf-usar-sugerido", "boton boton-secundario boton-mini", { color: c.clave }));
+      datos.push(sugerido);
+    }
     // Varios precios en el mensaje: se elige el del proveedor entre los leídos (o se escribe otro). Elegir
     // cuenta como corrección a mano: volver a leer el mensaje la conserva. El precio de venta es aparte.
     if (c.precios?.length > 1) {
@@ -810,7 +835,9 @@
         radio.checked = proveedorActual === valor && !c.revisar.has("precio");
         radio.dataset.color = c.clave;
         radio.dataset.cprecio = "1";
-        caja.append(radio, nodo("span", "", formatoPesos(valor)));
+        // Etapa 21: con la condición del catálogo PDF («disponible por caja»), si la hay.
+        const condicion = c.pdf?.costes?.find((x) => x.importe === valor);
+        caja.append(radio, nodo("span", "", condicion ? `${formatoPesos(valor)} · ${condicion.condicion ? condicion.condicion.toLocaleLowerCase("es") : "precio"}${condicion.general ? "" : " (condicionado)"}` : formatoPesos(valor)));
         listaPrecios.append(caja);
       });
       grupoPrecios.append(listaPrecios);
@@ -892,10 +919,10 @@
     const proveedor = comun().entero(c.proveedor);
     if (!String(c.venta).trim()) return "Escríbelo o usa «Aplicar precio de venta» arriba.";
     if (!Number.isFinite(venta)) return "Solo números, sin puntos ni símbolos.";
-    const base = `Se guardará ${formatoPesos(venta)}.`;
+    const base = `Se guardará ${formatoPesos(venta)}${c.origenVenta === "sugerido" && venta === c.pdf?.ventaSugerida ? " (venta sugerida del catálogo PDF, sin ajustes)" : ""}.`;
     if (Number.isFinite(proveedor) && proveedor > 0) {
       const diferencia = venta - proveedor;
-      return `${base} ${diferencia >= 0 ? `${formatoPesos(diferencia)} más` : `${formatoPesos(-diferencia)} menos`} que el proveedor${c.ventaManual ? " (escrito a mano)" : ""}.`;
+      return `${base} ${diferencia >= 0 ? `${formatoPesos(diferencia)} más` : `${formatoPesos(-diferencia)} menos`} que el proveedor${c.ventaManual && c.origenVenta !== "sugerido" ? " (escrito a mano)" : ""}.`;
     }
     return base;
   }
@@ -1963,6 +1990,7 @@
 
     let aplicados = 0;
     let manuales = 0;
+    let adoptados = 0; // etapa 21: precio de venta sugerido del PDF, adoptado tal cual
     let sinProveedor = 0;
     for (const f of marcadas) {
       if (publico) { f.publico = publico; f.editados.add("publico"); f.revisar.delete("publico"); aplicarRegla(f); }
@@ -1974,7 +2002,7 @@
           // El importe queda en el color: al elegir o cambiar después su precio del proveedor, su precio de
           // venta lo sigue. Los colores de fichas fuera de los destinos no lo reciben.
           c.margenAplicado = margen;
-          if (c.ventaManual) { manuales += 1; continue; }
+          if (c.ventaManual) { if (c.origenVenta === "sugerido") adoptados += 1; else manuales += 1; continue; }
           const p = C.entero(c.proveedor);
           if (!Number.isFinite(p) || p <= 0) { sinProveedor += 1; c.revisar.add("venta"); continue; }
           c.venta = String(p + margen);
@@ -1994,6 +2022,7 @@
     if (margen !== null) hechos.push(`precio de venta = proveedor + ${formatoPesos(margen)} en ${aplicados} ${aplicados === 1 ? "color" : "colores"}`);
     const partes = [`${marcadas.length === 1 ? "1 ficha actualizada" : `${marcadas.length} fichas actualizadas`}: ${hechos.join(", ")}.`];
     if (manuales) partes.push(`${manuales === 1 ? "1 precio escrito a mano se conservó" : `${manuales} precios escritos a mano se conservaron`}.`);
+    if (adoptados) partes.push(`${adoptados === 1 ? "1 precio de venta sugerido del PDF se conservó" : `${adoptados} precios de venta sugeridos del PDF se conservaron`} tal cual: no se les suma el importe.`);
     if (sinProveedor) partes.push(`${sinProveedor === 1 ? "1 color no tiene" : `${sinProveedor} colores no tienen`} precio del proveedor: su precio de venta queda por revisar.`);
     partes.push(`Actualizadas: ${marcadas.length === 1 ? "ficha" : "fichas"} ${listaNumeros(marcadas)}. Se guardan con «Guardar lote como oculto».`);
     lote.resumenAjustes = { texto: partes.join(" "), tipo: sinProveedor ? "aviso" : "ok" };
@@ -2056,8 +2085,14 @@
     const pegar = boton("Pegar varias publicaciones", "pegado-abrir", "boton boton-secundario boton-compacto");
     pegar.id = "imp-pegado-abrir";
     pegar.setAttribute("aria-expanded", String(Boolean(lote.pegado)));
-    cabecera.append(h, pegar);
-    const ayuda = nodo("p", "campo-ayuda importador-entrada-ayuda", "Pega varios mensajes de WhatsApp a la vez y revisa cómo se separan, o pega cada publicación en su ficha, más abajo.");
+    // Etapa 21: catálogos PDF del proveedor.
+    const catalogo = boton("Importar catálogo PDF", "pdf-abrir", "boton boton-secundario boton-compacto");
+    catalogo.id = "imp-pdf-abrir";
+    catalogo.setAttribute("aria-expanded", String(Boolean(lote.pdf)));
+    const botones = nodo("div", "importador-entrada-botones");
+    botones.append(pegar, catalogo);
+    cabecera.append(h, botones);
+    const ayuda = nodo("p", "campo-ayuda importador-entrada-ayuda", "Pega varios mensajes de WhatsApp a la vez y revisa cómo se separan, importa el catálogo PDF del proveedor, o pega cada publicación en su ficha, más abajo.");
     s.append(cabecera, ayuda, pintarPerfiles());
     return s;
   }
@@ -2762,6 +2797,944 @@
     }
   }
 
+  // ================================================================== etapa 21: catálogo PDF
+  /* «Importar catálogo PDF» (catalogo-pdf.js lee los documentos en este navegador):
+     1. Se eligen uno o varios PDF y cada uno recibe un papel, propuesto por su CONTENIDO (el nombre solo
+        desempata) y corregible: venta sugerida (descripciones, fotos y precio de venta), precios del
+        proveedor, o descripciones y fotos.
+     2. Revisión: una fila por tarjeta del documento principal (el de venta; si falta, el de descripciones;
+        si falta, el de precios) con su foto, procedencia, texto original, clasificación, datos reconocidos,
+        coste con sus condiciones, venta sugerida y la tarjeta que le corresponde en cada otro documento
+        (por la huella de la foto; las dudosas se eligen a mano).
+     3. Solo «Añadir al lote» crea fichas, con los componentes de siempre. Nada se escribe en Supabase ni
+        se actualiza ningún producto del catálogo.
+     Todo queda en el borrador local: documentos (sin el PDF), decisiones y fotos (una por huella). */
+  const pdf = () => window.GamaTallaCatalogoPdf;
+  let leyendoPdf = null;       // { controlador, nombre, pagina, total } mientras se lee un documento
+  let anadiendoPdf = false;
+  let versionPdf = 0;          // cambia con cada decisión: invalida el análisis en caché
+  let cacheAnalisis = { version: -1, lote: null, perfil: null, valor: null };
+  const urlsPdf = new Map();   // ref de foto → URL blob: de su miniatura
+  const VISTAS_PDF = [["calzado", "Calzado"], ["otro", "Excluidos"], ["dudosas", "Dudosos"], ["todas", "Todas"]];
+
+  function estadoPdf() {
+    if (!lote.pdf) lote.pdf = { documentos: [], fotos: {}, blobs: {}, decision: {}, precioVenta: "sugerido", confirmarFechas: false, vista: "calzado", anadidas: {}, aviso: "", cerrar: false };
+    return lote.pdf;
+  }
+  const cambioPdf = () => { versionPdf += 1; };
+  function urlFotoPdf(ref) {
+    if (!ref) return "";
+    if (urlsPdf.has(ref)) return urlsPdf.get(ref);
+    const blob = lote?.pdf?.blobs?.[ref];
+    if (!blob) return "";
+    const url = URL.createObjectURL(blob);
+    urlsPdf.set(ref, url);
+    return url;
+  }
+  function soltarUrlsPdf() {
+    for (const u of urlsPdf.values()) URL.revokeObjectURL(u);
+    urlsPdf.clear();
+  }
+  const docPdf = (id) => lote.pdf?.documentos.find((d) => d.id === id) || null;
+  const docPorPapel = (papel) => lote.pdf?.documentos.find((d) => d.papel === papel) || null;
+  function principalPdf() {
+    for (const p of pdf().ORDEN_PRINCIPAL) { const d = docPorPapel(p); if (d) return d; }
+    return null;
+  }
+  function erroresPapeles() {
+    const vistos = new Map();
+    const errores = [];
+    for (const d of lote.pdf.documentos) {
+      if (!d.papel) { errores.push(`Elige el papel de «${d.nombre}».`); continue; }
+      if (vistos.has(d.papel)) errores.push(`«${vistos.get(d.papel)}» y «${d.nombre}» tienen el mismo papel (${pdf().PAPELES[d.papel].corto}): cada papel corresponde a un solo documento.`);
+      vistos.set(d.papel, d.nombre);
+    }
+    return errores;
+  }
+  const lugarTarjeta = (d, t) => `${d ? `${pdf().PAPELES[d.papel]?.corto || d.nombre} · ` : ""}página ${t.pagina}, tarjeta ${t.orden}`;
+
+  // ------------------------------------------------------------------ leer documentos
+  async function leerPdfs(archivos) {
+    const P = pdf();
+    const p = estadoPdf();
+    if (leyendoPdf || guardando || anadiendoPdf) { mensaje("Espera a que termine la lectura en curso.", "aviso"); return; }
+    const lista = [...archivos].filter((a) => a instanceof Blob);
+    if (!lista.length) return;
+    const avisos = [];
+    let leidos = 0;
+    // Una sola lectura para toda la tanda: el avance no desaparece entre un documento y el siguiente, y
+    // «Cancelar la lectura» detiene la tanda (lo ya leído se conserva; el documento en curso no se añade).
+    const controlador = new AbortController();
+    leyendoPdf = { controlador, nombre: "", pagina: 0, total: 0, indice: 0, cuantos: lista.length };
+    repintarPdf();
+    try {
+      for (const [indice, archivo] of lista.entries()) {
+        const nombre = String(archivo.name || "documento.pdf").slice(0, 200);
+        Object.assign(leyendoPdf, { nombre, pagina: 0, total: 0, indice });
+        pintarAvancePdf();
+        if (p.documentos.length >= P.LIMITES.documentos) { avisos.push(`Como mucho ${P.LIMITES.documentos} documentos a la vez: «${nombre}» no se leyó.`); continue; }
+        if (archivo.size > P.LIMITES.bytesMax) { avisos.push(`«${nombre}» pesa ${tamano(archivo.size)}; el máximo es ${tamano(P.LIMITES.bytesMax)}.`); continue; }
+        let bytes;
+        try { bytes = await archivo.arrayBuffer(); } catch { avisos.push(`No se pudo abrir «${nombre}».`); continue; }
+        if (!new TextDecoder("latin1").decode(new Uint8Array(bytes.slice(0, 1024))).includes("%PDF-")) { avisos.push(`«${nombre}» no es un PDF.`); continue; }
+        const huella = await P.sha256(bytes);
+        // Reintentos, doble clic o el mismo archivo con otro nombre: se detecta por su contenido.
+        const repetido = p.documentos.find((d) => d.huella === huella);
+        if (repetido) { avisos.push(`«${nombre}» ya está en esta importación${repetido.nombre !== nombre ? ` (como «${repetido.nombre}»)` : ""}: no se vuelve a leer.`); continue; }
+        const id = `d${uuid().slice(0, 8)}`;
+        try {
+          const r = await P.leerDocumento(bytes, { senal: controlador.signal, idDoc: id, alAvanzar: ({ pagina, total }) => {
+            if (!leyendoPdf) return;
+            leyendoPdf.pagina = pagina;
+            leyendoPdf.total = total;
+            pintarAvancePdf();
+          } });
+          if (lote?.pdf !== p) return; // el lote cambió mientras se leía
+          // Fotos: una sola vez por huella (las mismas fotos en varios documentos no ocupan doble).
+          for (const t of r.tarjetas) {
+            const x = t.foto;
+            // El borrador y su respaldo admiten imágenes de trabajo hasta BYTES_PDF_MAX (borradores.js).
+            if (x.blob && x.blob.size > almacen().BYTES_PDF_MAX) { x.blob = null; x.error = `Foto demasiado grande para conservarla (más de ${tamano(almacen().BYTES_PDF_MAX)}).`; }
+            if (x.exacta && x.blob) {
+              if (!p.fotos[x.exacta]) { const ref = uuid(); p.fotos[x.exacta] = ref; p.blobs[ref] = x.blob; }
+              x.ref = p.fotos[x.exacta];
+            }
+            delete x.blob;
+          }
+          const propuesta = P.proponerPapel(r.tarjetas, nombre);
+          const ocupado = p.documentos.some((d) => d.papel === propuesta.papel);
+          p.documentos.push({ id, nombre, bytes: archivo.size, huella, paginas: r.paginas, fecha: r.fecha, notas: r.notas.slice(0, 10), aviso: r.aviso,
+            paginasSinTarjetas: r.paginasSinTarjetas.slice(0, 200), papel: ocupado ? "" : propuesta.papel, papelPropuesto: propuesta.papel, motivo: propuesta.motivo, tarjetas: r.tarjetas });
+          leidos += 1;
+          cambioPdf();
+        } catch (e) {
+          if (e?.name === "AbortError") avisos.push(`Lectura de «${nombre}» cancelada: no se añadió nada de ese documento.`);
+          else if (e instanceof P.ErrorPdf) avisos.push(`«${nombre}»: ${e.message}`);
+          else avisos.push(`«${nombre}»: no se pudo leer (${e?.message ? "el lector de PDF no está disponible o el archivo está dañado" : "error desconocido"}). Recarga la página y vuelve a intentarlo.`);
+        }
+        if (controlador.signal.aborted) break;
+      }
+    } finally {
+      leyendoPdf = null;
+    }
+    if (!lote || lote.pdf !== p) return;
+    p.aviso = avisos.join(" ");
+    repintarPdf();
+    guardarBorrador();
+    if (leidos) {
+      const r = analisisPdf();
+      mensaje(`${leidos === 1 ? "Documento leído" : `${leidos} documentos leídos`}. ${r.principal ? `${r.filas.length} tarjetas en «${r.principal.nombre}»: revisa y elige qué añadir al lote.` : "Asigna el papel de cada documento."} Nada se guardó en Supabase.`, "ok");
+      (document.getElementById("imp-pdf-resumen") || document.getElementById("imp-pdf-titulo"))?.focus({ preventScroll: true });
+    } else if (p.aviso) document.getElementById("imp-pdf-aviso")?.focus({ preventScroll: true });
+  }
+  function pintarAvancePdf() {
+    const caja = document.getElementById("imp-pdf-avance");
+    if (!caja || !leyendoPdf) return;
+    const { nombre, pagina, total, indice, cuantos } = leyendoPdf;
+    const cual = cuantos > 1 ? ` (documento ${indice + 1} de ${cuantos})` : "";
+    caja.querySelector("p").textContent = !nombre ? "Preparando la lectura…" : total ? `Leyendo «${nombre}»${cual}: página ${pagina} de ${total}.` : `Abriendo «${nombre}»${cual}…`;
+    const barra = caja.querySelector("progress");
+    if (total) { barra.max = total; barra.value = pagina; }
+  }
+  function quitarDocumentoPdf(id) {
+    const p = lote.pdf;
+    const d = docPdf(id);
+    if (!d) return;
+    p.documentos = p.documentos.filter((x) => x !== d);
+    // Fotos que ya no usa ningún documento.
+    const usadas = new Set(p.documentos.flatMap((x) => x.tarjetas.map((t) => t.foto?.exacta)).filter(Boolean));
+    for (const [exacta, ref] of Object.entries(p.fotos)) {
+      if (usadas.has(exacta)) continue;
+      delete p.fotos[exacta];
+      delete p.blobs[ref];
+      if (urlsPdf.has(ref)) { URL.revokeObjectURL(urlsPdf.get(ref)); urlsPdf.delete(ref); }
+    }
+    // Decisiones de parejas en ese documento: se olvidan.
+    for (const dec of Object.values(p.decision)) if (dec.pareja) delete dec.pareja[id];
+    cambioPdf();
+    mensaje(`Se quitó «${d.nombre}» de la importación.`);
+  }
+
+  // ------------------------------------------------------------------ análisis (en caché)
+  function analisisPdf() {
+    const p = lote.pdf;
+    if (cacheAnalisis.version === versionPdf && cacheAnalisis.lote === lote && cacheAnalisis.perfil === lote.perfilLote) return cacheAnalisis.valor;
+    const P = pdf();
+    const principal = principalPdf();
+    const valor = { principal, otros: [], filas: [], sinPareja: [], errores: erroresPapeles(), fechasDistintas: [], faltan: [] };
+    cacheAnalisis = { version: versionPdf, lote, perfil: lote.perfilLote, valor };
+    if (!principal || valor.errores.length) return valor;
+    const otros = p.documentos.filter((d) => d !== principal && d.papel);
+    valor.otros = otros;
+    if (!docPorPapel("proveedor")) valor.faltan.push("Falta el documento de precios del proveedor: el coste quedará pendiente en cada ficha.");
+    if (!docPorPapel("venta")) valor.faltan.push("Sin documento de venta sugerida: el precio de venta se calcula con «Ajustes para varias fichas» (proveedor + ajuste) o se escribe a mano.");
+    if (principal.papel === "proveedor") valor.faltan.push("Sin documento de descripciones: marca, modelo y clasificación salen solo del texto de los precios; revisa cada tarjeta.");
+    const porId = new Map(p.documentos.flatMap((d) => d.tarjetas.map((t) => [t.id, { t, d }])));
+    const rel = new Map(otros.map((d) => [d.id, P.relacionar(principal.tarjetas, d.tarjetas)]));
+    for (const d of otros) if (d.fecha && principal.fecha && d.fecha !== principal.fecha) valor.fechasDistintas.push(d);
+    const lim = texto().LIMITES_TALLA;
+    principal.tarjetas.forEach((t, i) => {
+      const dec = p.decision[t.id] || {};
+      const parejas = {};
+      for (const d of otros) {
+        const r = rel.get(d.id).porPrincipal[t.id];
+        const elegida = dec.pareja?.[d.id];
+        let tarjeta = null;
+        let estado = r.estado;
+        if (elegida === "ninguna") estado = "ninguna";
+        else if (elegida && porId.get(elegida)?.d === d) { tarjeta = porId.get(elegida).t; estado = "elegida"; }
+        // Solo una correspondencia EXACTA e inequívoca se usa sin preguntar. Una «parecida» (huella gris, que es
+        // aproximada) queda como propuesta: no aporta coste, descripción ni nada hasta confirmarla a mano.
+        // La tarjeta es la que dice «elegida» (la de la huella exacta), nunca «la primera de la lista».
+        else if (r.estado === "exacta" && r.elegida) tarjeta = porId.get(r.elegida).t;
+        const propuesta = tarjeta || (r.estado === "parecida" && r.elegida ? porId.get(r.elegida).t : null);
+        // Documentos de fechas distintas: la pareja se muestra, pero no se usa hasta confirmarlo.
+        const fechaPendiente = Boolean(d.fecha && principal.fecha && d.fecha !== principal.fecha && !p.confirmarFechas);
+        parejas[d.id] = { doc: d, estado, tarjeta: fechaPendiente ? null : tarjeta, propuesta, fechaPendiente, aproximada: r.estado === "parecida",
+          candidatos: r.candidatos.map((c) => ({ ...c, tarjeta: porId.get(c.id).t })) };
+      }
+      const pareja = (papel) => { const d = otros.find((x) => x.papel === papel); return d ? parejas[d.id].tarjeta : null; };
+      // Descripción: la del principal (venta o descripciones) más las líneas que solo trae el de descripciones.
+      const descripcion = principal.papel === "proveedor" ? [] : [...t.lineas];
+      const desc = principal.papel === "venta" ? pareja("descripcion") : null;
+      if (desc) for (const l of desc.lineas) if (!descripcion.some((x) => P.normal(x) === P.normal(l))) descripcion.push(l);
+      const costesT = principal.papel === "proveedor" ? t : pareja("proveedor");
+      const ventaT = principal.papel === "venta" ? t : null;
+      const comp = P.componer({ descripcion, costes: costesT ? costesT.lineas : null, venta: ventaT ? ventaT.destacados : null, notasVenta: docPorPapel("venta")?.notas || [] });
+      const leido = texto().analizar(comp.mensaje, { marcas: marcasConocidas(), perfil: perfilLote() });
+      const tipo = dec.tipo || comp.clasificacion.tipo;
+      const d = comp.tallasDeclaradas;
+      const fuera = d ? [d.desde, d.hasta].some((v) => v < lim.min || v > lim.max) : false;
+      const incompatible = comp.infantil
+        ? `Calzado infantil${d ? ` (EU ${d.desde} a ${d.hasta})` : ""}: el catálogo actual solo tiene públicos Hombre, Dama y Unisex${fuera ? ` y tallas EU ${lim.min}–${lim.max}` : ""}. Se conserva todo; decide antes de guardar.`
+        : fuera ? `Tallas EU ${d.desde} a ${d.hasta}: el catálogo admite ${lim.min}–${lim.max}. Se conservan; decide antes de guardar.` : "";
+      const incluir = typeof dec.incluir === "boolean" ? dec.incluir : tipo === "calzado" && !incompatible;
+      const dudas = [];
+      if (tipo === "revisar") dudas.push("clasificación");
+      for (const x of Object.values(parejas)) {
+        if (x.estado === "ambigua") dudas.push(`varias tarjetas posibles en «${x.doc.nombre}»`);
+        if (x.estado === "parecida") dudas.push(`correspondencia aproximada por confirmar en «${x.doc.nombre}»`);
+        if (x.estado === "sin") dudas.push(`sin correspondencia en «${x.doc.nombre}»`);
+        if (x.fechaPendiente && x.propuesta && x.estado !== "parecida") dudas.push(`«${x.doc.nombre}» es de otra fecha`);
+      }
+      if (incompatible) dudas.push("no encaja en el catálogo actual");
+      if (comp.costes.length > 1) dudas.push("varios importes del proveedor");
+      valor.filas.push({ t, numero: i + 1, dec, parejas, comp, leido, tipo, incluir, incompatible, dudas, costesT,
+        asociar: dec.asociar?.modo && dec.asociar.modo !== "ficha" ? dec.asociar : { modo: "ficha", destino: "" } });
+    });
+    for (const d of otros) for (const id of rel.get(d.id).sinPareja) valor.sinPareja.push({ d, t: porId.get(id).t });
+    resolverGruposPdf(valor);
+    return valor;
+  }
+  /* «Otra zapatilla» (raíz de una ficha), «otro color de la tarjeta N» u «otra foto del mismo color de la
+     tarjeta N». Cada fila incluida acaba en una raíz (la ficha) y en una fila-color (el color al que va su
+     foto). Errores claros si el destino no existe, no está incluido o forma un círculo. */
+  function resolverGruposPdf(a) {
+    const porNumero = new Map(a.filas.map((r) => [r.numero, r]));
+    const destinoDe = (r) => porNumero.get(Number(r.asociar.destino)) || null;
+    for (const r of a.filas) { r.raiz = null; r.colorFila = null; r.errorAsociacion = ""; }
+    const seguir = (r, hasta) => {
+      const vistos = new Set();
+      let x = r;
+      while (x && !hasta(x)) {
+        if (vistos.has(x)) return null;
+        vistos.add(x);
+        x = destinoDe(x);
+        if (x && !x.incluir) return { fuera: x };
+      }
+      return x;
+    };
+    for (const r of a.filas) {
+      if (!r.incluir) continue;
+      if (r.asociar.modo === "ficha") { r.raiz = r; r.colorFila = r; continue; }
+      const d = destinoDe(r);
+      if (!d) { r.errorAsociacion = `Escribe el número de la tarjeta (1 a ${a.filas.length}).`; continue; }
+      if (d === r) { r.errorAsociacion = "Elige otra tarjeta: no puede ser ella misma."; continue; }
+      if (!d.incluir) { r.errorAsociacion = `La tarjeta ${d.numero} no está marcada para añadir: márcala o elige otra.`; continue; }
+      const raiz = seguir(r, (x) => x.asociar.modo === "ficha");
+      const color = seguir(r, (x) => x.asociar.modo !== "foto");
+      if (!raiz || !color) { r.errorAsociacion = "Las asociaciones forman un círculo: revisa los números."; continue; }
+      if (raiz.fuera || color.fuera) { r.errorAsociacion = `La tarjeta ${(raiz.fuera || color.fuera).numero} no está marcada para añadir.`; continue; }
+      r.raiz = raiz;
+      r.colorFila = color;
+    }
+  }
+  // Fila ya añadida al lote (su color sigue existiendo): no se vuelve a añadir.
+  const anadidaPdf = (r) => { const k = lote.pdf.anadidas?.[r.t.id]; return k ? colorDe(k) : null; };
+  function contadoresPdf(a) {
+    const pendientes = a.filas.filter((r) => r.incluir && !anadidaPdf(r) && !r.errorAsociacion && r.raiz);
+    return {
+      tarjetas: a.filas.length,
+      calzado: a.filas.filter((r) => r.tipo === "calzado").length,
+      otros: a.filas.filter((r) => r.tipo === "otro").length,
+      dudosas: a.filas.filter((r) => r.dudas.length).length,
+      revisar: a.filas.filter((r) => r.tipo === "revisar").length,
+      fichas: pendientes.filter((r) => r.raiz === r).length,
+      colores: pendientes.filter((r) => r.colorFila === r).length,
+      fotos: pendientes.filter((r) => r.t.foto?.ref).length,
+      pendientes,
+      anadidas: a.filas.filter((r) => anadidaPdf(r)).length,
+      errores: a.filas.filter((r) => r.incluir && !anadidaPdf(r) && r.errorAsociacion)
+    };
+  }
+  const enVista = (r, vista) => (vista === "todas" ? true : vista === "dudosas" ? r.dudas.length > 0 : r.tipo === vista);
+
+  // ------------------------------------------------------------------ pintar la importación
+  function pintarPdf() {
+    const p = lote.pdf;
+    const P = pdf();
+    const s = nodo("section", "editor-seccion importador-pdf");
+    s.id = "imp-pdf";
+    s.setAttribute("aria-labelledby", "imp-pdf-titulo");
+    const h = nodo("h3", "editor-seccion-titulo", "Importar catálogo PDF");
+    h.id = "imp-pdf-titulo";
+    h.tabIndex = -1;
+    s.append(h, nodo("p", "campo-ayuda", "Elige los PDF del proveedor y comprueba el papel de cada uno. Se leen en este navegador: nada se sube a Supabase ni cambia productos del catálogo. Solo «Añadir al lote» crea fichas, que se guardan como siempre con «Guardar lote como oculto»."));
+    if (!P) { s.append(nodo("p", "campo-error", "El lector de catálogos PDF no se cargó. Recarga la página.")); return s; }
+    const elegir = nodo("div", "importador-pdf-elegir");
+    const b = boton(p.documentos.length ? "Añadir otro PDF" : "Elegir PDF", "pdf-elegir", "boton boton-secundario boton-compacto");
+    b.id = "imp-pdf-elegir";
+    if (leyendoPdf || p.documentos.length >= P.LIMITES.documentos) b.setAttribute("aria-disabled", "true");
+    const input = nodo("input");
+    input.type = "file";
+    input.multiple = true;
+    input.accept = "application/pdf,.pdf";
+    input.className = "solo-lectores";
+    input.id = "imp-pdf-archivo";
+    input.tabIndex = -1;
+    input.setAttribute("aria-hidden", "true");
+    input.dataset.pdfArchivos = "1";
+    elegir.append(b, input, nodo("p", "campo-ayuda", `Uno o varios a la vez: hasta ${P.LIMITES.documentos} PDF de ${tamano(P.LIMITES.bytesMax)} y ${P.LIMITES.paginasMax} páginas cada uno.`));
+    s.append(elegir);
+    if (leyendoPdf) {
+      const caja = nodo("div", "importador-pdf-avance");
+      caja.id = "imp-pdf-avance";
+      const linea = nodo("p", "", "");
+      linea.setAttribute("role", "status");
+      const barra = nodo("progress");
+      barra.setAttribute("aria-label", "Avance de la lectura");
+      caja.append(linea, barra, boton("Cancelar la lectura", "pdf-cancelar", "boton boton-secundario boton-compacto"));
+      s.append(caja);
+      queueMicrotask(pintarAvancePdf);
+    }
+    if (p.aviso) {
+      const aviso = nodo("p", "editor-nota importador-pdf-aviso", p.aviso);
+      aviso.id = "imp-pdf-aviso";
+      aviso.tabIndex = -1;
+      aviso.setAttribute("role", "alert");
+      s.append(aviso);
+    }
+    if (p.documentos.length) s.append(pintarDocumentosPdf());
+    const a = analisisPdf();
+    for (const e of a.errores) s.append(nodo("p", "campo-error", e));
+    if (a.fechasDistintas.length) {
+      const caja = nodo("div", "importador-pdf-fechas");
+      const principal = a.principal;
+      caja.append(nodo("p", "", `Los documentos son de fechas distintas: «${principal.nombre}» del ${fechaDoc(principal.fecha)} y ${a.fechasDistintas.map((d) => `«${d.nombre}» del ${fechaDoc(d.fecha)}`).join(", ")}. Sus precios no se usan hasta que confirmes que corresponden a la misma edición.`));
+      const casilla = nodo("label", "casilla");
+      const check = nodo("input");
+      check.type = "checkbox";
+      check.id = "imp-pdf-confirmar-fechas";
+      check.checked = Boolean(p.confirmarFechas);
+      check.dataset.pdfConfirmarFechas = "1";
+      casilla.append(check, nodo("span", "", "Confirmo que corresponden a la misma edición del catálogo"));
+      caja.append(casilla);
+      s.append(caja);
+    }
+    if (a.principal && !a.errores.length) {
+      for (const f of a.faltan) s.append(nodo("p", "editor-nota", f));
+      s.append(pintarRevisionPdf(a));
+    }
+    const acciones = nodo("div", "importador-pegado-acciones");
+    if (a.principal && !a.errores.length) {
+      const k = contadoresPdf(a);
+      const anadir = boton(k.fichas ? `Añadir al lote (${k.fichas === 1 ? "1 ficha" : `${k.fichas} fichas`})` : "Añadir al lote", "pdf-anadir", "boton boton-principal");
+      anadir.id = "imp-pdf-anadir";
+      anadir.setAttribute("aria-describedby", "imp-pdf-resumen");
+      if (!k.pendientes.length || leyendoPdf || anadiendoPdf) anadir.setAttribute("aria-disabled", "true");
+      acciones.append(anadir);
+    }
+    if (p.cerrar) {
+      const caja = nodo("div", "importador-confirmar");
+      caja.id = "imp-pdf-cerrar-confirmar";
+      caja.setAttribute("role", "group");
+      caja.setAttribute("aria-label", "Cerrar la importación");
+      caja.append(nodo("p", "", "Se cierra la revisión de los documentos: las fichas ya añadidas al lote se conservan; las tarjetas sin añadir, sus fotos y las decisiones se descartan."));
+      const fila = nodo("div", "editor-botones");
+      fila.append(boton("Cerrar la importación", "pdf-cerrar-si", "boton boton-principal boton-compacto"), boton("Seguir revisando", "pdf-cerrar-no", "boton boton-secundario boton-compacto"));
+      caja.append(fila);
+      acciones.append(caja);
+    } else acciones.append(boton("Cerrar la importación", "pdf-cerrar", "boton boton-texto"));
+    s.append(acciones);
+    return s;
+  }
+  const fechaDia = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
+  const fechaDoc = (iso) => { const d = iso ? new Date(`${iso}T00:00:00Z`) : null; return d && !Number.isNaN(d.getTime()) ? fechaDia.format(d) : "fecha desconocida"; };
+
+  function pintarDocumentosPdf() {
+    const P = pdf();
+    const ul = nodo("ul", "importador-pdf-docs");
+    ul.setAttribute("aria-label", "Documentos de la importación");
+    for (const d of lote.pdf.documentos) {
+      const li = nodo("li", "importador-pdf-doc");
+      li.dataset.doc = d.id;
+      const cab = nodo("div", "importador-fragmento-cabecera");
+      const titulo = nodo("h4", "importador-fragmento-titulo", d.nombre);
+      titulo.id = `imp-pdf-${d.id}-nombre`;
+      cab.append(titulo, boton("Quitar", "pdf-quitar", "boton boton-texto boton-mini", { doc: d.id }));
+      cab.lastChild.setAttribute("aria-label", `Quitar ${d.nombre}`);
+      li.append(cab);
+      const datos = [`${d.paginas} ${d.paginas === 1 ? "página" : "páginas"}`, `${d.tarjetas.length} ${d.tarjetas.length === 1 ? "tarjeta" : "tarjetas"}`,
+        `${new Set(d.tarjetas.map((t) => t.foto?.exacta).filter(Boolean)).size} fotos`, d.fecha ? `fecha ${fechaDoc(d.fecha)}` : "sin fecha", tamano(d.bytes)];
+      li.append(nodo("p", "importador-pdf-doc-datos", datos.join(" · ")));
+      const grupo = nodo("fieldset", `editor-opciones importador-pdf-papel${d.papel ? "" : " es-revisar"}`);
+      grupo.id = `imp-pdf-${d.id}-papel`;
+      const leyenda = nodo("legend", "", "Papel de este documento");
+      if (!d.papel) leyenda.append(" ", nodo("span", "importador-revisar", "Revisar"));
+      grupo.append(leyenda);
+      const lista = nodo("div", "editor-opciones-lista");
+      for (const papel of ["venta", "proveedor", "descripcion"]) {
+        const caja = nodo("label", "casilla");
+        const radio = nodo("input");
+        radio.type = "radio";
+        radio.name = `imp-pdf-${d.id}-papel`;
+        radio.value = papel;
+        radio.checked = d.papel === papel;
+        radio.dataset.pdfPapel = d.id;
+        caja.append(radio, nodo("span", "", P.PAPELES[papel].nombre));
+        lista.append(caja);
+      }
+      grupo.append(lista, nodo("p", "campo-ayuda", `Propuesto: ${P.PAPELES[d.papelPropuesto]?.nombre || "—"}. ${d.motivo}`));
+      li.append(grupo);
+      if (d.paginasSinTarjetas?.length) li.append(nodo("p", "campo-ayuda", `Sin tarjetas de producto: ${d.paginasSinTarjetas.map((x) => `página ${x.pagina} (${x.motivo})`).join("; ")}.`));
+      for (const n of d.notas || []) li.append(nodo("p", "campo-ayuda", `Nota del documento: «${n}».`));
+      if (d.aviso) li.append(nodo("p", "editor-nota", d.aviso));
+      ul.append(li);
+    }
+    return ul;
+  }
+
+  function pintarRevisionPdf(a) {
+    const p = lote.pdf;
+    const k = contadoresPdf(a);
+    const caja = nodo("div", "importador-pdf-revision");
+    const partes = [`${k.tarjetas} ${k.tarjetas === 1 ? "tarjeta" : "tarjetas"} en «${a.principal.nombre}»`, `${k.calzado} de calzado`, `${k.otros} de otros artículos`,
+      `${k.revisar} por clasificar`, `${k.dudosas} con dudas`];
+    let resumenTexto = `${partes.join(" · ")}. Se ${k.fichas === 1 ? "añadirá 1 ficha" : `añadirán ${k.fichas} fichas`} con ${k.colores === 1 ? "1 color" : `${k.colores} colores`} y ${k.fotos === 1 ? "1 fotografía" : `${k.fotos} fotografías`}.`;
+    if (k.anadidas) resumenTexto += ` Ya ${k.anadidas === 1 ? "se añadió 1 tarjeta" : `se añadieron ${k.anadidas} tarjetas`} al lote.`;
+    if (k.errores.length) resumenTexto += ` ${k.errores.length === 1 ? "1 tarjeta tiene" : `${k.errores.length} tarjetas tienen`} una asociación por corregir.`;
+    const resumen = nodo("p", "importador-pegado-resumen", resumenTexto);
+    resumen.id = "imp-pdf-resumen";
+    resumen.tabIndex = -1;
+    resumen.setAttribute("role", "status");
+    caja.append(resumen);
+    // Precio de venta: adoptar el sugerido (sin sumarle nada) o calcularlo después con el ajuste.
+    const hayVenta = Boolean(docPorPapel("venta"));
+    const grupo = nodo("fieldset", "editor-opciones importador-pdf-precio");
+    grupo.id = "imp-pdf-precio";
+    grupo.append(nodo("legend", "", "Precio de venta de las fichas que se añadan"));
+    const opciones = nodo("div", "editor-opciones-lista");
+    for (const [valor, etiqueta] of [["sugerido", "Adoptar el precio de venta sugerido del PDF (tal cual: no se le suma ningún ajuste)"],
+      ["margen", "Calcularlo después: precio del proveedor + ajuste, con «Ajustes para varias fichas»"]]) {
+      const c = nodo("label", "casilla");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = "imp-pdf-precio";
+      radio.value = valor;
+      radio.checked = (hayVenta ? p.precioVenta : "margen") === valor;
+      radio.disabled = valor === "sugerido" && !hayVenta;
+      radio.dataset.pdfPrecio = "1";
+      c.append(radio, nodo("span", "", etiqueta));
+      opciones.append(c);
+    }
+    grupo.append(opciones, nodo("p", "campo-ayuda", "El precio adoptado cuenta como escrito a mano: volver a leer el texto, cambiar el perfil, aplicar un ajuste o recuperar el borrador no lo cambia. El precio del proveedor y sus condiciones nunca se publican."));
+    caja.append(grupo);
+    // Vistas: calzado, excluidos (otros artículos), dudosos y todas.
+    const vistas = nodo("div", "importador-pdf-vistas");
+    vistas.setAttribute("role", "group");
+    vistas.setAttribute("aria-label", "Qué tarjetas ver");
+    for (const [v, etiqueta] of VISTAS_PDF) {
+      const n = a.filas.filter((r) => enVista(r, v)).length;
+      const bv = boton(`${etiqueta} (${n})`, "pdf-vista", `boton boton-compacto ${p.vista === v ? "boton-principal" : "boton-secundario"}`, { vista: v });
+      bv.id = `imp-pdf-vista-${v}`;
+      bv.setAttribute("aria-pressed", String(p.vista === v));
+      vistas.append(bv);
+    }
+    caja.append(vistas);
+    const filas = a.filas.filter((r) => enVista(r, p.vista));
+    const ol = nodo("ol", "importador-pdf-lista");
+    ol.setAttribute("aria-label", "Tarjetas del catálogo");
+    for (const r of filas) ol.append(pintarFilaPdf(r, a));
+    if (!filas.length) caja.append(nodo("p", "campo-ayuda", "No hay tarjetas en esta vista."));
+    caja.append(ol);
+    if (a.sinPareja.length) {
+      const det = nodo("details", "importador-original importador-pdf-sinpareja");
+      det.append(nodo("summary", "", `${a.sinPareja.length === 1 ? "1 tarjeta" : `${a.sinPareja.length} tarjetas`} de otros documentos sin correspondencia en «${a.principal.nombre}»`));
+      const ul = nodo("ul", "importador-pdf-candidatos");
+      for (const { d, t } of a.sinPareja) {
+        const li = nodo("li", "importador-pdf-candidato");
+        li.append(miniaturaPdf(t, `Foto de ${lugarTarjeta(d, t)}`), nodo("span", "", `${lugarTarjeta(d, t)}: ${t.lineas.join(" · ") || "sin texto"}`));
+        ul.append(li);
+      }
+      det.append(nodo("p", "campo-ayuda", "Su foto no coincide con ninguna tarjeta del documento principal: no se usan sus importes."), ul);
+      caja.append(det);
+    }
+    return caja;
+  }
+  function miniaturaPdf(t, alt) {
+    const url = urlFotoPdf(t.foto?.ref);
+    if (!url) return nodo("span", "importador-pdf-sinfoto", t.foto?.error || "Sin foto");
+    const img = nodo("img", "importador-pdf-miniatura");
+    img.src = url;
+    img.alt = alt;
+    img.loading = "lazy";
+    img.decoding = "async";
+    if (t.foto.ancho && t.foto.alto) { img.width = 96; img.height = Math.round(96 * t.foto.alto / t.foto.ancho); }
+    return img;
+  }
+  const precioTexto = (x) => `${formatoPesos(x.importe)}${x.condicion ? ` (${x.condicion.toLocaleLowerCase("es")})` : ""}${x.general ? "" : ", condicionado"}`;
+
+  function pintarFilaPdf(r, a) {
+    const t = r.t;
+    const id = t.id;
+    const ya = anadidaPdf(r);
+    const li = nodo("li", `importador-pdf-tarjeta${r.incluir ? "" : " es-excluido"}${r.dudas.length ? " es-dudosa" : ""}`);
+    li.id = `imp-pdf-${id}`;
+    const titulo = t.lineas[0] || r.comp.mensaje.split("\n")[0] || "Sin descripción";
+    const h = nodo("h4", "importador-fragmento-titulo", `Tarjeta ${r.numero} · ${titulo}`);
+    h.id = `imp-pdf-${id}-titulo`;
+    h.tabIndex = -1;
+    li.setAttribute("aria-labelledby", h.id);
+    const foto = nodo("div", "importador-pdf-foto");
+    foto.append(miniaturaPdf(t, `Foto de la tarjeta ${r.numero}`));
+    const cuerpo = nodo("div", "importador-pdf-cuerpo");
+    const cab = nodo("div", "importador-fragmento-cabecera");
+    cab.append(h);
+    if (ya) cab.append(nodo("span", "importador-pdf-estado", `Añadida a la ficha ${numero(ya.ficha)}`));
+    else {
+      const casilla = nodo("label", "casilla");
+      const check = nodo("input");
+      check.type = "checkbox";
+      check.id = `imp-pdf-${id}-incluir`;
+      check.checked = r.incluir;
+      check.dataset.pdfIncluir = id;
+      casilla.append(check, nodo("span", "", "Añadir al lote"));
+      cab.append(casilla);
+    }
+    cuerpo.append(cab, nodo("p", "importador-pdf-procedencia", `${a.principal.nombre}: página ${t.pagina}, tarjeta ${t.orden}${t.conMarco ? "" : " (sin recuadro: reconstruida por posición)"}`));
+    // Clasificación (corregible).
+    const grupo = nodo("fieldset", `editor-opciones importador-pdf-tipo${r.tipo === "revisar" ? " es-revisar" : ""}`);
+    const leyenda = nodo("legend", "", "Clasificación");
+    if (r.tipo === "revisar") leyenda.append(" ", nodo("span", "importador-revisar", "Revisar"));
+    grupo.append(leyenda);
+    const opciones = nodo("div", "editor-opciones-lista");
+    for (const [v, etiqueta] of [["calzado", "Calzado"], ["otro", "Otro artículo"], ["revisar", "Por revisar"]]) {
+      const c = nodo("label", "casilla");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = `imp-pdf-${id}-tipo`;
+      radio.value = v;
+      radio.checked = r.tipo === v;
+      radio.dataset.pdfTipo = id;
+      radio.disabled = Boolean(ya);
+      c.append(radio, nodo("span", "", etiqueta));
+      opciones.append(c);
+    }
+    grupo.append(opciones, nodo("p", "campo-ayuda", r.dec.tipo ? `Corregida a mano. Lectura automática: ${r.comp.clasificacion.motivo}` : r.comp.clasificacion.motivo));
+    cuerpo.append(grupo);
+    // Texto original de cada documento.
+    const original = nodo("details", "importador-original");
+    original.append(nodo("summary", "", "Descripción original"));
+    // Lo confirmado (o exacto) y, aparte, lo solo propuesto, marcado: no se usa hasta confirmarlo.
+    const textos = [[a.principal, t, ""], ...Object.values(r.parejas).filter((x) => x.propuesta).map((x) => [x.doc, x.propuesta, x.tarjeta ? "" : " · propuesta sin confirmar: no se usa"])];
+    for (const [d, x, nota] of textos) original.append(nodo("p", "importador-original-texto", `${d.nombre} (página ${x.pagina}, tarjeta ${x.orden}${nota}):\n${[...x.lineas, ...x.destacados].join("\n") || "sin texto"}`));
+    cuerpo.append(original);
+    // Datos reconocidos y pendientes.
+    const L = r.leido;
+    const dato = (nombre, valor) => `${nombre}: ${valor || "pendiente"}`;
+    const datos = [dato("Marca", L.marca && mayus(L.marca)), dato("Modelo", L.modelo && mayus(L.modelo)), dato("Público", textoPublico(L.publico)),
+      dato("Tallas", L.tallas.length ? `${L.tallas[0]} a ${L.tallas[L.tallas.length - 1]}${L.tallasExplicitas === false && L.reglaTallas ? " (por la regla del perfil)" : ""}` : r.comp.tallasDeclaradas ? `EU ${r.comp.tallasDeclaradas.desde} a ${r.comp.tallasDeclaradas.hasta} (no caben en el catálogo)` : ""),
+      dato("Color", L.color && mayus(L.color))];
+    cuerpo.append(nodo("p", "importador-pdf-datos", datos.join(" · ")));
+    if (r.comp.titulo.cambios.length) cuerpo.append(nodo("p", "campo-ayuda", `Interpretado: ${r.comp.titulo.cambios.join("; ")}.`));
+    if (r.incompatible) cuerpo.append(nodo("p", "editor-nota importador-pdf-incompatible", r.incompatible));
+    // Precios: coste (con condiciones) y venta sugerida, cada uno con su procedencia.
+    const precios = [];
+    const prov = docPorPapel("proveedor");
+    if (!prov) precios.push("Coste del proveedor: pendiente (sin documento de precios).");
+    else if (!r.costesT && r.parejas[prov.id]?.estado === "parecida") precios.push(`Coste del proveedor: pendiente hasta que confirmes la correspondencia con «${prov.nombre}» (foto parecida, no idéntica).`);
+    else if (!r.costesT) precios.push("Coste del proveedor: pendiente (sin tarjeta correspondiente en los precios).");
+    else if (!r.comp.costes.length) precios.push("Coste del proveedor: la tarjeta no trae importe.");
+    else if (r.comp.costes.length === 1) precios.push(`Coste del proveedor: ${precioTexto(r.comp.costes[0])} · ${lugarTarjeta(prov, r.costesT)}.${r.comp.costes[0].general ? "" : " Es un importe condicionado: revísalo en la ficha."}`);
+    else precios.push(`Coste del proveedor: revisar, ${r.comp.costes.map(precioTexto).join(" o ")} · ${lugarTarjeta(prov, r.costesT)}. Se elige en la ficha; ninguno se elige solo.`);
+    const venta = docPorPapel("venta");
+    if (venta) precios.push(r.comp.ventaSugerida ? `Venta sugerida: ${formatoPesos(r.comp.ventaSugerida)} · ${lugarTarjeta(venta, t)}.` : r.comp.ventas.length > 1 ? `Venta sugerida: varios importes (${r.comp.ventas.map(precioTexto).join(", ")}); escríbelo en la ficha.` : "Venta sugerida: la tarjeta no trae importe.");
+    cuerpo.append(nodo("p", "importador-pdf-precios", precios.join(" ")));
+    // Correspondencias en los demás documentos.
+    for (const x of Object.values(r.parejas)) cuerpo.append(pintarParejaPdf(r, x));
+    // Asociación con otras tarjetas.
+    if (!ya && r.incluir) cuerpo.append(pintarAsociacionPdf(r, a));
+    li.append(foto, cuerpo);
+    return li;
+  }
+  function pintarParejaPdf(r, x) {
+    const id = r.t.id;
+    const d = x.doc;
+    if (x.estado === "parecida") {
+      // Propuesta aproximada: las dos fotos a la vista; se confirma o se rechaza. Hasta entonces no aporta nada.
+      const caja = nodo("div", "importador-pdf-aproximada");
+      caja.id = `imp-pdf-${id}-${d.id}-aproximada`;
+      caja.setAttribute("role", "group");
+      caja.setAttribute("aria-label", `Correspondencia aproximada en ${d.nombre}`);
+      const explicacion = nodo("p", "", `${d.nombre}: la página ${x.propuesta.pagina}, tarjeta ${x.propuesta.orden}, tiene una foto parecida pero no idéntica. Compárala: hasta que la confirmes, de esa tarjeta no se usa nada (coste, descripción ni otros datos).`);
+      explicacion.prepend(nodo("span", "importador-revisar", "Revisar"), " ");
+      const comparar = nodo("div", "importador-pdf-comparar");
+      const una = nodo("figure", "");
+      una.append(miniaturaPdf(r.t, `Foto de la tarjeta ${r.numero}`), nodo("figcaption", "", `Tarjeta ${r.numero}`));
+      const otra = nodo("figure", "");
+      otra.append(miniaturaPdf(x.propuesta, `Foto propuesta de ${d.nombre}, página ${x.propuesta.pagina}, tarjeta ${x.propuesta.orden}`),
+        nodo("figcaption", "", `${d.nombre}: ${x.propuesta.lineas.join(" · ") || "sin texto"}`));
+      comparar.append(una, otra);
+      const botones = nodo("div", "editor-botones");
+      botones.append(boton("Sí, es la misma", "pdf-pareja-confirmar", "boton boton-secundario boton-compacto", { tarjeta: id, doc: d.id, candidata: x.propuesta.id }),
+        boton("No corresponde", "pdf-pareja-rechazar", "boton boton-secundario boton-compacto", { tarjeta: id, doc: d.id }));
+      caja.append(explicacion, comparar, botones);
+      return caja;
+    }
+    if (x.estado === "exacta" || x.estado === "elegida") {
+      const como = x.estado === "exacta" ? "misma foto" : x.aproximada ? "confirmada a mano (foto parecida)" : "elegida a mano";
+      const p = nodo("p", "importador-pdf-pareja", `${d.nombre}: página ${x.propuesta.pagina}, tarjeta ${x.propuesta.orden} · ${como}.${x.fechaPendiente ? " Pendiente: el documento es de otra fecha." : ""}`);
+      if (x.estado === "elegida") {
+        p.append(" ");
+        p.append(boton("Cambiar", "pdf-pareja-reiniciar", "boton boton-texto boton-mini", { tarjeta: id, doc: d.id }));
+      }
+      return p;
+    }
+    if (x.estado === "sin" || x.estado === "ninguna") {
+      const p = nodo("p", "importador-pdf-pareja es-revisar", `${d.nombre}: ${x.estado === "ninguna" ? "ninguna (elegido a mano)" : "sin tarjeta con la misma foto"}. Sus datos quedan pendientes.`);
+      if (x.estado === "ninguna") { p.append(" "); p.append(boton("Cambiar", "pdf-pareja-reiniciar", "boton boton-texto boton-mini", { tarjeta: id, doc: d.id })); }
+      return p;
+    }
+    // Ambigua: se elige entre las candidatas (con su foto y su texto) o ninguna. Nada se elige solo.
+    const grupo = nodo("fieldset", "editor-opciones importador-pdf-ambigua es-revisar");
+    const leyenda = nodo("legend", "", `${d.nombre}: varias tarjetas tienen una foto igual o muy parecida. ¿Cuál corresponde?`);
+    leyenda.append(" ", nodo("span", "importador-revisar", "Revisar"));
+    grupo.append(leyenda);
+    const lista = nodo("div", "importador-pdf-candidatos");
+    for (const c of [...x.candidatos.map((k) => ({ valor: k.id, k })), { valor: "ninguna", k: null }]) {
+      const caja = nodo("label", "casilla importador-pdf-candidato");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = `imp-pdf-${id}-${d.id}-pareja`;
+      radio.value = c.valor;
+      radio.checked = false;
+      radio.dataset.pdfPareja = `${id}|${d.id}`;
+      caja.append(radio);
+      if (c.k) caja.append(miniaturaPdf(c.k.tarjeta, `Foto de la página ${c.k.tarjeta.pagina}, tarjeta ${c.k.tarjeta.orden}`),
+        nodo("span", "", `Página ${c.k.tarjeta.pagina}, tarjeta ${c.k.tarjeta.orden}${c.k.exacta ? " · misma foto" : ""}${c.k.tarjeta.pagina === r.t.pagina && c.k.tarjeta.orden === r.t.orden ? " · misma posición" : ""}: ${c.k.tarjeta.lineas.join(" · ") || "sin texto"}`));
+      else caja.append(nodo("span", "", "Ninguna de estas"));
+      lista.append(caja);
+    }
+    grupo.append(lista);
+    return grupo;
+  }
+  function pintarAsociacionPdf(r, a) {
+    const id = r.t.id;
+    const grupo = nodo("fieldset", `editor-opciones importador-pdf-asociar${r.errorAsociacion ? " es-revisar" : ""}`);
+    grupo.id = `imp-pdf-${id}-asociar`;
+    grupo.append(nodo("legend", "", "Esta tarjeta es"));
+    const lista = nodo("div", "editor-opciones-lista");
+    const anterior = a.filas.slice(0, r.numero - 1).reverse().find((x) => x.incluir);
+    for (const [v, etiqueta] of [["ficha", "Otra zapatilla"], ["color", "Otro color de la misma zapatilla que la tarjeta…"], ["foto", "Otra fotografía del mismo color que la tarjeta…"]]) {
+      const c = nodo("label", "casilla");
+      const radio = nodo("input");
+      radio.type = "radio";
+      radio.name = `imp-pdf-${id}-asociar`;
+      radio.value = v;
+      radio.checked = r.asociar.modo === v;
+      radio.dataset.pdfAsociar = id;
+      if (anterior) radio.dataset.anterior = String(anterior.numero);
+      c.append(radio, nodo("span", "", etiqueta));
+      lista.append(c);
+    }
+    grupo.append(lista);
+    if (r.asociar.modo !== "ficha") {
+      const campoDestino = campo({ id: `imp-pdf-${id}-destino`, etiqueta: "Número de la tarjeta", valor: String(r.asociar.destino ?? ""), modo: "numeric", max: 3,
+        ayuda: r.asociar.modo === "color" ? "Se añade como otro color de esa zapatilla, con su propia foto, tallas y precios." : "Su foto se añade a la galería de ese color.",
+        datos: { pdfDestino: id } });
+      if (r.errorAsociacion) {
+        const error = nodo("p", "campo-error", r.errorAsociacion);
+        error.id = `imp-pdf-${id}-destino-error`;
+        campoDestino.append(error);
+        campoDestino.querySelector("input")?.setAttribute("aria-invalid", "true");
+      }
+      grupo.append(campoDestino);
+    }
+    return grupo;
+  }
+  function repintarPdf() {
+    const actual = $("#imp-pdf");
+    if (!actual || !lote?.pdf) { if (lote) pintar(); return; }
+    const activo = document.activeElement?.id;
+    actual.replaceWith(pintarPdf());
+    if (activo && document.getElementById(activo)) document.getElementById(activo).focus({ preventScroll: true });
+    programarGuardado();
+  }
+  function abrirPdf() {
+    estadoPdf();
+    pintar();
+    $("#imp-pdf")?.scrollIntoView({ block: "start" });
+    $("#imp-pdf-titulo")?.focus({ preventScroll: true });
+  }
+  function decisionPdf(id) {
+    const p = lote.pdf;
+    if (!p.decision[id]) p.decision[id] = {};
+    return p.decision[id];
+  }
+
+  // ------------------------------------------------------------------ añadir al lote
+  const PUBLICOS_PDF = new Set(["hombre", "dama", "unisex"]);
+  function textoOriginalPdf(r, a) {
+    const bloques = [[a.principal, r.t], ...Object.values(r.parejas).filter((x) => x.tarjeta).map((x) => [x.doc, x.tarjeta])];
+    return bloques.map(([d, t]) => `[${d.nombre} · página ${t.pagina}, tarjeta ${t.orden}]\n${[...t.lineas, ...t.destacados].join("\n")}`).join("\n\n");
+  }
+  function llenarColorPdf(f, c, r, a) {
+    const p = lote.pdf;
+    c.texto = r.comp.mensaje.slice(0, 4000);
+    c.original = textoOriginalPdf(r, a).slice(0, 12000);
+    const lugares = [`${a.principal.nombre}, página ${r.t.pagina} (tarjeta ${r.t.orden})`,
+      ...Object.values(r.parejas).filter((x) => x.tarjeta).map((x) => `${x.doc.nombre}, página ${x.tarjeta.pagina} (tarjeta ${x.tarjeta.orden})`)];
+    c.procedencia = `Catálogo PDF: ${lugares.join(" · ")}`.slice(0, 600);
+    c.pdf = {
+      tarjeta: r.t.id,
+      costes: r.comp.costes.slice(0, 6).map((x) => ({ importe: x.importe, condicion: String(x.condicion).slice(0, 120), general: Boolean(x.general) })),
+      ventaSugerida: r.comp.ventaSugerida || null,
+      notasVenta: (r.comp.notasVenta || []).slice(0, 4).map((n) => String(n).slice(0, 200)),
+      incompatible: r.incompatible.slice(0, 400),
+      tallas: r.comp.tallasDeclaradas || null
+    };
+    aplicarTexto(f, c);
+    // Tallas declaradas que el lector no admite (calzado infantil 28–35): se conservan tal cual y quedan
+    // «Revisar»; la validación de la ficha explica por qué no se pueden guardar así.
+    const d = c.pdf.tallas;
+    if (d && !c.tallasTexto.trim() && Number.isInteger(d.desde) && Number.isInteger(d.hasta) && d.hasta - d.desde <= 20) {
+      c.tallasTexto = Array.from({ length: d.hasta - d.desde + 1 }, (_, i) => String(d.desde + i)).join("; ");
+      c.editados.add("tallas");
+      c.revisar.add("tallas");
+    }
+    if (c.pdf.incompatible && f.colores[0] === c && !PUBLICOS_PDF.has(f.publico)) f.revisar.add("publico");
+    if (p.precioVenta === "sugerido" && c.pdf.ventaSugerida && docPorPapel("venta")) adoptarSugerido(c);
+    else if (!c.ventaManual && !String(c.venta).trim()) c.revisar.add("venta");
+  }
+  // Precio de venta sugerido del PDF, tal cual: cuenta como escrito a mano (ningún ajuste lo cambia).
+  function adoptarSugerido(c) {
+    c.venta = String(c.pdf.ventaSugerida);
+    c.ventaManual = true;
+    c.origenVenta = "sugerido";
+    c.revisar.delete("venta");
+  }
+  function itemFotoPdf(r, c) {
+    const ref = r.t.foto?.ref;
+    const blob = ref ? lote.pdf.blobs[ref] : null;
+    if (!blob || c.fotos.length >= fotos().LIMITES.fotosPorColor) return null;
+    const ext = blob.type === "image/webp" ? "webp" : blob.type === "image/png" ? "png" : "jpg";
+    const nombre = `catalogo-p${r.t.pagina}-${r.t.orden}.${ext}`;
+    const archivo = typeof File === "function" ? new File([blob], nombre, { type: blob.type }) : blob;
+    const item = { clave: nuevaClave("p"), ref: uuid(), estado: "procesando", archivo, nombre };
+    c.fotos.push(item);
+    return item;
+  }
+  async function anadirPdfAlLote() {
+    if (anadiendoPdf || guardando || leyendoPdf || !lote?.pdf) return;
+    const a = analisisPdf();
+    if (!a.principal || a.errores.length) { mensaje(a.errores[0] || "Elige primero los documentos.", "aviso"); return; }
+    const k = contadoresPdf(a);
+    if (k.errores.length) {
+      mensaje(`Corrige la asociación de la tarjeta ${k.errores[0].numero}: ${k.errores[0].errorAsociacion}`, "aviso");
+      if (!enVista(k.errores[0], lote.pdf.vista)) { lote.pdf.vista = "todas"; repintarPdf(); }
+      document.getElementById(`imp-pdf-${k.errores[0].t.id}-destino`)?.focus();
+      return;
+    }
+    if (!k.pendientes.length) { mensaje("Marca al menos una tarjeta para añadir al lote.", "aviso"); return; }
+    const raices = k.pendientes.filter((r) => r.raiz === r);
+    const MAX_FICHAS = 400;
+    if (lote.fichas.length + raices.length > MAX_FICHAS) { mensaje(`Un lote admite hasta ${MAX_FICHAS} fichas: añade menos tarjetas o guarda primero este lote.`, "aviso"); return; }
+    anadiendoPdf = true;
+    const porColor = new Map(); // color → { f, items }
+    const anotar = (f, c, item) => { if (!item) return; if (!porColor.has(c)) porColor.set(c, { f, items: [] }); porColor.get(c).items.push(item); };
+    const p = lote.pdf;
+    const creadas = [];
+    const omitidas = [];
+    try {
+      const vacia = lote.fichas.length === 1 && fichaVacia(lote.fichas[0]) ? lote.fichas[0] : null;
+      const colorDeFila = new Map(); // fila → { ficha, color }
+      const destinoPrevio = (fila) => { const ref = anadidaPdf(fila); return ref && editable(ref.ficha) ? ref : null; };
+      // 1. Una ficha por cada «otra zapatilla».
+      for (const r of raices) {
+        let f = !creadas.length && vacia ? vacia : null;
+        if (f) f.perfil = lote.perfilLote;
+        else { f = fichaNueva(lote.perfilLote); lote.fichas.push(f); }
+        const c = f.colores[0];
+        llenarColorPdf(f, c, r, a);
+        colorDeFila.set(r, { ficha: f, color: c });
+        p.anadidas[r.t.id] = c.clave;
+        anotar(f, c, itemFotoPdf(r, c));
+        creadas.push(f);
+      }
+      // 2. «Otro color»: en la ficha de su raíz (también una añadida antes).
+      for (const r of k.pendientes.filter((x) => x.raiz !== x && x.colorFila === x)) {
+        const destino = colorDeFila.get(r.raiz) || destinoPrevio(r.raiz);
+        if (!destino || destino.ficha.colores.length >= comun().LIM.colores) { omitidas.push(r); continue; }
+        const f = destino.ficha;
+        const c = colorNuevo();
+        f.colores.push(c);
+        llenarColorPdf(f, c, r, a);
+        f.pendiente = null;
+        colorDeFila.set(r, { ficha: f, color: c });
+        p.anadidas[r.t.id] = c.clave;
+        anotar(f, c, itemFotoPdf(r, c));
+        if (!creadas.includes(f)) creadas.push(f);
+      }
+      // 3. «Otra fotografía del mismo color»: a la galería de ese color.
+      for (const r of k.pendientes.filter((x) => x.colorFila !== x)) {
+        const destino = colorDeFila.get(r.colorFila) || destinoPrevio(r.colorFila);
+        if (!destino) { omitidas.push(r); continue; }
+        const item = itemFotoPdf(r, destino.color);
+        if (!item) { omitidas.push(r); continue; }
+        destino.ficha.pendiente = null;
+        p.anadidas[r.t.id] = destino.color.clave;
+        anotar(destino.ficha, destino.color, item);
+      }
+      cambioPdf();
+      const nuevas = creadas.filter((f) => f !== vacia);
+      if (lote.destinos && nuevas.length) lote.avisoDestinos = `${nuevas.length === 1 ? "La ficha" : "Las fichas"} ${listaNumeros(nuevas)} ${nuevas.length === 1 ? "es nueva y no está elegida" : "son nuevas y no están elegidas"} para los ajustes: márcalas si quieres ajustarlas.`;
+      pintar();
+      const colores = [...porColor.keys()].length;
+      const fotosN = [...porColor.values()].reduce((n, x) => n + x.items.length, 0);
+      const fichasN = raices.length;
+      mensaje(`Se ${fichasN === 1 ? "añadió 1 ficha" : `añadieron ${fichasN} fichas`} al lote (${colores === 1 ? "1 color" : `${colores} colores`}, ${fotosN === 1 ? "1 fotografía" : `${fotosN} fotografías`}).${omitidas.length ? ` ${omitidas.length === 1 ? "1 tarjeta no se pudo añadir" : `${omitidas.length} tarjetas no se pudieron añadir`} (destino ya guardado o lleno): siguen en la revisión.` : ""} Las fotos se optimizan ahora. Nada se guardó en Supabase.`, omitidas.length ? "aviso" : "ok");
+      const primera = creadas.find((f) => lote.fichas.includes(f));
+      if (primera) {
+        document.getElementById(`imp-${primera.clave}`)?.scrollIntoView({ block: "start" });
+        document.getElementById(`imp-${primera.clave}-titulo`)?.focus({ preventScroll: true });
+      }
+      guardarBorrador();
+      // Las fotos se optimizan de una en una (fotos.js): la ventana sigue usable.
+      const loteActual = lote;
+      for (const [c, { f, items }] of porColor) {
+        if (lote !== loteActual) break;
+        await procesarFotos(f, c, items);
+      }
+      if (lote === loteActual) { repintarPdf(); guardarBorrador(); }
+    } finally {
+      anadiendoPdf = false;
+    }
+  }
+  function cerrarPdf() {
+    leyendoPdf?.controlador.abort();
+    soltarUrlsPdf();
+    lote.pdf = null;
+    cambioPdf();
+    pintar();
+    $("#imp-pdf-abrir")?.focus();
+    mensaje("Importación del catálogo PDF cerrada. Las fichas añadidas siguen en el lote.");
+    guardarBorrador();
+  }
+  function alClicPdf(accion, b) {
+    switch (accion) {
+      case "pdf-abrir": abrirPdf(); return true;
+      case "pdf-elegir":
+        if (b.getAttribute("aria-disabled") === "true") { mensaje(leyendoPdf ? "Espera a que termine la lectura en curso." : `Como mucho ${pdf().LIMITES.documentos} documentos: quita uno para añadir otro.`, "aviso"); return true; }
+        $("#imp-pdf-archivo")?.click();
+        return true;
+      case "pdf-cancelar": leyendoPdf?.controlador.abort(); return true;
+      case "pdf-quitar":
+        if (leyendoPdf) { mensaje("Espera a que termine la lectura en curso.", "aviso"); return true; }
+        quitarDocumentoPdf(b.dataset.doc);
+        repintarPdf();
+        $("#imp-pdf-elegir")?.focus();
+        return true;
+      case "pdf-vista":
+        lote.pdf.vista = b.dataset.vista;
+        repintarPdf();
+        document.getElementById(`imp-pdf-vista-${b.dataset.vista}`)?.focus({ preventScroll: true });
+        return true;
+      case "pdf-anadir":
+        if (b.getAttribute("aria-disabled") === "true") { mensaje(leyendoPdf || anadiendoPdf ? "Espera a que termine el proceso en curso." : "Marca al menos una tarjeta para añadir al lote.", "aviso"); return true; }
+        anadirPdfAlLote();
+        return true;
+      case "pdf-pareja-confirmar":
+      case "pdf-pareja-rechazar": {
+        const dec = decisionPdf(b.dataset.tarjeta);
+        dec.pareja = { ...(dec.pareja || {}), [b.dataset.doc]: accion === "pdf-pareja-confirmar" ? b.dataset.candidata : "ninguna" };
+        cambioPdf();
+        repintarPdf();
+        document.getElementById(`imp-pdf-${b.dataset.tarjeta}-titulo`)?.focus({ preventScroll: true });
+        return true;
+      }
+      case "pdf-pareja-reiniciar": {
+        const dec = decisionPdf(b.dataset.tarjeta);
+        if (dec.pareja) delete dec.pareja[b.dataset.doc];
+        cambioPdf();
+        repintarPdf();
+        document.getElementById(`imp-pdf-${b.dataset.tarjeta}-titulo`)?.focus({ preventScroll: true });
+        return true;
+      }
+      case "pdf-cerrar": lote.pdf.cerrar = true; repintarPdf(); $('[data-imp="pdf-cerrar-no"]')?.focus(); return true;
+      case "pdf-cerrar-no": lote.pdf.cerrar = false; repintarPdf(); $('[data-imp="pdf-cerrar"]')?.focus(); return true;
+      case "pdf-cerrar-si": cerrarPdf(); return true;
+      case "pdf-usar-sugerido": {
+        const ref = colorDe(b.dataset.color);
+        if (!ref || !editable(ref.ficha) || !ref.color.pdf?.ventaSugerida) return true;
+        adoptarSugerido(ref.color);
+        ref.ficha.pendiente = null;
+        repintarFicha(ref.ficha);
+        document.getElementById(`imp-${ref.color.clave}-venta`)?.focus({ preventScroll: true });
+        return true;
+      }
+      default: return false;
+    }
+  }
+  // Casillas, opciones y campos de la revisión. Devuelve true si el evento era de la importación.
+  function alEscribirPdf(n) {
+    const p = lote.pdf;
+    const d = n.dataset;
+    if (d.pdfPapel === undefined && d.pdfIncluir === undefined && d.pdfTipo === undefined && d.pdfPareja === undefined && d.pdfAsociar === undefined
+      && d.pdfDestino === undefined && d.pdfPrecio === undefined && d.pdfConfirmarFechas === undefined) return false;
+    if (!p || anadiendoPdf) return true;
+    if (n.type === "radio" && !n.checked) return true;
+    let foco = n.id;
+    if (d.pdfPapel !== undefined) { const doc = docPdf(d.pdfPapel); if (doc) doc.papel = n.value; }
+    else if (d.pdfIncluir !== undefined) decisionPdf(d.pdfIncluir).incluir = n.checked;
+    else if (d.pdfTipo !== undefined) {
+      const dec = decisionPdf(d.pdfTipo);
+      dec.tipo = n.value;
+      // Cambiar la clasificación a mano decide también si se añade (calzado sí; lo demás no), salvo que
+      // la casilla se haya tocado después.
+      dec.incluir = n.value === "calzado";
+    } else if (d.pdfPareja !== undefined) {
+      const [tarjeta, doc] = d.pdfPareja.split("|");
+      const dec = decisionPdf(tarjeta);
+      dec.pareja = { ...(dec.pareja || {}), [doc]: n.value };
+      foco = `imp-pdf-${tarjeta}-titulo`;
+    } else if (d.pdfAsociar !== undefined) {
+      const dec = decisionPdf(d.pdfAsociar);
+      const previo = dec.asociar || { modo: "ficha", destino: "" };
+      dec.asociar = { modo: n.value, destino: n.value === "ficha" ? "" : previo.destino || d.anterior || "" };
+    } else if (d.pdfDestino !== undefined) {
+      const dec = decisionPdf(d.pdfDestino);
+      dec.asociar = { ...(dec.asociar || { modo: "color" }), destino: n.value.trim() };
+      cambioPdf();
+      programar(`pdf-destino-${d.pdfDestino}`, () => { repintarPdf(); document.getElementById(foco)?.focus({ preventScroll: true }); }, 400);
+      return true;
+    } else if (d.pdfPrecio !== undefined) p.precioVenta = n.value;
+    else if (d.pdfConfirmarFechas !== undefined) p.confirmarFechas = n.checked;
+    cambioPdf();
+    repintarPdf();
+    document.getElementById(foco)?.focus({ preventScroll: true });
+    return true;
+  }
+
   // ------------------------------------------------------------------ guardado local (IndexedDB)
   let almacenOk = false;
   const metas = new WeakMap(); // por lote: { persistidas: Map(ref → clase), revision, existe, sucio, descartado }
@@ -2771,7 +3744,7 @@
   let cadena = Promise.resolve();
   const ESPERA_GUARDADO = 800;    // tras el último cambio
   const ESPERA_MAXIMA = 4000;     // aunque se siga escribiendo
-  const TRANSITORIOS = new Set(["blob", "archivo", "vistaPrevia", "quitada", "enCurso", "cortar"]);
+  const TRANSITORIOS = new Set(["blob", "archivo", "vistaPrevia", "quitada", "enCurso", "cortar", "blobs", "cerrar"]);
   const horaCorta = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" });
   const fechaLarga = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
   const formatoFecha = (iso, formato = fechaLarga) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : formato.format(d); };
@@ -2831,7 +3804,7 @@
   // guardando o quedaron sin confirmar), imágenes del reparto, un pegado o ajustes del lote.
   function pendientesDe(l) {
     return l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length + (l.reparto?.items.length || 0) + (l.pegado?.texto.trim() ? 1 : 0)
-      + (ajustesPendientes(l) ? 1 : 0);
+      + (ajustesPendientes(l) ? 1 : 0) + (l.pdf?.documentos?.length ? 1 : 0);
   }
   const hayContenido = (l) => pendientesDe(l) > 0 || l.fichas.some((f) => f.estado !== "borrador");
 
@@ -2859,6 +3832,13 @@
       for (const c of f.colores) for (const x of c.fotos) considerar(x);
     }
     for (const it of l.reparto?.items || []) considerar(it);
+    // Etapa 21: fotos de las tarjetas del catálogo PDF (una por huella), mientras la importación siga abierta.
+    for (const ref of Object.values(l.pdf?.fotos || {})) {
+      const blob = l.pdf.blobs?.[ref];
+      // Clase «pdf»: imagen de TRABAJO extraída del catálogo (WebP, o JPEG si el navegador no genera WebP), no
+      // una foto final lista para publicar; al añadirla al lote, fotos.js la prepara como cualquier otra.
+      if (blob) lista.push({ ref, clase: "pdf", blob, nombre: "catalogo-pdf" });
+    }
     return lista;
   }
   function registroDe(l) {
@@ -2866,7 +3846,8 @@
       id: l.id, creado: l.creado, proveedor: nombrePerfil(instantanea(l.perfilLote, l)), publicaciones: contarPublicaciones(l),
       fichas: l.fichas.length, guardadas: l.fichas.filter((f) => f.estado === "guardada").length, pendientes: pendientesDe(l),
       // Etapa 20: qué está pendiente, para la lista de borradores.
-      detalle: { fichas: l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length, imagenes: l.reparto?.items.length || 0, pegado: Boolean(l.pegado?.texto.trim()), ajustes: ajustesPendientes(l) },
+      detalle: { fichas: l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length, imagenes: l.reparto?.items.length || 0, pegado: Boolean(l.pegado?.texto.trim()), ajustes: ajustesPendientes(l),
+        pdf: l.pdf?.documentos?.length || 0 },
       datos: serializar(l)
     };
   }
@@ -2974,12 +3955,39 @@
         if (!Array.isArray(c.notas)) c.notas = [];
         if (!Array.isArray(c.reglas)) c.reglas = [];
         if (!Array.isArray(c.precios)) c.precios = [];
+        // Etapa 21: procedencia, datos del catálogo PDF y origen del precio de venta.
+        if (typeof c.procedencia !== "string") c.procedencia = "";
+        exigir(c.procedencia.length <= 600, "Un color no es válido.");
+        if (!c.pdf || typeof c.pdf !== "object" || Array.isArray(c.pdf)) c.pdf = null;
+        if (c.pdf && !Array.isArray(c.pdf.costes)) c.pdf.costes = [];
+        if (!["", "manual", "sugerido"].includes(c.origenVenta ?? "")) c.origenVenta = "";
         for (const x of c.fotos) exigir(x && RE_CLAVE.test(x.clave) && ESTADOS_FOTO.has(x.estado) && (!x.ref || UUID.test(x.ref)), "Una foto no es válida.");
       }
     }
     if (l.reparto) {
       exigir(Array.isArray(l.reparto.items) && l.reparto.items.length <= MAX_REPARTO, "El reparto de fotos no es válido.");
       for (const it of l.reparto.items) exigir(it && RE_CLAVE.test(it.clave) && ["procesando", "lista", "error"].includes(it.estado) && (!it.ref || UUID.test(it.ref)), "Una imagen del reparto no es válida.");
+    }
+    if (l.pdf) {
+      // Etapa 21: importación de catálogo PDF en curso.
+      const p = l.pdf;
+      exigir(typeof p === "object" && Array.isArray(p.documentos) && p.documentos.length <= 3, "La importación del catálogo PDF no es válida.");
+      exigir(p.fotos && typeof p.fotos === "object" && Object.values(p.fotos).every((r) => typeof r === "string" && UUID.test(r)), "Las fotos del catálogo PDF no son válidas.");
+      for (const d of p.documentos) {
+        exigir(d && typeof d.id === "string" && /^d[0-9a-f]{8}$/.test(d.id) && typeof d.nombre === "string" && d.nombre.length <= 200 && Array.isArray(d.tarjetas) && d.tarjetas.length <= 400
+          && ["", "venta", "proveedor", "descripcion"].includes(d.papel ?? ""), "Un documento del catálogo PDF no es válido.");
+        for (const t of d.tarjetas) {
+          exigir(t && typeof t.id === "string" && t.id.startsWith(`${d.id}-`) && Array.isArray(t.lineas) && Array.isArray(t.destacados) && t.foto && typeof t.foto === "object"
+            && t.lineas.every((x) => typeof x === "string" && x.length <= 600) && t.destacados.every((x) => typeof x === "string" && x.length <= 600), "Una tarjeta del catálogo PDF no es válida.");
+          if (!Array.isArray(t.etiquetas)) t.etiquetas = [];
+        }
+      }
+      for (const k of ["decision", "anadidas"]) if (!p[k] || typeof p[k] !== "object" || Array.isArray(p[k])) p[k] = {};
+      if (!["sugerido", "margen"].includes(p.precioVenta)) p.precioVenta = "sugerido";
+      if (!["calzado", "otro", "dudosas", "todas"].includes(p.vista)) p.vista = "calzado";
+      p.confirmarFechas = Boolean(p.confirmarFechas);
+      if (typeof p.aviso !== "string") p.aviso = "";
+      p.blobs = {};
     }
     if (l.pegado) {
       exigir(typeof l.pegado.texto === "string" && l.pegado.texto.length <= separador().MAX_TEXTO && Array.isArray(l.pegado.cortes), "El pegado no es válido.");
@@ -3046,6 +4054,13 @@
         vistas(c.clave);
         for (const x of c.fotos) { vistas(x.clave); restaurarFoto(x, fotosGuardadas, f.estado === "guardada"); }
       }
+    }
+    // Etapa 21: fotos de las tarjetas del catálogo PDF.
+    if (l.pdf) {
+      l.pdf.blobs = {};
+      for (const ref of Object.values(l.pdf.fotos)) { const g = fotosGuardadas.get(ref); if (g?.blob) l.pdf.blobs[ref] = g.blob; }
+      for (const d of l.pdf.documentos) for (const t of d.tarjetas) if (t.foto?.ref && !l.pdf.blobs[t.foto.ref]) t.foto.error = "No se pudo recuperar esta foto del borrador.";
+      cambioPdf();
     }
     if (l.reparto) {
       l.reparto.items.forEach((it) => { vistas(it.clave); restaurarFoto(it, fotosGuardadas, false); });
@@ -3146,7 +4161,8 @@
     const d = b.detalle;
     if (!d) return `${b.pendientes} con trabajo pendiente`;
     const partes = [d.fichas ? `${d.fichas} ${d.fichas === 1 ? "ficha" : "fichas"} sin guardar` : "", d.imagenes ? `${d.imagenes} ${d.imagenes === 1 ? "imagen" : "imágenes"} sin asignar` : "",
-      d.pegado ? "un pegado sin crear" : "", d.ajustes ? "ajustes del lote" : ""].filter(Boolean);
+      d.pegado ? "un pegado sin crear" : "", d.ajustes ? "ajustes del lote" : "",
+      d.pdf ? `una importación de catálogo PDF (${d.pdf === 1 ? "1 documento" : `${d.pdf} documentos`})` : ""].filter(Boolean);
     return `Pendiente: ${partes.join(", ")}`;
   }
   // Espacio legible: KB, MB o GB según el tamaño.
@@ -3476,6 +4492,8 @@
   function soltarLote({ guardar = false } = {}) {
     const l = lote;
     if (!l) return Promise.resolve();
+    leyendoPdf?.controlador.abort();
+    soltarUrlsPdf();
     lote = null;
     clearTimeout(temporizadorGuardado);
     primerCambio = 0;
@@ -3662,6 +4680,7 @@
     if (!lote && !SIN_LOTE.has(accion)) return;
     if (guardando && accion !== "cerrar") return;
     if (alClicEtapa20(accion, b)) return;
+    if (alClicPdf(accion, b)) return;
     const f = fichaDe(b.dataset.ficha);
     switch (accion) {
       case "cerrar": intentarCerrar(); break;
@@ -3747,6 +4766,8 @@
   function alEscribir(e) {
     if (!lote || guardando) return;
     const n = e.target;
+    // Etapa 21: revisión del catálogo PDF.
+    if (alEscribirPdf(n)) return;
     // Etapa 20: pegado, perfiles y «Recordar para este proveedor».
     if (n.dataset.pegado === "texto") { if (lote.pegado) { lote.pegado.texto = n.value; lote.pegado.error = ""; } return; }
     if (n.dataset.pegadoColores !== undefined) {
@@ -3864,7 +4885,7 @@
       }
       c[k] = n.value;
       if (k === "texto") { programar(`texto-${c.clave}`, () => { aplicarTexto(f, c); repintarFicha(f); repintarOtras(f); }, 300); return; }
-      if (k === "venta") { c.ventaManual = String(n.value).trim() !== ""; if (c.ventaManual) c.revisar.delete("venta"); }
+      if (k === "venta") { c.ventaManual = String(n.value).trim() !== ""; c.origenVenta = c.ventaManual ? "manual" : ""; if (c.ventaManual) c.revisar.delete("venta"); }
       const mapaRevisar = { proveedor: "precio", tallasTexto: "tallas", color: "color" };
       if (mapaRevisar[k]) { c.editados.add(k === "tallasTexto" ? "tallas" : k); c.revisar.delete(mapaRevisar[k]); }
       if (k === "proveedor" && !c.ventaManual) ventaAutomatica(c);
@@ -3909,6 +4930,13 @@
       return;
     }
     if (n.type !== "file" || !lote) return;
+    // Etapa 21: PDF del proveedor.
+    if (n.dataset.pdfArchivos) {
+      const elegidos = [...(n.files || [])];
+      n.value = "";
+      if (!guardando && elegidos.length) leerPdfs(elegidos);
+      return;
+    }
     if (n.dataset.reparto) {
       const elegidos = [...(n.files || [])];
       n.value = "";
@@ -4031,6 +5059,8 @@
      los archivos subidos por este lote que ninguna galería usa (limpieza verificada de limpiarSubidas). */
   function descartar() {
     descartarReparto({ silencio: true });
+    leyendoPdf?.controlador.abort();
+    soltarUrlsPdf();
     const l = lote;
     for (const f of l?.fichas || []) for (const c of f.colores) {
       for (const x of c.fotos) { x.quitada = true; if (String(x.vistaPrevia || "").startsWith("blob:")) URL.revokeObjectURL(x.vistaPrevia); }
@@ -4062,7 +5092,8 @@
     const porAsignar = lote.reparto?.items.length || 0;
     const pegando = lote.pegado?.texto.trim() ? 1 : 0;
     const ajustes = ajustesPendientes(lote) ? 1 : 0;
-    if (!sinGuardar && !porAsignar && !pegando && !ajustes) {
+    const importando = lote.pdf?.documentos?.length ? 1 : 0;
+    if (!sinGuardar && !porAsignar && !pegando && !ajustes && !importando) {
       // Nada pendiente. Un lote que ya está en el borrador local (p. ej. con sus fichas guardadas en
       // Supabase) se conserva en la lista: solo se borra con una acción expresa.
       if (almacenOk && meta(lote).existe) { cerrar(); soltarLote({ guardar: true }); return; }
@@ -4072,7 +5103,8 @@
     mensaje(""); // el pie solo muestra la pregunta: en pantallas bajas no quita sitio al contenido
     const pendientes = [sinGuardar ? (sinGuardar === 1 ? "una ficha sin guardar" : `${sinGuardar} fichas sin guardar`) : "",
       porAsignar ? (porAsignar === 1 ? "una imagen sin asignar" : `${porAsignar} imágenes sin asignar`) : "",
-      pegando ? "un pegado de varias publicaciones sin crear" : "", ajustes && !sinGuardar ? "ajustes del lote elegidos" : ""].filter(Boolean).join(" y ");
+      pegando ? "un pegado de varias publicaciones sin crear" : "", importando ? "una importación de catálogo PDF abierta" : "",
+      ajustes && !sinGuardar ? "ajustes del lote elegidos" : ""].filter(Boolean).join(" y ");
     $("#importador-salida-texto").textContent = almacenOk
       ? `Hay ${pendientes}. Puedes cerrar y seguir después (queda guardado como borrador en este navegador, no en Supabase) o descartarlo.`
       : `Hay ${pendientes}. Puedes cerrar y seguir después (este navegador no guarda borradores: se conserva mientras no recargues la página) o descartarlo.`;

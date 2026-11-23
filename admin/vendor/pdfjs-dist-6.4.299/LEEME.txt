@@ -1,0 +1,16 @@
+pdfjs-dist 6.4.299 (publicada el 2026-10-03), licencia Apache-2.0 (ver LICENSE).
+
+Origen: paquete npm pdfjs-dist@6.4.299, archivos build/pdf.min.mjs y build/pdf.worker.min.mjs sin modificar.
+Integridad del paquete (registro npm): sha512-AVl138zALtfaAPvADulE0PZThbYzCBS79nL4pOSL/6Sm/4AH5A21BD9VHt97OlCuzJuCpmeZtAtkinisF4Vb1g==
+SHA-256 de pdf.min.mjs:        57456c8e0c81e46be31174b499ef77f2b9f5ee46d04412ba627320a36755d4c2
+SHA-256 de pdf.worker.min.mjs: 9536359f1b8367850d485731ca1d5e45c159a7b7a0912325e539937aa21ceb18
+
+Se sirve desde el propio sitio (sin CDN). Solo lo usa el panel privado para «Importar catálogo PDF»
+(admin/catalogo-pdf.js lo carga con import() la primera vez que se lee un PDF; el resto del panel no lo
+descarga). Se usa sin evaluar código (isEvalSupported: false), sin fuentes del sistema y sin descargas
+adicionales: no se incluyen standard_fonts, cmaps ni wasm (los catálogos del proveedor usan fotos JPEG y
+texto con fuentes estándar; un PDF con imágenes JPX/JBIG2 mostraría «No se pudo extraer la foto»).
+
+Para actualizarlo: npm pack pdfjs-dist@<versión>, copiar build/pdf.min.mjs, build/pdf.worker.min.mjs y
+LICENSE a una carpeta nueva con su versión, actualizar esta nota, VERSION_PDFJS en admin/catalogo-pdf.js
+y la carpeta en scripts/preparar-publicacion.mjs.

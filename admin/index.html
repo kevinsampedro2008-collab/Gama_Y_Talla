@@ -9,7 +9,7 @@
   <meta name="referrer" content="no-referrer">
   <!-- Solo scripts del propio sitio y conexiones a Supabase (proyecto y stack local de pruebas).
        blob: en img-src es para la vista previa local de las fotos antes de subirlas. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; connect-src 'self' https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; base-uri 'none'; form-action 'self'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; connect-src 'self' https://mwhiusocfdwzxnzenfsz.supabase.co http://127.0.0.1:54321; worker-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
   <title>Panel · Gama &amp; Talla</title>
   <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,6 +28,7 @@
   <script src="texto-proveedor.js" defer></script>
   <!-- Etapa 20: separar varias publicaciones pegadas y borradores/perfiles locales (IndexedDB). -->
   <script src="separar-publicaciones.js" defer></script>
+  <script src="catalogo-pdf.js" defer></script>
   <script src="borradores.js" defer></script>
   <script src="importador.js" defer></script>
 </head>

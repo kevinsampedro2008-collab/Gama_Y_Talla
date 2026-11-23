@@ -1510,6 +1510,66 @@ details.importador-perfiles:not([open]) { display: block; }
   .importador-perfil-acciones { padding-left: 0; }
 }
 .importador-fragmento-titulo, .importador-recordar-titulo, #imp-perfil-editor-titulo { margin: 0; }
+/* Etapa 21: «Importar catálogo PDF». Documentos con su papel, avance y revisión por tarjeta (foto a la
+   izquierda; en celular, encima). Las dudosas y las incompatibles se señalan con el mismo ámbar que las
+   divisiones dudosas del pegado. */
+.importador-entrada-botones { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.importador-pdf { gap: var(--e-3); box-shadow: inset 0 0 0 2px var(--cobalto); }
+.importador-pdf-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
+.importador-pdf-elegir .campo-ayuda { margin: 0; }
+.importador-pdf-elegir [aria-disabled="true"], .importador-pdf [data-imp="pdf-anadir"][aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.importador-pdf-avance { display: grid; gap: var(--e-2); padding: var(--e-3); border-radius: var(--r-control); background: var(--cobalto-suave); }
+.importador-pdf-avance p { margin: 0; font-weight: 600; }
+.importador-pdf-avance progress { width: 100%; height: 0.5rem; accent-color: var(--cobalto); }
+.importador-pdf-avance .boton { justify-self: start; }
+.importador-pdf-aviso { margin: 0; }
+.importador-pdf-docs { display: grid; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
+.importador-pdf-doc { display: grid; gap: var(--e-2); padding: var(--e-3) var(--e-4); border: 1px solid var(--linea-fuerte); border-radius: var(--r-control); background: var(--superficie); min-width: 0; }
+.importador-pdf-doc .importador-fragmento-titulo { overflow-wrap: anywhere; }
+.importador-pdf-doc-datos { margin: 0; font-size: 0.875rem; color: var(--tinta-2); }
+.importador-pdf-doc .campo-ayuda, .importador-pdf-doc .editor-nota { margin: 0; }
+.importador-pdf-fechas { display: grid; gap: var(--e-2); padding: var(--e-3); border-radius: var(--r-control); background: #fffaf0; box-shadow: inset 4px 0 0 #b26a00; }
+.importador-pdf-fechas p { margin: 0; color: #5c3b00; }
+.importador-pdf-revision { display: grid; gap: var(--e-3); min-width: 0; }
+.importador-pdf-vistas { display: flex; flex-wrap: wrap; gap: var(--e-2); }
+.importador-pdf-lista { display: grid; gap: var(--e-3); margin: 0; padding: 0; list-style: none; }
+.importador-pdf-tarjeta { display: grid; grid-template-columns: 6rem minmax(0, 1fr); gap: var(--e-3); padding: var(--e-3) var(--e-4); border: 1px solid var(--linea-fuerte); border-radius: var(--r-control); background: var(--superficie); min-width: 0; }
+.importador-pdf-tarjeta.es-dudosa { border-color: #b26a00; box-shadow: inset 4px 0 0 #b26a00; }
+.importador-pdf-tarjeta.es-excluido { background: var(--papel); }
+.importador-pdf-tarjeta.es-excluido .importador-pdf-cuerpo > :not(.importador-fragmento-cabecera) { opacity: 0.8; }
+.importador-pdf-foto { min-width: 0; }
+.importador-pdf-miniatura { display: block; width: 100%; max-width: 6rem; height: auto; border-radius: calc(var(--r-control) - 2px); background: var(--papel); }
+.importador-pdf-sinfoto { display: grid; place-items: center; aspect-ratio: 1; padding: var(--e-1); border: 1px dashed var(--linea-fuerte); border-radius: var(--r-control); font-size: 0.75rem; text-align: center; color: var(--tinta-2); }
+.importador-pdf-cuerpo { display: grid; gap: var(--e-2); min-width: 0; }
+.importador-pdf-cuerpo > p, .importador-pdf-cuerpo .campo-ayuda { margin: 0; }
+.importador-pdf-procedencia { font-size: 0.875rem; color: var(--tinta-2); }
+.importador-pdf-datos, .importador-pdf-precios { font-size: 0.9375rem; overflow-wrap: anywhere; }
+.importador-pdf-pareja { font-size: 0.875rem; overflow-wrap: anywhere; }
+.importador-pdf-pareja.es-revisar { color: #5c3b00; }
+.importador-pdf-estado { font-weight: 600; color: var(--exito, #1f6b3a); }
+.importador-pdf-incompatible { margin: 0; }
+.importador-pdf-candidatos { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; }
+.importador-pdf-candidato { display: grid; grid-template-columns: auto 4rem minmax(0, 1fr); align-items: center; gap: var(--e-2); font-size: 0.875rem; overflow-wrap: anywhere; }
+li.importador-pdf-candidato { grid-template-columns: 4rem minmax(0, 1fr); }
+.importador-pdf-candidato .importador-pdf-miniatura { max-width: 4rem; }
+.importador-pdf-asociar .campo { max-width: 16rem; }
+/* Correspondencia aproximada: las dos fotos lado a lado y la decisión (confirmar o «No corresponde»). */
+.importador-pdf-aproximada { display: grid; gap: var(--e-2); padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fffaf0; box-shadow: inset 4px 0 0 #b26a00; }
+.importador-pdf-aproximada > p { margin: 0; font-size: 0.875rem; color: #5c3b00; overflow-wrap: anywhere; }
+.importador-pdf-aproximada .editor-botones { justify-content: flex-start; }
+.importador-pdf-comparar { display: grid; grid-template-columns: repeat(2, minmax(0, 8rem)); gap: var(--e-3); }
+.importador-pdf-comparar figure { display: grid; gap: var(--e-1); margin: 0; min-width: 0; }
+.importador-pdf-comparar .importador-pdf-miniatura { max-width: 8rem; }
+.importador-pdf-comparar figcaption { font-size: 0.75rem; color: var(--tinta-2); overflow-wrap: anywhere; }
+.importador-procedencia { overflow-wrap: anywhere; }
+.importador-sugerido { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-2) var(--e-3); }
+.importador-sugerido .campo-ayuda { margin: 0; }
+@media (max-width: 479px) {
+  .importador-entrada-botones { width: 100%; }
+  .importador-pdf-tarjeta { grid-template-columns: minmax(0, 1fr); }
+  .importador-pdf-miniatura { max-width: 8rem; }
+  .importador-pdf-vistas .boton { flex: 1 1 calc(50% - var(--e-2)); }
+}
 /* Celular: la cabecera deja sitio al contenido; el estado del borrador local sigue a la vista. */
 @media (max-width: 767px) {
   .importador .importador-descripcion { display: none; }
