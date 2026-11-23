@@ -1,4 +1,4 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19, 20 y 21
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19, 20, 21 y 22
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
@@ -149,6 +149,44 @@ color: agrupar o separar fichas durante la revisión no los cambia. **«Asignar 
 una vez (lo asignado sale de la revisión: pulsar dos veces no duplica nada); lo que falló o sobra se
 queda para revisarlo. Las fotos van al borrador: se suben con «Guardar lote como oculto», y «Quitar
 foto» y «Hacer principal» siguen funcionando. La revisión admite hasta 60 imágenes a la vez.
+
+#### Elegir el orden con las fotos (22)
+
+El selector de archivos del dispositivo puede entregar las imágenes en un orden distinto al de los clics y
+no se puede recuperar ese historial. Por eso, en **«Revisa el reparto»**, **«Elegir orden con las
+fotos»** deja elegirlo dentro del panel («El selector del dispositivo puede cambiar el orden. Aquí puedes
+elegirlo antes de asignar»):
+
+- **Galería:** miniaturas grandes (cuadrícula que baja a 2 columnas en celular; sin desplazamiento
+  horizontal). Pulsar una foto la añade al final de la selección y muestra su número (1, 2, 3…). Pulsar
+  otra vez la quita y renumera las siguientes. Cada miniatura es un botón de dos estados (`aria-pressed`),
+  con su nombre, su «Recibida n.º k» y su posición si está elegida: funciona con clic, toque y teclado
+  (Espacio e Intro), y el repintado conserva el foco y el clic.
+- **Controles:** «Deshacer última selección», «Reiniciar orden», «Confirmar este orden (N)», «Usar el
+  orden recibido» y «Cancelar». Las imágenes que no se eligen no se asignan.
+- **Secuencia elegida:** antes de confirmar se ve cada foto con su destino (ficha, modelo y color) y los
+  avisos de siempre: colores que quedarán sin foto, imágenes que sobran y cuántas quedaron sin elegir.
+- **Confirmar** pone las elegidas al principio de la lista, en ese orden, y deja las demás al final
+  como **«Sin elegir: no se asigna»**; «Incluir al final» las suma después.
+- **Orden recibido y orden actual:** el *orden recibido* es el de llegada de los archivos (el número
+  «Recibida n.º k», estable); el *orden actual* es el de la lista, que cambia al elegir, con «Subir»/«Bajar»
+  o con «Ordenar por nombre». **«Usar el orden recibido»** recupera el de llegada de las imágenes que
+  siguen en el reparto, las incluye todas (quita «sin elegir») y las asigna sin pulsar una por una. No
+  cambia las claves, los archivos, las fotos optimizadas ni los destinos manuales, y no reincorpora las
+  imágenes quitadas o ya asignadas. En borradores anteriores, sin número de recepción, cada imagen recibe
+  el suyo en el orden en que está. «Subir», «Bajar», «Cambiar
+  destino» y «Ordenar por nombre de archivo» siguen siendo acciones expresas (las «sin elegir» no se
+  mezclan con las demás).
+- **Identificadores estables:** cada imagen se identifica por su clave (`r1`, `r2`…), nunca por el nombre
+  del archivo: dos imágenes con el mismo nombre se distinguen por su «Recibida n.º». Terminar de
+  optimizar una imagen (o reemplazarla) no cambia el orden ni la selección.
+- **Reglas que no cambian:** los destinos fijados a mano se conservan (también dentro de la secuencia
+  elegida), se saltan los colores que ya tienen fotos (incluidas las que se están optimizando) y se
+  avisa de lo que sobra o falta.
+- **Guardado:** la selección en curso (`reparto.orden.elegidas`, con las claves en orden), las
+  imágenes «sin elegir» y el número de recepción van en el borrador local y en su respaldo. Los
+  borradores anteriores se leen igual (sin selección; las imágenes reciben su número en el orden en que
+  están).
 
 ### Pegar varias publicaciones (20)
 
@@ -467,6 +505,44 @@ archivo.
 - **CSP:** se añadió `worker-src 'self'`.
 - **Build:** el paquete la copia y comprueba que esté.
 - **Sin servicios externos:** ninguna IA ni clave de API.
+
+### Publicar u ocultar desde la tarjeta del modelo (22)
+
+En la fila de cada modelo del tablero, entre **«Editar»** y **«Seleccionar tallas»**, hay un botón que
+publica u oculta **el modelo completo** (no un color) sin abrir el editor y sin confirmaciones
+adicionales:
+
+- **Qué muestra:** **«Publicar»** si el modelo está oculto y **«Ocultar»** si está publicado. Sale del
+  estado de publicación del producto (`activo`), no del de sus tallas. Un modelo **retirado** no lleva el
+  botón: ni se publica ni se restaura por accidente (se restaura desde «Editar»).
+- **Cómo escribe:** solo con `fn_admin_estado_producto`, la misma vía del editor: permiso de
+  administrador, control de versión (la que cargó el tablero), identificador de operación y las
+  validaciones de publicar (público, y un mismo color visible con foto y talla activa). No hay otra
+  escritura, no completa datos ni activa tallas o colores para poder publicar.
+- **Publicar y ocultar no tocan la disponibilidad:** conservan colores, fotos, tallas, precios e
+  historial; no marcan tallas como agotadas ni renuevan o confirman vigencias.
+- **Mientras se procesa** el botón dice «Publicando…» u «Ocultando…» y el resto del tablero queda
+  ocupado: un segundo clic (o doble clic) no envía nada más.
+- **El resultado está junto al modelo** (un aviso dentro de su tarjeta, con «Cerrar aviso») y se anuncia
+  también en una región accesible (`role="status"`), sin avisos fijos arriba ni cambios de foco que
+  provoquen saltos. El estado y el texto del botón cambian solo cuando el servidor confirmó. Se conservan
+  la posición, la búsqueda, el filtro y la selección de tallas; el foco sigue en el botón.
+- **Si falta algo para publicar**, la tarjeta dice qué («Para publicarla falta: …»), el modelo sigue
+  oculto y no cambia nada.
+- **Si el modelo deja de verse por el filtro activo**, se queda en un lugar cercano y el aviso aparece
+  junto al modelo vecino («… ya no aparece con el filtro «…»; te dejamos junto a «…»»).
+- **Conflicto de versión:** si otra edición se guardó antes, no se cambia nada, se carga el estado actual
+  y se puede volver a pulsar.
+- **Respuesta perdida:** antes de permitir un reintento se lee el producto y se compara su
+  `ultima_operacion` con la de ESTA operación. Que el estado actual coincida con el deseado no basta
+  para anunciar el éxito. Si no se puede confirmar, el aviso ofrece **«Comprobar otra vez»** y
+  **«Reintentar»** (la misma operación: si ya se aplicó, el servidor no la repite) y el botón principal
+  queda deshabilitado hasta resolverlo. Si el producto cambió por otra operación, se carga su estado real y
+  no se anuncia éxito.
+- **Sesión vencida o permiso perdido:** se comprueban antes de escribir y al recibir el error, con el
+  mismo tratamiento que el resto del tablero.
+- **Celular:** hasta 479 px, «Editar» y «Publicar» comparten fila y «Seleccionar tallas» ocupa la
+  siguiente, a todo el ancho (áreas táctiles de al menos 44 px); sin desbordes.
 
 ## Cómo mostrar cada color (18)
 
@@ -1049,3 +1125,38 @@ GT_PDF_REALES=<carpeta> GT_CAPTURAS_REALES=<carpeta de capturas> SITIO=http://12
   tarjetas y fotos, los papeles, el cruce 78 a 78, el calzado (57: 41 + 16), los ejemplos de precios, la
   caja, el calzado infantil y la Dama 36–40. Con `GT_CAPTURAS_REALES`, además, captura la revisión en el
   importador.
+
+Etapa 22: también contra el **entorno aislado** (8770):
+
+```bash
+SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa22 --workers=1
+```
+
+`tests/etapa22/estado-producto.spec.js` (catálogo FICTICIO «MARCA ESTADO T22» en el Supabase local):
+- **Publicar y ocultar:** desde la tarjeta, sin abrir el editor. Se comprueba el resultado guardado
+  (versión y operación), el catálogo público, que ninguna columna de tallas, colores o fotos cambia, y que
+  los demás modelos no cambian.
+- **Rechazos y retirados:** la publicación incompleta con su motivo y el modelo que sigue oculto; el
+  retirado sin botón.
+- **Fallos y concurrencia:** doble clic (una sola operación), conflicto de versión, respuesta perdida
+  aplicada, respuesta perdida sin llegar al servidor (Comprobar y Reintentar con la misma operación) y el
+  caso en que otra edición dejó el estado igual al deseado.
+- **Vista:** posición, búsqueda, filtro y selección, el modelo que desaparece por el filtro, teclado
+  (Tab, Intro y Espacio), disposición en escritorio y en celular táctil.
+
+`tests/etapa22/orden-fotos.spec.js` recibe las imágenes en un orden y las elige en otro, y comprueba:
+- **Galería y selección:** numeración, quitar y renumerar, «Deshacer última selección», «Reiniciar
+  orden», teclado y la secuencia con el destino de cada foto.
+- **Confirmación y reparto:** las «sin elegir», la opción rápida «Usar el orden recibido», «Incluir al
+  final», «Subir» y «Bajar», «Ordenar por nombre» y el reparto final.
+- **Orden recibido:** tras elegir 3 y 1 vuelve a 1, 2, 3; también tras «Ordenar por nombre», «Bajar» y
+  recargar el borrador, con destinos manuales, sin reincorporar lo quitado ni lo asignado y con
+  borradores anteriores.
+- **Persistencia:** recargar con la galería abierta y con el orden confirmado, el destino manual y el
+  respaldo con la selección en curso.
+- **Identificadores:** nombres de archivo repetidos con la optimización retrasada de forma controlada
+  (se elige mientras se optimiza y el orden no se mueve) y los colores que ya tienen fotos, también las
+  que se están optimizando, con los avisos de sobrantes y faltantes.
+- **Celular táctil:** 390 px, con toques, miniaturas de al menos 120 px y sin desplazamiento horizontal.
+
+No se guarda nada en el catálogo.

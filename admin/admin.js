@@ -312,6 +312,8 @@
     usuarioActual = null; // etapa 20: se vuelve a fijar al comprobar el acceso (los borradores van por usuario)
     catalogo = [];
     seleccion = new Set();
+    avisosProducto.clear();
+    operacionesEstado.clear();
     accionAbierta = null;
     lugar = null;
     panelBarra = "";
@@ -436,7 +438,9 @@
       const respuestas = await Promise.all([
         leerPaginado(() => cliente.from("productos")
           // publico (etapa 19): el importador distingue las versiones de un mismo modelo para otro público.
-          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,publico,activo,orden,retirado_en," + columnasVariantesTablero())
+          // Etapa 22: version y ultima_operacion para publicar u ocultar desde la tarjeta (control de versión y
+          // comprobación de la operación, como el editor).
+          .select("id,codigo_interno,referencia_proveedor,nombre,marca,categoria,publico,activo,orden,retirado_en,version,ultima_operacion," + columnasVariantesTablero())
           .order("orden").order("codigo_interno").order("id")),
         leerPaginado(() => cliente.rpc("fn_admin_tallas").select(COLUMNAS_TALLA).order("variante_id").order("id")),
         leerPaginado(() => cliente.from("catalogo_publico").select("codigoInterno,variantes").order("orden").order("codigoInterno")),
@@ -566,6 +570,7 @@
     if (activo.dataset.tallaId) return `.talla[data-talla-id="${CSS.escape(activo.dataset.tallaId)}"]`;
     if (activo.dataset.menuTallas) return `[data-menu-tallas="${CSS.escape(activo.dataset.menuTallas)}"]`;
     if (activo.dataset.accion === "editar-producto") return `[data-accion="editar-producto"][data-producto-id="${CSS.escape(activo.dataset.productoId)}"]`;
+    if (activo.dataset.accion === "estado-producto") return `[data-accion="estado-producto"][data-producto-id="${CSS.escape(activo.dataset.productoId)}"]`;
     return null;
   }
 
@@ -682,8 +687,11 @@
     cuerpo.append(codigos, titulo, meta, publicado);
 
     // Etapa 19: «Editar» y «Seleccionar tallas» en su propia fila (en celular, a todo el ancho).
+    // Etapa 22: «Publicar» u «Ocultar» (el modelo completo, según su estado de publicación) entre los dos.
     const botones = nodo("div", "producto-botones");
     botones.append(editar);
+    const botonEstado = botonEstadoProducto(p);
+    if (botonEstado) botones.append(botonEstado);
     if (p.variantes.some((v) => v.tallas.length)) {
       const menuCaja = nodo("div", "menu-tallas");
       const abrir = nodo("button", "boton boton-secundario boton-compacto menu-tallas-boton", "Seleccionar tallas");
@@ -702,7 +710,10 @@
     if (!p.variantes.length) variantes.append(nodo("li", "variante-vacia", "Sin colores registrados."));
     for (const v of p.variantes) variantes.append(filaVariante(p, v));
 
-    articulo.append(marco, cuerpo, botones, variantes);
+    articulo.append(marco, cuerpo, botones);
+    const aviso = avisoDeProducto(p.id);
+    if (aviso) articulo.append(aviso);
+    articulo.append(variantes);
     li.append(articulo);
     return li;
   }
@@ -975,6 +986,9 @@
       const tarjeta = tarjetaEnLista(foco.productoId);
       if (tarjeta) {
         if (foco.control === "menu") objetivo = tarjeta.querySelector("[data-menu-tallas]");
+        // Etapa 22: «Publicar»/«Ocultar»: el foco vuelve al mismo botón; mientras la acción sigue en curso está
+        // deshabilitado y ejecutarEstado lo enfoca al terminar (aquí queda el nombre del modelo).
+        if (foco.control === "estado") objetivo = tarjeta.querySelector('[data-accion="estado-producto"]:not(:disabled)');
         objetivo = objetivo || tallaEnLista(foco.tallaId) || filaEnLista(foco.varianteId)?.querySelector(".talla[data-talla-id]") || tarjeta.querySelector(".producto-nombre");
       } else {
         const vecino = vecinoEnLista(orden, foco.productoId);
@@ -1241,10 +1255,269 @@
   function marcarOcupado(si) {
     ocupado = si;
     if (si) cerrarMenuTallas();
-    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #lista-productos [data-menu-tallas], #boton-nuevo, #filtros button, #barra-acciones button, #seleccion-herramientas button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
-      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, [data-menu-tallas], #barra-acciones button, #seleccion-herramientas button")); });
+    document.querySelectorAll("#lista-productos .talla[data-talla-id], #lista-productos .producto-editar, #lista-productos .producto-estado-boton, #lista-productos .producto-aviso button, #lista-productos [data-menu-tallas], #boton-nuevo, #filtros button, #barra-acciones button, #seleccion-herramientas button, #boton-actualizar, #boton-historial, #boton-exportar, [data-accion='salir'], #historial button")
+      // Un modelo con una operación de estado sin confirmar mantiene deshabilitado su botón principal: primero se comprueba.
+      .forEach((b) => { b.disabled = si || (verificacionPendiente && b.matches(".talla, [data-menu-tallas], #barra-acciones button, #seleccion-herramientas button")) || (!si && b.matches(".producto-estado-boton") && operacionesEstado.has(b.dataset.productoId)); });
     $("#barra-acciones")?.setAttribute("aria-busy", String(si));
     document.querySelectorAll("#dialogo-accion button").forEach((b) => { b.disabled = si; });
+  }
+
+  // ------------------------------------------------------------------- publicar y ocultar un modelo (etapa 22)
+  /* «Publicar»/«Ocultar» en la tarjeta de cada modelo. Escribe SOLO con fn_admin_estado_producto (la misma vía
+     que el editor, con sus validaciones, el control de versión, el permiso y el identificador de operación):
+     no hay otra escritura ni se completa nada para poder publicar. El botón sale del estado de publicación del
+     producto (p.activo), no del de sus tallas; un modelo retirado no lleva botón.
+     - Un clic ejecuta la acción, sin editor ni confirmaciones. Mientras se procesa (todo el tablero queda
+       ocupado) el botón dice «Publicando…» u «Ocultando…»; un segundo clic no hace nada.
+     - El resultado solo se anuncia cuando el servidor lo confirma. Si se pierde la respuesta, se lee el producto y se
+       compara su ultima_operacion con la de ESTA operación (que el estado coincida con el deseado no basta); sin
+       confirmar, queda «Comprobar otra vez» y «Reintentar» (la misma operación: si ya se aplicó, no se repite).
+     - El resultado se muestra junto al modelo (y en una región accesible), sin avisos fijos arriba ni saltos:
+       se conserva la posición, la búsqueda, el filtro y la selección de tallas. Si el modelo deja de verse por el
+       filtro, se explica en el modelo más cercano. */
+  const TEXTOS_ESTADO = {
+    publicar: { boton: "Publicar", ocupado: "Publicando…", hecho: "Publicado: ya se ve en la tienda.", sigue: "El modelo sigue oculto." },
+    ocultar: { boton: "Ocultar", ocupado: "Ocultando…", hecho: "Oculto: ya no se ve en la tienda.", sigue: "El modelo sigue publicado." }
+  };
+  const NO_CAMBIA = "Sus tallas, su disponibilidad y sus fechas no cambiaron.";
+  const avisosProducto = new Map();    // productoId → { texto, tipo: "ok" | "aviso", acciones: [{ texto, accion }] }
+  const operacionesEstado = new Map(); // productoId → { accion, operacion, version }: enviada y sin confirmar
+  const accionDeEstado = (p) => (p.activo ? "ocultar" : "publicar");
+
+  function botonEstadoProducto(p) {
+    if (p.retirado_en) return null; // los retirados no se publican ni se restauran por accidente desde aquí
+    const accion = accionDeEstado(p);
+    const b = nodo("button", "boton boton-secundario boton-compacto producto-estado-boton", TEXTOS_ESTADO[accion].boton);
+    b.type = "button";
+    b.dataset.accion = "estado-producto";
+    b.dataset.estadoAccion = accion;
+    b.dataset.productoId = p.id;
+    b.setAttribute("aria-label", `${TEXTOS_ESTADO[accion].boton} ${p.nombre} (${p.codigo_interno})`);
+    b.disabled = ocupado || operacionesEstado.has(p.id);
+    return b;
+  }
+
+  function avisoDeProducto(productoId) {
+    const a = avisosProducto.get(productoId);
+    if (!a) return null;
+    const caja = nodo("div", `producto-aviso es-${a.tipo}`);
+    caja.dataset.avisoProducto = productoId;
+    caja.append(nodo("p", "producto-aviso-texto", a.texto));
+    const fila = nodo("div", "producto-aviso-acciones");
+    for (const x of a.acciones || []) {
+      const b = nodo("button", "boton boton-secundario boton-mini", x.texto);
+      b.type = "button";
+      b.dataset.accion = x.accion;
+      b.dataset.productoId = productoId;
+      b.disabled = ocupado;
+      fila.append(b);
+    }
+    const cerrar = nodo("button", "boton boton-texto boton-mini", "Cerrar aviso");
+    cerrar.type = "button";
+    cerrar.dataset.accion = "cerrar-aviso-producto";
+    cerrar.dataset.productoId = productoId;
+    fila.append(cerrar);
+    caja.append(fila);
+    return caja;
+  }
+
+  // Coloca (o quita) el aviso de un modelo en su tarjeta ya pintada, sin repintar la lista.
+  function pintarAvisoEn(productoId) {
+    const tarjeta = tarjetaEnLista(productoId);
+    const articulo = tarjeta?.querySelector(".producto-articulo");
+    if (!articulo) return;
+    articulo.querySelector(".producto-aviso")?.remove();
+    const nuevo = avisoDeProducto(productoId);
+    if (nuevo) articulo.querySelector(".variantes")?.before(nuevo);
+  }
+
+  // Región accesible (siempre presente, fuera de la lista que se repinta): anuncia el resultado sin mover el foco.
+  function anunciarProducto(texto) {
+    const region = $("#anuncio-producto");
+    if (!region) return;
+    region.textContent = "";
+    requestAnimationFrame(() => { region.textContent = texto; });
+  }
+
+  function ponerBotonEstado(productoId, { ocupadoTexto = null } = {}) {
+    const p = catalogo.find((x) => x.id === productoId);
+    const b = tarjetaEnLista(productoId)?.querySelector('[data-accion="estado-producto"]');
+    if (!p || !b) return;
+    const accion = ocupadoTexto || accionDeEstado(p);
+    const t = TEXTOS_ESTADO[accion];
+    b.textContent = ocupadoTexto ? t.ocupado : t.boton;
+    b.dataset.estadoAccion = accion;
+    b.setAttribute("aria-label", ocupadoTexto ? `${t.ocupado.replace("…", "")} ${p.nombre}` : `${t.boton} ${p.nombre} (${p.codigo_interno})`);
+    if (ocupadoTexto) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy");
+  }
+
+  const tipoErrorEstado = (r) => {
+    const e = r.error || {};
+    const estado = Number(r.status ?? e.status) || 0;
+    const codigo = String(e.code || "");
+    if (estado === 0 && !codigo) return "red";
+    if (estado === 401 || /^PGRST30[0-3]$/.test(codigo)) return "sin-sesion";
+    if (codigo === "42501" || estado === 403) return "sin-permiso";
+    if (codigo === "PT409" || estado === 409) return "conflicto";
+    if (codigo === "PT404") return "no-existe";
+    if (codigo === "PT422" || ["23514", "22P02", "23505", "22003"].includes(codigo) || estado === 400 || estado === 422) return "datos";
+    if (estado >= 500) return "red";
+    return "otro";
+  };
+
+  /* Cierra una operación con su aviso. «recargar»: se vuelve a leer el catálogo conservando la posición (el
+     estado cambió o puede haber cambiado); si no, solo se pone el aviso en la tarjeta (la página no se mueve). */
+  async function terminarEstado(productoId, aviso, { recargar = false, ancla = null, anuncio = null } = {}) {
+    avisosProducto.set(productoId, aviso);
+    anunciarProducto(anuncio || aviso.texto);
+    if (!recargar) {
+      ponerBotonEstado(productoId);
+      pintarAvisoEn(productoId);
+      return;
+    }
+    const pintado = await cargarCatalogo({ conservarPosicion: true, ancla });
+    if (!pintado) return;
+    const nota = restaurarAncla(ancla, { enfocar: true });
+    if (tarjetaEnLista(productoId)) return;
+    // El modelo ya no aparece (filtro o búsqueda): se explica en el más cercano, que es donde queda el foco.
+    avisosProducto.delete(productoId);
+    const texto = `${aviso.texto}${nota ? ` ${nota}` : ""}`;
+    const vecino = vecinoEnLista(ancla.orden, productoId);
+    const vecinoId = vecino?.dataset.productoId;
+    if (vecinoId) {
+      avisosProducto.set(vecinoId, { ...aviso, texto, acciones: [] });
+      pintarAvisoEn(vecinoId);
+    } else {
+      $("#tablero-estado").textContent = texto;
+    }
+    anunciarProducto(texto);
+  }
+
+  async function ejecutarEstado(productoId, modo = "nuevo") {
+    if (ocupado || verificacionPendiente) return;
+    const p = catalogo.find((x) => x.id === productoId);
+    if (!p) return;
+    let op = operacionesEstado.get(productoId);
+    if (modo === "nuevo") {
+      if (op) return; // hay una operación sin confirmar: primero se comprueba
+      if (p.retirado_en) return;
+      if (!Number.isInteger(p.version)) {
+        avisosProducto.set(productoId, { tipo: "aviso", texto: "No se pudo leer la versión de esta zapatilla. No se cambió nada: actualiza el tablero e inténtalo de nuevo.", acciones: [] });
+        pintarAvisoEn(productoId);
+        return;
+      }
+      op = { accion: accionDeEstado(p), operacion: crypto.randomUUID(), version: p.version };
+      operacionesEstado.set(productoId, op);
+    } else if (!op) {
+      return;
+    }
+    const t = TEXTOS_ESTADO[op.accion];
+    const mia = generacion;
+    // Un solo envío a la vez: el tablero queda ocupado ANTES de cualquier espera (un segundo clic no hace nada).
+    marcarOcupado(true);
+    lugar = { productoId, nombre: p.nombre, varianteId: null, tallaId: null, control: "estado" };
+    const ancla = capturarAncla();
+    avisosProducto.delete(productoId);
+    tarjetaEnLista(productoId)?.querySelector(".producto-aviso")?.remove();
+    if (modo !== "comprobar") ponerBotonEstado(productoId, { ocupadoTexto: op.accion });
+    anunciarProducto(modo === "comprobar" ? `Comprobando el resultado en ${p.nombre}…` : `${t.ocupado.replace("…", "")} ${p.nombre}…`);
+    let hecho = false;
+    try {
+      if (modo === "comprobar") { await comprobarEstado(productoId, op, ancla, mia); return; }
+      const acceso = await comprobarAcceso();
+      if (mia !== generacion) return;
+      if (acceso.estado !== "admin") {
+        operacionesEstado.delete(productoId);
+        if (acceso.estado === "red") {
+          await terminarEstado(productoId, { tipo: "aviso", texto: "No pudimos comprobar tu sesión. No se cambió nada: revisa tu conexión e inténtalo de nuevo.", acciones: [] });
+          return;
+        }
+        marcarOcupado(false);
+        hecho = true;
+        await aplicarAcceso(acceso);
+        return;
+      }
+      let r;
+      try { r = await cliente.rpc("fn_admin_estado_producto", { p_id: productoId, p_accion: op.accion, p_version: op.version, p_operacion: op.operacion }); } catch { r = { error: { status: 0 } }; }
+      if (mia !== generacion) return;
+      if (!r.error) { await confirmarEstado(productoId, op, r.data, ancla, false); return; }
+      const tipo = tipoErrorEstado(r);
+      if (tipo === "red") { await comprobarEstado(productoId, op, ancla, mia, true); return; }
+      operacionesEstado.delete(productoId);
+      if (tipo === "conflicto") {
+        await terminarEstado(productoId, { tipo: "aviso", texto: `Otra edición de esta zapatilla se guardó antes que tu cambio. No se cambió nada: cargamos su estado actual. Si todavía quieres ${op.accion === "publicar" ? "publicarla" : "ocultarla"}, vuelve a pulsar el botón.`, acciones: [] }, { recargar: true, ancla });
+        return;
+      }
+      if (tipo === "no-existe") {
+        await terminarEstado(productoId, { tipo: "aviso", texto: `«${p.nombre}» ya no existe en el catálogo. Cargamos la lista actual.`, acciones: [] }, { recargar: true, ancla });
+        return;
+      }
+      if (tipo === "sin-sesion" || tipo === "sin-permiso") {
+        marcarOcupado(false);
+        hecho = true;
+        await aplicarAcceso(await comprobarAcceso());
+        return;
+      }
+      if (tipo === "datos") {
+        // Lo que impide publicar (o la razón del rechazo): se muestra en la tarjeta y el estado no cambia.
+        await terminarEstado(productoId, { tipo: "aviso", texto: `${r.error.message || "No se pudo completar la acción."}${op.accion === "publicar" ? ` ${t.sigue} No se completó ni se activó nada.` : ` ${t.sigue}`}`, acciones: [] });
+        return;
+      }
+      await terminarEstado(productoId, { tipo: "aviso", texto: `El servidor no pudo completar la acción. No se cambió nada. ${t.sigue}`, acciones: [] });
+    } finally {
+      if (!hecho) marcarOcupado(false);
+      // El foco vuelve al botón de ese modelo (si el modelo sigue en la lista) sin mover la página.
+      const tarjeta = tarjetaEnLista(productoId);
+      const boton = tarjeta?.querySelector('[data-accion="estado-producto"]:not(:disabled)');
+      const a = document.activeElement;
+      if (boton && a !== boton && (!a || a === document.body || a.disabled || a === tarjeta.querySelector(".producto-nombre"))) boton.focus({ preventScroll: true });
+    }
+  }
+
+  // Respuesta válida del servidor: solo ella confirma. «ya_aplicada» = el servidor reconoce ESTA operación.
+  async function confirmarEstado(productoId, op, respuesta, ancla, comprobado) {
+    const t = TEXTOS_ESTADO[op.accion];
+    operacionesEstado.delete(productoId);
+    const p = catalogo.find((x) => x.id === productoId);
+    if (p) { p.activo = Boolean(respuesta.activo); p.version = respuesta.version; p.ultima_operacion = op.operacion; }
+    const prefijo = comprobado ? "Comprobado con el identificador de esta operación. " : respuesta.estado === "ya_aplicada" ? "Esa acción ya se había aplicado; no se repitió. " : "";
+    await terminarEstado(productoId, { tipo: "ok", texto: `${prefijo}${t.hecho} ${NO_CAMBIA}`, acciones: [] }, { recargar: true, ancla, anuncio: `${p?.nombre || "El modelo"}: ${prefijo}${t.hecho}` });
+  }
+
+  /* Respuesta perdida o resultado dudoso: se lee el producto (solo lectura) y se compara su ultima_operacion con la
+     de esta operación. Que el estado actual coincida con el deseado NO es una confirmación. */
+  async function comprobarEstado(productoId, op, ancla, mia, tras = false) {
+    const p = catalogo.find((x) => x.id === productoId);
+    const t = TEXTOS_ESTADO[op.accion];
+    let r;
+    try { r = await cliente.from("productos").select("id,version,ultima_operacion,activo,retirado_en").eq("id", productoId).maybeSingle(); } catch { r = { error: { status: 0 } }; }
+    if (mia !== generacion) return;
+    const acciones = [{ texto: "Comprobar otra vez", accion: "estado-comprobar" }, { texto: "Reintentar", accion: "estado-reintentar" }];
+    const nota = " «Reintentar» usa la misma operación: si ya se aplicó, no se repite.";
+    const entrada = tras ? "Se perdió la respuesta del servidor. " : "";
+    if (r.error) {
+      const tipo = tipoErrorEstado(r);
+      if (tipo === "sin-sesion" || tipo === "sin-permiso") { operacionesEstado.delete(productoId); marcarOcupado(false); await aplicarAcceso(await comprobarAcceso()); return; }
+      await terminarEstado(productoId, { tipo: "aviso", texto: `${entrada}Resultado no confirmado: tampoco pudimos leer el estado actual (revisa tu conexión). ${t.sigue.replace("sigue", "podría seguir")} hasta comprobarlo.${nota}`, acciones });
+      return;
+    }
+    const actual = r.data;
+    if (actual && actual.ultima_operacion === op.operacion) {
+      await confirmarEstado(productoId, op, { estado: "aplicada", version: actual.version, activo: actual.activo, retirado: Boolean(actual.retirado_en) }, ancla, true);
+      return;
+    }
+    if (!actual) {
+      operacionesEstado.delete(productoId);
+      await terminarEstado(productoId, { tipo: "aviso", texto: `«${p?.nombre || "La zapatilla"}» ya no existe en el catálogo. Cargamos la lista actual.`, acciones: [] }, { recargar: true, ancla });
+      return;
+    }
+    if (actual.version === op.version) {
+      await terminarEstado(productoId, { tipo: "aviso", texto: `${entrada}Resultado no confirmado: la zapatilla sigue sin cambios por ahora, pero la operación todavía podría aplicarse.${nota}`, acciones });
+      return;
+    }
+    // Cambió, pero no por esta operación: otra edición se guardó. No se anuncia éxito ni se repite nada.
+    operacionesEstado.delete(productoId);
+    await terminarEstado(productoId, { tipo: "aviso", texto: "Resultado no confirmado: la zapatilla cambió, pero no por esta operación (otra edición se guardó). No sabemos si la tuya llegó antes. Cargamos su estado actual: revísalo y vuelve a elegir.", acciones: [] }, { recargar: true, ancla });
   }
 
   // ------------------------------------------------------------------- acciones
@@ -2239,6 +2512,15 @@
       else if (accion === "historial-mas") { if (!ocupado) cargarHistorial(false); }
       else if (accion === "historial-filtro") { if (!ocupado) elegirFiltroHistorial(e.target.closest("[data-historial-filtro]").dataset.historialFiltro); }
       else if (accion === "exportar") { if (!ocupado) exportarCatalogo(); }
+      else if (accion === "estado-producto") { const b = e.target.closest("[data-accion]"); if (!b.disabled) ejecutarEstado(b.dataset.productoId); }
+      else if (accion === "estado-comprobar") { const b = e.target.closest("[data-accion]"); if (!b.disabled) ejecutarEstado(b.dataset.productoId, "comprobar"); }
+      else if (accion === "estado-reintentar") { const b = e.target.closest("[data-accion]"); if (!b.disabled) ejecutarEstado(b.dataset.productoId, "reintentar"); }
+      else if (accion === "cerrar-aviso-producto") {
+        const id = e.target.closest("[data-accion]").dataset.productoId;
+        avisosProducto.delete(id);
+        pintarAvisoEn(id);
+        tarjetaEnLista(id)?.querySelector('[data-accion="estado-producto"]:not(:disabled)')?.focus({ preventScroll: true });
+      }
       else if (accion in ACCIONES) abrirAccion(accion, e.target.closest("[data-accion]"));
       else if (accion === "deseleccionar") { if (!ocupado) quitarSeleccion(); }
       else if (accion === "seleccionar-visibles") seleccionarVisibles();

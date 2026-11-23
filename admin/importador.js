@@ -1129,14 +1129,26 @@
        no los cambia; un destino que deja de estar pendiente vuelve al orden (y se avisa).
      - Una imagen que falla o aún se optimiza conserva su destino: las siguientes no se corren.
      - Las imágenes se optimizan de una en una, cediendo el hilo entre ellas: la ventana sigue usable.
-     - Lo asignado sale de la revisión: pulsar otra vez no duplica nada. */
+     - Lo asignado sale de la revisión: pulsar otra vez no duplica nada.
+     Etapa 22: «Elegir orden con las fotos». El selector de archivos del sistema puede entregar las imágenes
+     en otro orden que el de los clics: dentro del panel se pulsan las miniaturas en el orden deseado (1, 2,
+     3…; pulsar otra vez quita y renumera), se revisa la secuencia con el destino de cada una y se confirma.
+     - Cada imagen se identifica por su clave estable (it.clave), nunca por el nombre de archivo (puede
+       repetirse): terminar de optimizar una imagen, reemplazarla o recargar no cambia el orden.
+     - La selección en curso vive en r.orden.elegidas (claves, en orden) y se guarda en el borrador y el
+       respaldo. Al confirmar, las elegidas pasan al principio de r.items en ese orden; las demás quedan al
+       final con it.fuera = true («Sin elegir: no se asigna») y pueden incluirse después.
+     - Los destinos fijados a mano, la regla de saltar los colores con fotos (también las que se están
+       optimizando) y los avisos de sobrantes y colores sin foto son los de siempre (calcularReparto). */
   const MAX_REPARTO = 60;      // imágenes en una misma revisión (no es el límite de fotos por color)
   const NINGUNO = "ninguno";   // destino elegido a mano: «Sin destino»
   const SIN_DESTINO = "Sin destino (no se asigna)";
   let procesandoReparto = false;
 
   // abierto: imagen cuyo desplegable «Cambiar destino» está abierto (se conserva al repintar).
-  const reparto = () => lote.reparto || (lote.reparto = { items: [], estado: null, aplicado: false, abierto: null });
+  // Etapa 22: orden = { elegidas: [clave…] } mientras se elige el orden con las fotos (null si no); recibidas
+  // numera las imágenes en el orden en que llegaron (para distinguir nombres repetidos).
+  const reparto = () => lote.reparto || (lote.reparto = { items: [], estado: null, aplicado: false, abierto: null, orden: null, recibidas: 0 });
   // ¿Tiene ya fotos? Cuentan las listas, las subidas y las que se están optimizando; no las que fallaron.
   const tieneFoto = (c) => c.fotos.some((x) => x.estado !== "error");
   function destinosPendientes() {
@@ -1160,12 +1172,14 @@
 
   /* Reparto actual: las imágenes con destino elegido a mano lo reservan; las demás, en el orden de la
      revisión, toman los colores pendientes que quedan. Sin color libre, la imagen queda «sin destino». */
-  function calcularReparto() {
+  function calcularReparto(secuencia = null) {
     const r = reparto();
+    // La secuencia que se reparte: la de la revisión (sin las «sin elegir») o, al elegir el orden, la elegida.
+    const base = secuencia || r.items.filter((it) => !it.fuera);
     const pendientes = destinosPendientes();
     const porClave = new Map(pendientes.map((d) => [d.color.clave, d]));
     const reservados = new Set();
-    for (const it of r.items) {
+    for (const it of base) {
       if (!it.destino || it.destino === NINGUNO) continue;
       if (porClave.has(it.destino) && !reservados.has(it.destino)) { reservados.add(it.destino); continue; }
       it.destino = null;
@@ -1173,7 +1187,7 @@
     }
     const libres = pendientes.filter((d) => !reservados.has(d.color.clave));
     const asignacion = new Map();
-    for (const it of r.items) {
+    for (const it of base) {
       if (it.destino === NINGUNO) asignacion.set(it.clave, null);
       else if (it.destino) asignacion.set(it.clave, porClave.get(it.destino));
       else asignacion.set(it.clave, libres.shift() || null);
@@ -1182,7 +1196,8 @@
     return {
       pendientes, asignacion,
       sinFoto: pendientes.filter((d) => !usados.has(d.color.clave)),
-      sobrantes: r.items.filter((it) => !asignacion.get(it.clave))
+      sobrantes: base.filter((it) => !asignacion.get(it.clave)),
+      sinElegir: r.items.filter((it) => !base.includes(it))
     };
   }
 
@@ -1229,20 +1244,46 @@
     h.id = "imp-reparto-revision-titulo";
     h.tabIndex = -1;
     const procesando = r.items.filter((it) => it.estado === "procesando").length;
-    const errores = r.items.filter((it) => it.estado === "error").length;
     const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
     const resumen = nodo("p", "importador-reparto-resumen",
       `${plural(r.items.length, "imagen", "imágenes")} · ${plural(plan.pendientes.length, "color sin foto", "colores sin foto")} en las fichas marcadas.${procesando ? ` Optimizando: ${plural(procesando, "imagen pendiente", "imágenes pendientes")}…` : ""}`);
     resumen.id = "imp-reparto-resumen";
     resumen.setAttribute("aria-live", "polite");
+    // Etapa 22: elegir el orden con las fotos (la galería sustituye a la lista hasta confirmar o cancelar).
+    if (r.orden) {
+      const salir = nodo("div", "importador-reparto-acciones");
+      salir.append(boton("Descartar el reparto", "reparto-descartar", "boton boton-secundario"));
+      caja.append(h, resumen, pintarGaleriaOrden(r), salir);
+      return caja;
+    }
     const herramientas = nodo("div", "importador-reparto-herramientas");
-    herramientas.append(nodo("p", "campo-ayuda", "El orden de esta lista es el que se usa. Cámbialo con «Subir» y «Bajar» o elige el destino de una imagen."),
+    const abrirOrden = boton("Elegir orden con las fotos", "orden-abrir", "boton boton-secundario boton-compacto");
+    abrirOrden.id = "imp-orden-abrir";
+    abrirOrden.setAttribute("aria-expanded", "false");
+    herramientas.append(abrirOrden, nodo("p", "campo-ayuda", "El orden actual de esta lista es el que se usa. El selector del dispositivo puede cambiar el orden en que llegan los archivos: elígelo tú con las fotos, o cámbialo con «Subir» y «Bajar» o elige el destino de una imagen."),
       boton("Ordenar por nombre de archivo", "reparto-ordenar", "boton boton-texto boton-mini"));
 
     const lista = nodo("ol", "importador-reparto-lista");
     lista.setAttribute("aria-label", "Imágenes del reparto, en orden");
     r.items.forEach((it, i) => lista.append(pintarItemReparto(r, plan, it, i)));
 
+    const avisos = pintarAvisosReparto(r, plan);
+
+    const acciones = nodo("div", "importador-reparto-acciones");
+    const asignar = boton("Asignar fotos", "reparto-asignar", "boton boton-principal");
+    asignar.id = "imp-reparto-asignar";
+    const listos = r.items.filter((it) => it.estado === "lista" && plan.asignacion.get(it.clave)).length;
+    if (procesando || !listos) asignar.setAttribute("aria-disabled", "true");
+    asignar.setAttribute("aria-describedby", resumen.id);
+    acciones.append(asignar, boton("Descartar el reparto", "reparto-descartar", "boton boton-secundario"));
+    caja.append(h, resumen, herramientas, lista, avisos, acciones);
+    return caja;
+  }
+
+  // Avisos de la revisión: sin destinos, colores sin foto, imágenes que sobran, sin elegir y las que no sirven.
+  function pintarAvisosReparto(r, plan) {
+    const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
+    const errores = r.items.filter((it) => it.estado === "error").length;
     const avisos = nodo("div", "importador-reparto-avisos");
     if (!plan.pendientes.length) {
       avisos.append(nodo("p", "importador-reparto-aviso", "Todas las fichas marcadas ya tienen fotos en todos sus colores: no queda ningún destino. Marca otra ficha, quita una foto o descarta el reparto."));
@@ -1257,17 +1298,93 @@
     if (plan.sobrantes.length && plan.pendientes.length) {
       avisos.append(nodo("p", "importador-reparto-aviso", `Sobran imágenes: ${plan.sobrantes.map((it) => `«${it.nombre}»`).join(", ")} ${plan.sobrantes.length === 1 ? "no tiene" : "no tienen"} destino. Elige uno, cámbialas de orden o quítalas.`));
     }
+    if (plan.sinElegir.length) avisos.append(nodo("p", "importador-reparto-aviso importador-reparto-sinelegir", `${plural(plan.sinElegir.length, "imagen sin elegir no se asignará", "imágenes sin elegir no se asignarán")}. Puedes incluirlas al final cuando quieras.`));
     if (errores) avisos.append(nodo("p", "importador-reparto-aviso es-error", `${plural(errores, "imagen no se puede usar", "imágenes no se pueden usar")}: ${errores === 1 ? "conserva su destino; reemplázala o quítala" : "conservan su destino; reemplázalas o quítalas"}.`));
     avisos.hidden = !avisos.childElementCount;
+    return avisos;
+  }
 
-    const acciones = nodo("div", "importador-reparto-acciones");
-    const asignar = boton("Asignar fotos", "reparto-asignar", "boton boton-principal");
-    asignar.id = "imp-reparto-asignar";
-    const listos = r.items.filter((it) => it.estado === "lista" && plan.asignacion.get(it.clave)).length;
-    if (procesando || !listos) asignar.setAttribute("aria-disabled", "true");
-    asignar.setAttribute("aria-describedby", resumen.id);
-    acciones.append(asignar, boton("Descartar el reparto", "reparto-descartar", "boton boton-secundario"));
-    caja.append(h, resumen, herramientas, lista, avisos, acciones);
+  /* Etapa 22: galería para elegir el orden. Cada miniatura es un botón de dos estados (aria-pressed) con su
+     número de selección; pulsar añade al final, volver a pulsar quita y renumera. Debajo, la secuencia
+     elegida con el destino de cada foto (ficha, modelo y color) y los avisos de siempre. */
+  function pintarGaleriaOrden(r) {
+    const o = r.orden;
+    const elegidas = o.elegidas.map((k) => r.items.find((x) => x.clave === k)).filter(Boolean);
+    const caja = nodo("div", "importador-orden");
+    caja.id = "imp-orden";
+    caja.setAttribute("role", "group");
+    caja.setAttribute("aria-labelledby", "imp-orden-titulo");
+    const h = nodo("h4", "importador-paso-titulo", "Elige el orden con las fotos");
+    h.id = "imp-orden-titulo";
+    h.tabIndex = -1;
+    const ayuda = nodo("p", "campo-ayuda", "El selector del dispositivo puede cambiar el orden. Aquí puedes elegirlo antes de asignar. Pulsa las fotos en el orden en que quieres asignarlas: la primera será para el primer color sin foto. Pulsa otra vez una foto para quitarla. Las que no elijas no se asignan. «Usar el orden recibido» vuelve al orden en que llegaron los archivos (Recibida n.º 1, 2, 3…) e incluye todas, aunque el orden actual de la lista sea otro.");
+    const estado = nodo("p", "importador-orden-contador", `${elegidas.length} de ${r.items.length} ${r.items.length === 1 ? "foto elegida" : "fotos elegidas"}.`);
+    estado.id = "imp-orden-contador";
+    estado.setAttribute("aria-live", "polite");
+
+    const galeria = nodo("ul", "importador-orden-galeria");
+    galeria.setAttribute("aria-label", "Fotografías: pulsa para elegir el orden");
+    for (const it of r.items) {
+      const n = elegidas.indexOf(it) + 1;
+      const li = nodo("li", "importador-orden-celda");
+      const b = nodo("button", `importador-orden-foto${n ? " es-elegida" : ""}${it.estado === "error" ? " es-error" : ""}`);
+      b.type = "button";
+      b.id = `imp-orden-${it.clave}`;
+      b.dataset.imp = "orden-alternar";
+      b.dataset.item = it.clave;
+      b.setAttribute("aria-pressed", String(Boolean(n)));
+      b.setAttribute("aria-label", `${it.nombre}, recibida n.º ${it.recibida}, ${n ? `elegida en la posición ${n}` : "sin elegir"}${it.estado === "procesando" ? ", optimizando" : it.estado === "error" ? ", no se puede usar" : ""}`);
+      const marco = nodo("span", "importador-orden-marco");
+      if (it.vistaPrevia) {
+        const img = nodo("img");
+        img.src = it.vistaPrevia;
+        img.alt = "";
+        marco.append(img);
+      } else marco.append(nodo("span", "importador-orden-sinvista", it.estado === "error" ? "Sin vista" : "Optimizando…"));
+      const numero = nodo("span", "importador-orden-numero", n ? String(n) : "");
+      numero.setAttribute("aria-hidden", "true");
+      marco.append(numero);
+      b.append(marco, nodo("span", "importador-orden-nombre", it.nombre), nodo("span", "importador-orden-recibida", `Recibida n.º ${it.recibida}`));
+      li.append(b);
+      galeria.append(li);
+    }
+
+    const acciones = nodo("div", "importador-orden-acciones");
+    const sin = !elegidas.length;
+    const deshacer = boton("Deshacer última selección", "orden-deshacer", "boton boton-secundario boton-compacto");
+    const reiniciar = boton("Reiniciar orden", "orden-reiniciar", "boton boton-secundario boton-compacto");
+    if (sin) for (const x of [deshacer, reiniciar]) x.setAttribute("aria-disabled", "true");
+    const confirmar = boton(sin ? "Confirmar este orden" : `Confirmar este orden (${elegidas.length})`, "orden-confirmar", "boton boton-principal");
+    confirmar.id = "imp-orden-confirmar";
+    if (sin) confirmar.setAttribute("aria-disabled", "true");
+    const recibido = boton("Usar el orden recibido", "orden-recibido", "boton boton-secundario boton-compacto");
+    recibido.id = "imp-orden-recibido";
+    acciones.append(deshacer, reiniciar, confirmar, recibido, boton("Cancelar", "orden-cancelar", "boton boton-texto boton-compacto"));
+
+    const secuencia = nodo("div", "importador-orden-secuencia");
+    const hs = nodo("h5", "importador-orden-secuencia-titulo", "Secuencia elegida");
+    hs.id = "imp-orden-secuencia-titulo";
+    secuencia.append(hs);
+    const plan = calcularReparto(elegidas);
+    if (sin) {
+      secuencia.append(nodo("p", "campo-ayuda", `Todavía no elegiste ninguna foto. Hay ${plan.pendientes.length === 1 ? "1 color sin foto" : `${plan.pendientes.length} colores sin foto`} en las fichas marcadas. «Usar el orden recibido» asigna todas en el orden en que llegaron los archivos, sin elegir una por una.`));
+    } else {
+      const ol = nodo("ol", "importador-orden-lista");
+      ol.setAttribute("aria-labelledby", hs.id);
+      elegidas.forEach((it, i) => {
+        const destino = plan.asignacion.get(it.clave) || null;
+        const li = nodo("li", "importador-orden-fila");
+        li.dataset.item = it.clave;
+        const mini = nodo("span", "importador-orden-minifoto");
+        if (it.vistaPrevia) { const img = nodo("img"); img.src = it.vistaPrevia; img.alt = ""; mini.append(img); }
+        const texto2 = nodo("span", "importador-orden-fila-texto");
+        texto2.append(nodo("span", "importador-orden-fila-archivo", `${i + 1}. ${it.nombre}`), nodo("span", "importador-orden-fila-destino", destino ? nombreDestino(destino) : SIN_DESTINO));
+        li.append(mini, texto2);
+        ol.append(li);
+      });
+      secuencia.append(ol, pintarAvisosReparto(r, plan));
+    }
+    caja.append(h, ayuda, estado, galeria, acciones, secuencia);
     return caja;
   }
 
@@ -1283,11 +1400,15 @@
     } else {
       marco.append(nodo("span", "", it.estado === "error" ? "Sin vista" : "…"));
     }
-    const posicion = nodo("span", "importador-reparto-posicion", String(i + 1));
+    const fuera = Boolean(it.fuera);
+    if (fuera) li.classList.add("es-fuera");
+    const posicion = nodo("span", "importador-reparto-posicion", fuera ? "–" : String(i + 1));
     posicion.setAttribute("aria-hidden", "true");
     marco.append(posicion);
     const info = nodo("div", "importador-reparto-info");
     info.append(nodo("p", "importador-reparto-archivo", it.nombre));
+    // Nombres repetidos: «Recibida n.º k» distingue una imagen de otra con el mismo nombre de archivo.
+    if (r.items.some((otro) => otro !== it && otro.nombre === it.nombre)) info.append(nodo("p", "importador-reparto-recibida", `Recibida n.º ${it.recibida}`));
     const estados = { procesando: "Optimizando…", lista: it.info ? `Lista · ${it.info.ancho}×${it.info.alto} px · ${fotos().peso(it.info.pesoFinal)}` : "Lista", error: "No se puede usar" };
     const estado = nodo("p", "importador-reparto-estado-item", estados[it.estado]);
     if (it.estado === "error") estado.setAttribute("role", "alert");
@@ -1301,6 +1422,19 @@
     const campoDestino = nodo("div", "importador-reparto-destino");
     const textoDestino = nodo("p", "importador-reparto-destino-texto", "Destino: ");
     textoDestino.append(nodo("strong", "", destino ? nombreDestino(destino) : SIN_DESTINO));
+    if (fuera) {
+      // Sin elegir en el orden: no se asigna. Se puede incluir al final o quitar.
+      info.append(nodo("p", "importador-reparto-fuera", "Sin elegir: no se asigna."));
+      const accionesFuera = nodo("div", "importador-reparto-botones");
+      const incluir = boton("Incluir al final", "orden-incluir", "boton boton-secundario boton-mini", { item: it.clave });
+      incluir.setAttribute("aria-label", `Incluir ${it.nombre} al final del orden`);
+      const quitarFuera = boton("Quitar", "reparto-quitar", "boton boton-texto boton-mini", { item: it.clave });
+      quitarFuera.setAttribute("aria-label", `Quitar ${it.nombre} del reparto`);
+      accionesFuera.append(incluir, quitarFuera);
+      info.append(accionesFuera);
+      li.append(marco, info);
+      return li;
+    }
     const cambiar = nodo("details", "importador-reparto-cambiar");
     cambiar.dataset.item = it.clave;
     cambiar.open = r.abierto === it.clave;
@@ -1342,7 +1476,7 @@
     if (i === 0) subir.setAttribute("aria-disabled", "true");
     const bajar = boton("Bajar", "reparto-bajar", "boton boton-secundario boton-mini", { item: it.clave });
     bajar.setAttribute("aria-label", `Bajar ${it.nombre} una posición`);
-    if (i === r.items.length - 1) bajar.setAttribute("aria-disabled", "true");
+    if (i === r.items.length - 1 || r.items[i + 1].fuera) bajar.setAttribute("aria-disabled", "true");
     acciones.append(subir, bajar);
     if (it.estado === "error") {
       const reemplazar = nodo("label", "boton boton-secundario boton-mini importador-reparto-reemplazar", "Reemplazar");
@@ -1406,7 +1540,10 @@
       aviso = `La revisión admite ${MAX_REPARTO} imágenes a la vez: se añadieron ${Math.max(0, libres)}. Asigna estas y elige las demás después.`;
       lista = lista.slice(0, Math.max(0, libres));
     }
-    for (const archivo of lista) r.items.push({ clave: nuevaClave("r"), ref: uuid(), nombre: archivo.name || "imagen sin nombre", archivo, version: 1, estado: "procesando", destino: null });
+    // Las nuevas van detrás de las que ya se reparten y antes de las «sin elegir».
+    const corte = r.items.findIndex((it) => it.fuera);
+    const nuevas = lista.map((archivo) => ({ clave: nuevaClave("r"), ref: uuid(), nombre: archivo.name || "imagen sin nombre", archivo, version: 1, estado: "procesando", destino: null, recibida: (r.recibidas = (r.recibidas || 0) + 1) }));
+    r.items.splice(corte < 0 ? r.items.length : corte, 0, ...nuevas);
     r.aplicado = false;
     r.estado = aviso ? { texto: aviso, tipo: "aviso" } : null;
     repintarReparto();
@@ -1444,7 +1581,9 @@
           it.estado = "error";
           it.mensaje = error;
         }
-        repintarReparto();
+        // Sin perder un clic: mientras el puntero está pulsado se espera (un botón sustituido entre «pulsar» y
+        // «soltar» pierde el clic en WebKit). El orden no cambia: la imagen se identifica por su clave.
+        programar("reparto-repinte", repintarReparto, 0);
         await new Promise((resolver) => setTimeout(resolver, 0)); // cede el hilo entre imagen e imagen
       }
     } finally {
@@ -1462,7 +1601,7 @@
     const r = reparto();
     const i = r.items.findIndex((x) => x.clave === claveItem);
     const j = i + paso;
-    if (i < 0 || j < 0 || j >= r.items.length) return;
+    if (i < 0 || j < 0 || j >= r.items.length || Boolean(r.items[i].fuera) !== Boolean(r.items[j].fuera)) return;
     [r.items[i], r.items[j]] = [r.items[j], r.items[i]];
     r.aplicado = false;
     r.estado = { texto: `«${r.items[j].nombre}» ahora es la ${j + 1}.ª imagen.`, tipo: "ok" };
@@ -1494,6 +1633,7 @@
     if (i < 0) return;
     const [it] = r.items.splice(i, 1);
     soltarItem(it);
+    if (r.orden) r.orden.elegidas = r.orden.elegidas.filter((k) => k !== it.clave);
     r.aplicado = false;
     r.estado = { texto: `«${it.nombre}» se quitó del reparto.`, tipo: "ok" };
     repintarReparto();
@@ -1514,11 +1654,108 @@
     procesarReparto();
   }
 
+  // ---- Etapa 22: elegir el orden con las fotos
+  function abrirOrden() {
+    const r = reparto();
+    if (!r.items.length) return;
+    r.orden = { elegidas: [] };
+    r.estado = null;
+    repintarReparto();
+    $("#imp-orden")?.scrollIntoView({ block: "start" });
+    $("#imp-orden-titulo")?.focus({ preventScroll: true });
+  }
+  function alternarOrden(claveItem) {
+    const r = reparto();
+    const it = itemDe(claveItem);
+    if (!r.orden || !it) return;
+    const i = r.orden.elegidas.indexOf(claveItem);
+    if (i >= 0) {
+      r.orden.elegidas.splice(i, 1);
+      r.estado = { texto: `«${it.nombre}» (recibida n.º ${it.recibida}) se quitó de la selección.${r.orden.elegidas.length > i ? " Las siguientes se renumeraron." : ""}`, tipo: "ok" };
+    } else {
+      r.orden.elegidas.push(claveItem);
+      r.estado = { texto: `«${it.nombre}» (recibida n.º ${it.recibida}): elegida en la posición ${r.orden.elegidas.length}.`, tipo: "ok" };
+    }
+    repintarReparto();
+  }
+  function deshacerOrden() {
+    const r = reparto();
+    if (!r.orden?.elegidas.length) return;
+    const clave = r.orden.elegidas.pop();
+    const it = itemDe(clave);
+    r.estado = { texto: `Se deshizo la última selección: «${it?.nombre ?? "imagen"}» ya no está elegida.`, tipo: "ok" };
+    repintarReparto();
+    // Si ya no queda nada que deshacer, el foco pasa a la última foto quitada.
+    if (!r.orden.elegidas.length) document.getElementById(`imp-orden-${clave}`)?.focus({ preventScroll: true });
+  }
+  function reiniciarOrden() {
+    const r = reparto();
+    if (!r.orden?.elegidas.length) return;
+    r.orden.elegidas = [];
+    r.estado = { texto: "Orden reiniciado: ninguna foto está elegida.", tipo: "ok" };
+    repintarReparto();
+    r.items[0] && document.getElementById(`imp-orden-${r.items[0].clave}`)?.focus({ preventScroll: true });
+  }
+  function cancelarOrden() {
+    const r = reparto();
+    r.orden = null;
+    r.estado = { texto: "Elección de orden cancelada: el orden actual de la lista no cambió.", tipo: "ok" };
+    repintarReparto();
+    $("#imp-orden-abrir")?.focus({ preventScroll: true });
+  }
+  /* Confirma lo elegido: las elegidas pasan al principio en ese orden; las demás quedan al final «sin elegir»
+     y no se asignan (se pueden incluir después). Los destinos manuales de las elegidas se conservan. */
+  function confirmarOrden() {
+    const r = reparto();
+    const elegidas = (r.orden?.elegidas || []).map((k) => itemDe(k)).filter(Boolean);
+    if (!elegidas.length) return;
+    const resto = r.items.filter((it) => !elegidas.includes(it));
+    for (const it of elegidas) it.fuera = false;
+    for (const it of resto) it.fuera = true;
+    r.items = [...elegidas, ...resto];
+    r.orden = null;
+    r.aplicado = false;
+    r.estado = { texto: `Orden confirmado: ${elegidas.length === 1 ? "1 foto elegida" : `${elegidas.length} fotos elegidas`}${resto.length ? `; ${resto.length === 1 ? "1 sin elegir no se asigna" : `${resto.length} sin elegir no se asignan`}` : ""}. Ya puedes pulsar «Asignar fotos».`, tipo: "ok" };
+    repintarReparto();
+    ($("#imp-reparto-asignar") || $("#imp-reparto-revision-titulo"))?.focus({ preventScroll: true });
+  }
+  /* Opción rápida: el ORDEN RECIBIDO es el de llegada de los archivos (it.recibida, un número estable que
+     asigna agregarAlReparto), no el orden ACTUAL de la lista (el que dejaron elegir, «Subir»/«Bajar» u
+     «Ordenar por nombre»). Se recupera el de llegada de las imágenes que siguen en el reparto (las quitadas
+     o ya asignadas no vuelven) y se incluyen todas. Las claves, los archivos, las fotos optimizadas y los
+     destinos manuales no se tocan: solo cambia la posición y se quitan las marcas «sin elegir». */
+  function usarOrdenRecibido() {
+    const r = reparto();
+    // Estable: con el mismo número de recepción (borradores anteriores) manda la posición actual.
+    r.items = r.items.map((it, i) => ({ it, i })).sort((a, b) => (a.it.recibida || 0) - (b.it.recibida || 0) || a.i - b.i).map((x) => x.it);
+    for (const it of r.items) it.fuera = false;
+    r.orden = null;
+    r.aplicado = false;
+    r.estado = { texto: `Se usará el orden recibido: el orden en que llegaron los archivos (Recibida n.º 1, 2, 3…), con ${r.items.length === 1 ? "la imagen" : `las ${r.items.length} imágenes`} que siguen en el reparto. Ya puedes pulsar «Asignar fotos».`, tipo: "ok" };
+    repintarReparto();
+    ($("#imp-reparto-asignar") || $("#imp-reparto-revision-titulo"))?.focus({ preventScroll: true });
+  }
+  // Incluye al final del orden una imagen que quedó «sin elegir».
+  function incluirAlFinal(claveItem) {
+    const r = reparto();
+    const i = r.items.findIndex((x) => x.clave === claveItem);
+    if (i < 0 || !r.items[i].fuera) return;
+    const [it] = r.items.splice(i, 1);
+    it.fuera = false;
+    const corte = r.items.findIndex((x) => x.fuera);
+    r.items.splice(corte < 0 ? r.items.length : corte, 0, it);
+    r.aplicado = false;
+    r.estado = { texto: `«${it.nombre}» se incluyó al final del orden (n.º ${r.items.indexOf(it) + 1}).`, tipo: "ok" };
+    repintarReparto();
+    document.querySelector(`#imp-reparto [data-imp="reparto-quitar"][data-item="${it.clave}"]`)?.focus({ preventScroll: true });
+  }
+
   function descartarReparto({ silencio = false } = {}) {
     const r = lote?.reparto;
     if (!r) return;
     for (const it of r.items) soltarItem(it);
     r.items = [];
+    r.orden = null;
     r.aplicado = false;
     r.estado = silencio ? null : { texto: "Reparto descartado: no se asignó ninguna foto.", tipo: "ok" };
   }
@@ -1554,7 +1791,10 @@
     const partes = [`${asignadas.length === 1 ? "Se asignó 1 foto principal" : `Se asignaron ${asignadas.length} fotos principales`} en ${tocadas.length === 1 ? `la ficha ${numero(tocadas[0])}` : `las fichas ${tocadas.map(numero).join(", ")}`}. Se subirán con «Guardar lote como oculto».`];
     const quedan = calcularReparto();
     if (quedan.sinFoto.length) partes.push(`${quedan.sinFoto.length === 1 ? "1 color sigue" : `${quedan.sinFoto.length} colores siguen`} sin foto.`);
-    if (r.items.length) partes.push(`${r.items.length === 1 ? "Queda 1 imagen" : `Quedan ${r.items.length} imágenes`} en la revisión (sin destino o que no se pueden usar).`);
+    const porRevisar = r.items.filter((it) => !it.fuera).length;
+    const sinElegir = r.items.length - porRevisar;
+    if (porRevisar) partes.push(`${porRevisar === 1 ? "Queda 1 imagen" : `Quedan ${porRevisar} imágenes`} en la revisión (sin destino o que no se pueden usar).`);
+    if (sinElegir) partes.push(`${sinElegir === 1 ? "1 imagen sin elegir no se asignó" : `${sinElegir} imágenes sin elegir no se asignaron`}.`);
     r.estado = { texto: partes.join(" "), tipo: quedan.sinFoto.length || r.items.length ? "aviso" : "ok" };
     for (const f of tocadas) repintarFicha(f);
     repintarReparto();
@@ -3967,6 +4207,23 @@
     if (l.reparto) {
       exigir(Array.isArray(l.reparto.items) && l.reparto.items.length <= MAX_REPARTO, "El reparto de fotos no es válido.");
       for (const it of l.reparto.items) exigir(it && RE_CLAVE.test(it.clave) && ["procesando", "lista", "error"].includes(it.estado) && (!it.ref || UUID.test(it.ref)), "Una imagen del reparto no es válida.");
+      // Etapa 22: la selección en curso y las «sin elegir». Los borradores anteriores no las tienen.
+      const claves = new Set(l.reparto.items.map((it) => it.clave));
+      exigir(claves.size === l.reparto.items.length, "Una imagen del reparto no es válida.");
+      for (const it of l.reparto.items) {
+        it.fuera = it.fuera === true;
+        if (!Number.isInteger(it.recibida) || it.recibida < 1) it.recibida = 0;
+      }
+      // Borradores anteriores: las imágenes sin número de recepción lo reciben en el orden en que están.
+      let mayor = Math.max(0, ...l.reparto.items.map((it) => it.recibida));
+      for (const it of l.reparto.items) if (!it.recibida) it.recibida = ++mayor;
+      l.reparto.recibidas = Math.max(Number.isInteger(l.reparto.recibidas) ? l.reparto.recibidas : 0, mayor);
+      const o = l.reparto.orden;
+      if (o && typeof o === "object" && Array.isArray(o.elegidas)) {
+        // Solo claves de imágenes que existen, sin repetir y en su orden.
+        const vistas = new Set();
+        l.reparto.orden = { elegidas: o.elegidas.filter((k) => typeof k === "string" && claves.has(k) && !vistas.has(k) && vistas.add(k)) };
+      } else l.reparto.orden = null;
     }
     if (l.pdf) {
       // Etapa 21: importación de catálogo PDF en curso.
@@ -4714,7 +4971,8 @@
       case "reparto-descartar": descartarReparto(); repintarReparto(); $("#imp-reparto-elegir")?.focus({ preventScroll: true }); break;
       case "reparto-ordenar": {
         const r = reparto();
-        r.items.sort((a, b) => a.nombre.localeCompare(b.nombre, "es", { numeric: true, sensitivity: "base" }));
+        // Las «sin elegir» siguen al final; el orden por nombre es estable con nombres repetidos (por recibida).
+        r.items.sort((a, b) => Number(Boolean(a.fuera)) - Number(Boolean(b.fuera)) || a.nombre.localeCompare(b.nombre, "es", { numeric: true, sensitivity: "base" }) || (a.recibida || 0) - (b.recibida || 0));
         r.aplicado = false;
         estadoReparto("Imágenes ordenadas por nombre de archivo.");
         break;
@@ -4723,6 +4981,15 @@
         if (b.getAttribute("aria-disabled") !== "true") moverItem(b.dataset.item, accion === "reparto-subir" ? -1 : 1);
         break;
       case "reparto-orden": elegirDestino(b.dataset.item, null); break;
+      // Etapa 22: elegir el orden con las fotos.
+      case "orden-abrir": abrirOrden(); break;
+      case "orden-alternar": alternarOrden(b.dataset.item); break;
+      case "orden-deshacer": if (b.getAttribute("aria-disabled") !== "true") deshacerOrden(); break;
+      case "orden-reiniciar": if (b.getAttribute("aria-disabled") !== "true") reiniciarOrden(); break;
+      case "orden-confirmar": if (b.getAttribute("aria-disabled") !== "true") confirmarOrden(); break;
+      case "orden-recibido": usarOrdenRecibido(); break;
+      case "orden-cancelar": cancelarOrden(); break;
+      case "orden-incluir": incluirAlFinal(b.dataset.item); break;
       case "reparto-quitar": quitarDelReparto(b.dataset.item); break;
       case "abrir-editor": window.GamaTallaEditor?.abrir(b.dataset.producto, b); break;
       case "comprobar": if (f) comprobar(f); break;
