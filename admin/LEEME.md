@@ -1,4 +1,4 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18 y 19
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19 y 20
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
@@ -79,8 +79,9 @@ llegar a un extremo, la rueda o el dedo no mueven nada más, y el panel de fondo
 la ventana está abierta. Al cerrarla vuelven su desplazamiento, su posición y el foco en el botón que
 la abrió.
 
-Cerrar con fichas sin guardar ofrece «Cerrar y conservar el lote» (se conserva mientras no recargues
-la página, también si la sesión vence) o «Descartar el lote».
+Cerrar con fichas sin guardar ofrece «Cerrar y conservar el lote» (etapa 20: queda guardado como
+borrador en este navegador, también si recargas, cierras el navegador o cierras sesión) o «Descartar el
+lote» (borra el borrador local; ver «Borradores guardados en este navegador (20)»).
 
 ### Lectura del mensaje: público combinado y «todas las tallas» (19)
 
@@ -148,6 +149,176 @@ color: agrupar o separar fichas durante la revisión no los cambia. **«Asignar 
 una vez (lo asignado sale de la revisión: pulsar dos veces no duplica nada); lo que falló o sobra se
 queda para revisarlo. Las fotos van al borrador: se suben con «Guardar lote como oculto», y «Quitar
 foto» y «Hacer principal» siguen funcionando. La revisión admite hasta 60 imágenes a la vez.
+
+### Pegar varias publicaciones (20)
+
+Arriba del importador, en **«Publicaciones del proveedor»**, el botón **«Pegar varias publicaciones»**
+abre un cuadro donde se pegan muchos mensajes juntos (copiados del chat, con o sin la fecha y el nombre).
+La entrada de siempre, un mensaje por ficha, sigue igual.
+
+1. **«Revisar la separación»** propone dónde empieza cada publicación (`separar-publicaciones.js`):
+   - el **encabezado** de un mensaje de WhatsApp («[22/11/26, 10:15] Nombre: …», «22/11/26, 10:15 -
+     Nombre: …», «[10:15 a. m., 22/11/2026] Nombre: …»): el encabezado no pasa al texto;
+   - una **línea separadora** de signos («-----», «=====», «*****»);
+   - una línea que **empieza por una marca** cuando la publicación en curso ya trae un precio. Las líneas
+     sin datos justo encima («🔥NUEVO INGRESO🔥», «RECARGA») van con la nueva; el teléfono o la frase de
+     contacto del final se quedan con la anterior.
+   **Una línea en blanco sola nunca separa**: los saltos internos se conservan. «<Multimedia omitido>»,
+   «imagen omitida», «Se eliminó este mensaje» y «<Se editó este mensaje.>» no pasan al texto.
+2. La vista previa muestra cada publicación con su texto tal cual, lo que se lee (marca, modelo,
+   precio, tallas, público) y la casilla **«Crear esta publicación»**. Las **divisiones dudosas** se
+   señalan con su motivo (una marca justo debajo de otros datos; un fragmento sin precio ni marca, que
+   puede ser la continuación del anterior) y no se crean solas si no traen datos. Se corrige con
+   **«Unir con la anterior»**, **«Separar…»** (eligiendo la línea con la que empieza la siguiente) o
+   «La división está bien». Un fragmento vacío (solo una foto o un aviso de WhatsApp) no se crea.
+3. **«Crear N publicaciones»** añade una ficha por publicación marcada **al final del lote**, sin tocar
+   las que ya había (la ficha inicial se aprovecha solo si está completamente vacía). Cada una se lee con
+   el perfil del lote y conserva su **texto original** («Ver el texto original pegado», con encabezados).
+   Nada se agrupa solo ni se escribe en Supabase: después se usan como siempre el lector, «Agrupar», los
+   ajustes y el reparto de fotos, y se guarda con «Guardar lote como oculto». Pulsar dos veces no crea
+   nada más. Hasta 120 publicaciones de una vez.
+
+### Varios colores en una publicación: «(N colores)» (20)
+
+Si el mensaje dice cuántos colores tendrá la zapatilla —**«(2 colores)»** en cualquier parte de una línea
+o **«3 colores»** sola en su línea, con mayúsculas o espacios—, el lector lo toma como **dato de
+preparación**: no pasa al modelo, ni a las tallas, ni al precio. Sin cantidad, todo sigue igual (un
+color). La expresión se reconoce aunque su valor no sirva («(-2 colores)», «(2.5 colores)», «(2,5
+colores)», «(1000 colores)»): sale siempre del texto que se lee y el mensaje original no cambia. Un
+valor negativo, cero, con decimales, por encima del límite real del catálogo (20 colores por zapatilla,
+el mismo `LIM.colores` del editor) o dos cantidades distintas en el mismo mensaje quedan **«Revisar»**
+con el valor tal como llegó: nunca se redondea ni se cambia por otro, y no se ofrece preparar colores
+hasta corregirlo.
+
+- **Pegar varias publicaciones:** la revisión muestra **«Colores a preparar»** en cada publicación (se
+  puede corregir antes de crear) y el resumen distingue publicaciones, fichas y colores («5 publicaciones
+  detectadas · se crearán 5 fichas con 9 colores»). «Crear N publicaciones» crea una ficha por
+  publicación con sus colores. Una cantidad no válida se señala y se crea con 1 color.
+- **Una sola ficha:** **«Cantidad de colores»** (junto al público) muestra cuántos tiene la ficha y
+  cuántos se piden; **«Añadir N colores»** prepara solo los que faltan (pulsar dos veces o volver a leer
+  el mensaje no añade más). Pedir menos **no quita nada**: para retirar un color, «Separar en otra ficha»
+  y quitar esa ficha, como siempre. La cantidad escrita a mano manda sobre la del mensaje.
+- **Colores preparados:** marca, modelo, público y categoría son de la ficha. Cada color nuevo propone
+  las tallas y el precio del proveedor de la publicación (y los sigue al releerla mientras no se corrijan
+  a mano); su nombre queda vacío y «Revisar». «Color 1», «Color 2»… son solo encabezados: el nombre real
+  se escribe y es el que se guarda. Cada color tiene sus fotos (no se copia ninguna), principal, círculo o
+  foto, tono y tallas. «Asignar fotos por lote» los recorre en su orden y salta los que ya tienen foto.
+- Si el mensaje no trae modelo (p. ej. solo «HUGO BOSS»), queda «Revisar»: no se inventa. Los enlaces
+  (wa.link, wa.me, URL) se omiten como el teléfono.
+- La preparación se guarda en el borrador y en sus respaldos.
+
+### Categorías: selector común (20)
+
+Todas las categorías del panel usan el mismo selector desplegable (`categorias.js`): editor de zapatillas,
+fichas del importador, «Ajustes para varias fichas» y categoría habitual del perfil. Ofrece **URBANAS,
+RUNNING y CASUALES** y las categorías que ya existen en el catálogo, sin duplicados por mayúsculas o
+espacios (la tienda no fija categorías propias: sus filtros salen del catálogo). **«Otra categoría…»**
+abre un campo para escribir una nueva (se guarda en mayúsculas). La opción inicial depende del uso:
+**«Selecciona una categoría»** (zapatilla o ficha: sigue siendo obligatoria), **«Sin cambiar»** (ajustes
+en bloque: cada ficha conserva la suya) y **«Sin categoría predeterminada»** (perfil). Esas etiquetas y
+«Otra categoría…» nunca se guardan. Abrir una zapatilla antigua no cambia su categoría: su valor aparece
+entre las opciones tal cual. Elegirla a mano sigue mandando sobre el perfil y la relectura del mensaje.
+Teclado: Intro abre, las flechas eligen, Escape cierra el menú (no la ventana); con ratón o tacto,
+elegir lo cierra. Sin `<select>` (la CSP del panel lo impide en WebKit).
+
+### Perfiles de proveedor (20)
+
+**«Perfil del proveedor»** (plegable, bajo «Pegar varias publicaciones») elige el perfil con el que se
+leen las publicaciones nuevas del lote y permite **crear, editar y eliminar** perfiles. El **Perfil
+general** es el comportamiento de siempre (`REGLAS_PROVEEDOR`) y no se puede modificar.
+
+Cada perfil guarda reglas **declarativas**, una por línea (nada de fórmulas ni código: cada expresión se
+compara como palabras completas, sin tildes ni mayúsculas; los signos se toman literalmente):
+- **Alias de marcas** `alias = marca` («NB = NEW BALANCE»). Gana la coincidencia más larga y un alias de
+  una o dos letras solo cuenta al principio de la línea (las protecciones de ON, Vans Slip On, Air Max 90
+  y Club C 85 se mantienen).
+- **Expresiones de público** `expresión = dama | hombre | unisex` («chicas = dama»), además de las generales.
+- **Palabras de «numeración»** `palabra = público` («niña = dama» → «numeración niña»).
+- **Tallas por público** para «todas las tallas» y «numeración» (desde–hasta, tallas EU enteras, como mucho
+  16 tallas). Vacío = el del Perfil general (Dama 36–39, Hombre 36–44, Unisex 36–44). Son convenciones
+  del proveedor, no límites del catálogo.
+- **Categoría habitual** (opcional): se propone en las fichas nuevas y nunca sustituye una escrita a mano
+  (ni la de «Aplicar ajustes»).
+- **Frases promocionales** que se omiten (no pasan a la ficha).
+
+**Prioridad:** corrección a mano > dato explícito del mensaje (tallas numéricas, público escrito) > regla
+del perfil > valor del Perfil general. Sin información suficiente, el dato queda «Revisar».
+
+**Lo ya leído no cambia en silencio.** Cada ficha guarda una copia del perfil (y de su versión) con la
+que se leyó; cambiar el perfil del lote o editarlo solo afecta a las publicaciones nuevas. Si hay fichas
+leídas con otro perfil o con una versión anterior, aparece **«Volver a leer N fichas con «…»»**: es la
+única forma de releerlas y conserva lo corregido a mano. Eliminar un perfil no cambia los borradores ni
+las fichas que lo usaron (el lote lo muestra como «(eliminado)» y conserva sus reglas). Las fichas que
+aún no tienen mensaje toman el perfil del lote.
+
+**«Recordar para este proveedor»** aparece en «Datos reconocidos» cuando una corrección a mano puede ser
+una regla: el alias de una marca que el lector no reconoció («Se guardará: «ZX» = ADIDAS»), una categoría
+habitual, el rango de tallas corregido en un color con «todas las tallas»/«numeración», o la expresión de
+público (se escribe tal como aparece en el mensaje y se ve la regla antes de guardarla). **Solo se guarda
+al pulsar «Recordar»**; «No recordar» la oculta para esa ficha. Se añade al perfil de la ficha (o al del
+lote si la ficha se leyó con el general) y sirve para las publicaciones nuevas. Nunca se corrige la
+ortografía de un modelo ni se convierte cada edición en regla. Los precios no forman parte del perfil: se
+conservan el ajuste actual y la elección entre varios precios del mensaje.
+
+### Borradores guardados en este navegador (20)
+
+El importador se **guarda solo, como borrador, en este navegador** (IndexedDB, `borradores.js`): textos
+pegados y su separación, mensajes originales, fichas, colores, agrupaciones y orden, datos reconocidos y
+correcciones a mano (con la marca de lo escrito a mano), precios, público, categoría, guía y tallas,
+**fotografías** (pendientes de subir, su orden y la principal), el reparto de fotos sin confirmar, cómo
+se muestra cada color, los ajustes y selecciones, el perfil y sus reglas, el estado de revisión y los
+identificadores y resultados de los guardados en Supabase. La cabecera dice **«Guardando…»**, **«Guardado
+en este navegador · hora»** o el error.
+
+- **Cuándo se escribe:** tras una pausa al editar (y como mucho cada pocos segundos mientras se escribe),
+  al añadir fotos (el original, para recuperarlo aunque se recargue mientras se optimiza), antes de cada
+  escritura en Supabase y al ocultar o cerrar la pestaña. Las fotos se guardan **una sola vez** (como
+  bytes); teclear no las vuelve a escribir. Las fichas ya guardadas en Supabase no guardan sus fotos aquí.
+- **Qué no se guarda:** contraseñas, tokens de sesión ni claves. Nada de esto se envía a Supabase:
+  allí solo llega lo que guarda «Guardar lote como oculto».
+- **Separación:** por proyecto de Supabase (URL) y UUID del administrador. Al cerrar sesión el lote se
+  guarda y deja de mostrarse; solo vuelve al entrar con el mismo usuario en el mismo proyecto.
+- **Al abrir el importador:** si hay borradores con trabajo pendiente, se elige **«Continuar»**,
+  **«Empezar un lote nuevo»** (el anterior se conserva) o **«Eliminar»** (con confirmación). Cada uno se
+  identifica por proveedor, número de publicaciones, guardadas en Supabase, trabajo pendiente y fecha.
+  El botón **«Borradores»** de la cabecera abre la misma lista en cualquier momento.
+- **Nada se borra solo**: ni por antigüedad, ni al cerrar el importador, recargar, cerrar el navegador o
+  cerrar sesión. Un lote cuyas fichas ya están todas en Supabase se conserva en la lista hasta eliminarlo.
+  Eliminar un borrador **no borra nada de Supabase ni de Storage** (los archivos sobrantes siguen el flujo
+  de «Archivos sin usar»). «Descartar el lote», con el lote abierto, borra su borrador y, como antes,
+  solo limpia de Storage los archivos que subió este lote y ninguna galería usa (limpieza verificada).
+- **Espacio:** no hay una cuota fija. La lista muestra la estimación del propio navegador. Si falta
+  espacio, el trabajo abierto sigue en pantalla, la cabecera lo dice y ofrece **«Exportar respaldo»**
+  (desde lo abierto) y la lista de borradores para liberar espacio; nada se borra para hacer sitio y el
+  borrador anterior queda intacto (cada guardado es una transacción completa o no ocurre).
+- **Guardados interrumpidos:** antes de subir fotos se guardan sus nombres de archivo, y antes de
+  `fn_admin_guardar_producto` su operación. Al recuperar, una ficha que estaba «Guardando…» vuelve
+  **«sin confirmar»** (o «fallida» si no llegó a enviarse); al volver a guardar se **comprueba primero**
+  (solo lectura) con su operación: si ya se guardó no se reenvía, y si no, se reintenta con la misma
+  operación. Las fotos que estaban subiendo se vuelven a subir con el mismo nombre y, si ya estaban, se
+  comprueba y no se duplican. Las fichas ya guardadas no se reenvían.
+- **Dos pestañas:** cada borrador lo edita una sola pestaña. Si otra lo continúa, la primera intenta
+  guardar lo suyo, se detiene y lo dice («Este borrador continúa en otra pestaña») con **«Continuar
+  aquí»** (trae la última versión guardada). Solo afirma que sus últimos cambios se guardaron si de
+  verdad se guardaron; si no, dice que no están en el borrador y ofrece **«Exportar lo de esta
+  pestaña»**, y la pestaña que lo toma avisa de que la otra no lo confirmó. Nada se mezcla: un guardado de
+  una pestaña que ya no lo tiene se rechaza.
+- **Cambiar de lote sin perder nada:** «Empezar otro lote» y «Continuar» otro borrador solo sueltan el
+  lote abierto si su guardado local se confirmó; si falla (p. ej. sin espacio), el lote sigue abierto y se
+  explica. Al cerrar sesión con el guardado fallido, el lote queda retenido en memoria y vuelve al entrar
+  con el mismo usuario y proyecto.
+- **Qué cuenta como trabajo:** cualquier dato escrito o elegido a mano, aunque aún no haya mensaje ni
+  modelo (marca, categoría, público, guía, cantidad de colores, nombre, precios, tallas, tono, forma o
+  fotos de un color), los colores preparados y los ajustes del lote. La lista lo desglosa («Pendiente: 2
+  fichas sin guardar, ajustes del lote»).
+- **Respaldo:** «Exportar respaldo» descarga un `.json` (formato `gama-talla/borrador-importador`,
+  versión 1) con los datos y las fotos. **«Importar un respaldo»** valida el formato, la versión y la
+  firma de cada foto: si algo falla no se escribe nada. Con el mismo identificador que un borrador
+  existente pregunta antes de sustituirlo. De otro proyecto o usuario solo se importa como borrador
+  nuevo, sin sus guardados (lo guardado allí se trata como pendiente aquí).
+- **Ojo:** los borradores viven solo en este navegador y con este usuario. Borrar los datos del
+  navegador (o usar una ventana privada) los elimina: exporta un respaldo para conservarlos o
+  llevarlos a otro equipo.
 
 ## Cómo mostrar cada color (18)
 
@@ -640,6 +811,35 @@ modelos a 360, 390 y 1440 px, y una pulsación con la búsqueda por repintar (ra
 corrección el clic se pierde en los tres navegadores). Capturas en la carpeta temporal
 (`gama-talla-19-tablero`). `tests/etapa19/editor-cancelar.spec.js`: cerrar el selector de archivos del
 editor sin elegir conserva el editor; Escape sigue avisando de los cambios sin guardar.
+
+Etapa 20: se ejecutan contra el **entorno aislado** (`node scripts/entorno-local.mjs`, puerto 8770, con
+la configuración del Supabase LOCAL; nunca con los `config.js` reales del 8765):
+
+```bash
+node scripts/entorno-local.mjs        # en otra terminal (puerto 8770)
+SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa20 --workers=1
+```
+
+`tests/etapa20/separador.spec.js` y `perfiles-lector.spec.js` no necesitan servidor (separación con
+saltos internos, emojis, encabezados y multimedia; los mensajes Reebok, Nike 7 CAMARAS, ON y New Balance
+nunca se dividen; 30 publicaciones; Perfil general idéntico al lector anterior; dos proveedores;
+prioridad de las tallas explícitas; alias y protecciones de ON, Slip On, Air Max 90 y Club C 85;
+reglas literales y validación). `pegado.spec.js` (pegado en el importador: crear en la ficha inicial
+vacía, doble clic, encabezados, dudosas, unir y separar, lote con trabajo previo y celular),
+`perfiles.spec.js` (crear, validar, editar y eliminar perfiles sin alterar lo leído; volver a leer con
+correcciones a mano; recuperación del borrador con el perfil eliminado; «Recordar para este proveedor») y
+`borradores.spec.js` (recuperación tras recargar con fotos, orden, principal, agrupaciones y ajustes; foto
+a medio optimizar; falta de espacio simulada; cerrar sesión y otro usuario o proyecto; dos pestañas;
+respaldo con fotos, mismo identificador, otro usuario y archivos no válidos; guardado parcial con
+respuesta perdida; recarga en mitad del guardado; reintento rechazado por un alta que sí llegó; lote de
+30 publicaciones y 20 imágenes; guardado local fallido al cambiar de lote; traspaso sin confirmar;
+trabajo sin mensaje ni modelo). `colores.spec.js` («(N colores)» en el lector, el pegado masivo y la
+ficha; cantidades no válidas; relectura y doble clic; cambiar la cantidad sin perder fotos; reparto,
+borrador, respaldo y guardado) y `categorias.spec.js` (selector en el editor, la ficha, los ajustes y el
+perfil; categoría antigua y personalizada; «Sin cambiar»; prioridad de lo elegido a mano; teclado y
+celular; el menú sigue abierto aunque la ficha se repinte mientras se elige). Las pruebas antiguas que escribían la categoría usan `elegirCategoria`/`campoCategoria`
+(`tests/etapa15/ayudas-panel.js`). Modelos ficticios « P20», borrados al terminar; fotos ficticias en
+`gama-talla-20-fotos` y capturas en `gama-talla-20-capturas` (carpeta temporal).
 
 Etapa 18: `tests/etapa18/importador.spec.js` (los dos mensajes de ejemplo, lote con agrupación de
 colores y precio de venta, coincidencia con el catálogo, fallo parcial con reintento, selector con un

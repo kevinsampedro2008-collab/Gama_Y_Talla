@@ -18,6 +18,7 @@ import {
   revisarEditor, borrarObjetos
 } from './ayudas-catalogo.js';
 import { guardarDatosEnvio } from '../etapa9/ayudas.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 
@@ -65,7 +66,7 @@ async function abrirPanel(page) {
 async function rellenarModelo(page, { nombre, marca = MARCA, categoria = 'Running', referencia = '', publico = 'Hombre' }) {
   await editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true }).fill(nombre);
   await editor(page).getByRole('combobox', { name: 'Marca (obligatorio)', exact: true }).fill(marca);
-  await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill(categoria);
+  await elegirCategoria(editor(page), categoria);
   if (referencia) await editor(page).getByLabel('Referencia del proveedor', { exact: true }).fill(referencia);
   // Etapa 17: el público es obligatorio. Con un esquema anterior a 16.3 la opción está bloqueada.
   if (publico) {
@@ -1291,7 +1292,7 @@ test('panel en celular: cabecera, filtros y guía plegables, selección de talla
   await radioPublico(page, 'Hombre').check();
   await campoMuestra(page, 0).fill('#141414');
   await color(page, 0).getByLabel('Precio actual (COP)').fill('275000');
-  await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill('Casual');
+  await elegirCategoria(editor(page), 'Casual');
   const r = await revisarEditor(page);
   expect(r.desborde, '360×560: sin desplazamiento horizontal').toBe(0);
   expect(r.fuera).toBe(0);

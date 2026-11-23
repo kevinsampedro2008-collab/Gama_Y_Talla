@@ -21,9 +21,14 @@
   <script src="config.js" defer></script>
   <script src="admin.js" defer></script>
   <script src="fotos.js" defer></script>
+  <!-- Etapa 20: selector de categorías común (editor, importador y perfiles). -->
+  <script src="categorias.js" defer></script>
   <script src="editor.js" defer></script>
   <!-- Etapa 18: lectura de las publicaciones del proveedor (en el navegador) e importador por lotes. -->
   <script src="texto-proveedor.js" defer></script>
+  <!-- Etapa 20: separar varias publicaciones pegadas y borradores/perfiles locales (IndexedDB). -->
+  <script src="separar-publicaciones.js" defer></script>
+  <script src="borradores.js" defer></script>
   <script src="importador.js" defer></script>
 </head>
 <body>
@@ -264,7 +269,9 @@
           <div class="editor-titulos">
             <p class="editor-codigo">Lote de publicaciones</p>
             <h2 class="editor-titulo" id="importador-titulo" tabindex="-1">Importar desde WhatsApp</h2>
-            <p class="editor-nota importador-descripcion" id="importador-descripcion">Pega cada publicación y añade sus fotos. Se lee en este navegador; nada se guarda hasta «Guardar lote como oculto».</p>
+            <p class="editor-nota importador-descripcion" id="importador-descripcion">Pega las publicaciones y añade sus fotos. Se guardan como borrador solo en este navegador (se pierde si borras sus datos) y llegan al catálogo con «Guardar lote como oculto».</p>
+            <!-- Etapa 20: estado del borrador local («Guardando…», «Guardado en este navegador», errores). -->
+            <div class="importador-local" id="importador-local"></div>
           </div>
           <button class="boton boton-secundario boton-compacto editor-cerrar" type="button" data-imp="cerrar" aria-label="Cerrar el importador">Cerrar</button>
         </header>

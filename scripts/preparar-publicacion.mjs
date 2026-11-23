@@ -49,7 +49,9 @@ const ARCHIVOS = [
   'assets/images/productos/editadas/zapatilla_48.webp', 'assets/images/productos/editadas/zapatilla_24.webp', 'assets/images/productos/editadas/zapatilla_11.webp',
   'admin/index.html', 'admin/admin.css', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js',
   // Etapa 18: lectura de las publicaciones del proveedor e importador por lotes.
-  'admin/texto-proveedor.js', 'admin/importador.js'
+  'admin/texto-proveedor.js', 'admin/importador.js',
+  // Etapa 20: separar varias publicaciones y borradores/perfiles locales del importador.
+  'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js'
 ];
 // Carpetas completas: el SDK del panel y three.js (con Draco), que la escena importa por import map.
 const CARPETAS = ['admin/vendor/supabase-js-2.118.0', 'assets/vendor/three-0.165.0'];
@@ -187,7 +189,7 @@ export function construir({ raiz = RAIZ_REPO, salida, env = process.env } = {}) 
 // archivos versionados de _headers existen y son los únicos «immutable».
 export function verificarPaquete(destino, versionados) {
   const problemas = [];
-  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js']
+  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js', 'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js']
     .filter((f) => fs.existsSync(path.join(destino, f)));
   // 18: todo <script src> y <link href> local de las dos páginas existe en el paquete (un archivo
   // nuevo que se olvida en la lista de copia rompería el panel sin que nada más lo detecte).

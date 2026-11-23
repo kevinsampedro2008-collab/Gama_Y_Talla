@@ -15,6 +15,7 @@ import {
   PANEL, SITIO, entorno, servicio, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin, configurarPanel, ingresar,
   limpiarRestosDePruebas, revisarDisposicion, borrarCatalogo
 } from '../etapa16/ayudas-catalogo.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 
@@ -72,7 +73,7 @@ async function rellenarNueva(page, nombre) {
   await expect(editor(page)).toBeVisible();
   await editor(page).getByRole('textbox', { name: 'Modelo (obligatorio)', exact: true }).fill(nombre);
   await editor(page).getByRole('combobox', { name: 'Marca (obligatorio)', exact: true }).fill(MARCA);
-  await editor(page).getByRole('combobox', { name: 'Categoría (obligatorio)', exact: true }).fill('Urbanas');
+  await elegirCategoria(editor(page), 'Urbanas');
   const c = editor(page).locator('.editor-variante').first();
   await c.getByRole('textbox', { name: 'Color (obligatorio)', exact: true }).fill('Negro');
   await c.getByLabel('Precio actual (COP)').fill('250000');

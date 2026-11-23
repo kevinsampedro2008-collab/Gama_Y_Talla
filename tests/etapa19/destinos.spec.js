@@ -15,6 +15,7 @@ import {
   PANEL, entorno, servicio, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin, configurarPanel, ingresar,
   revisarDisposicion, borrarCatalogo, prepararFotos, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180000);
@@ -57,7 +58,7 @@ const ajustes = (page) => importador(page).locator('#imp-ajustes');
 const destino = (page, n) => ajustes(page).getByRole('checkbox', { name: new RegExp(`^Ficha ${n} · `) });
 const venta = (f) => color(f, 0).getByLabel(/^Precio de venta/);
 const proveedor = (f) => color(f, 0).getByLabel(/^Precio del proveedor/);
-const categoria = (f) => f.getByRole('combobox', { name: /^Categoría/ });
+const categoria = (f) => campoCategoria(f); // etapa 20: selector de categorías
 const guiaMujer = (f) => f.getByRole('group', { name: 'Tabla de la guía de tallas' }).getByRole('radio', { name: 'Mujer', exact: true });
 
 const AVISO_CAPTURA_WEBKIT = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
@@ -92,7 +93,7 @@ async function publicaciones(page, textos) {
   }
 }
 async function abrirAjustes(page) {
-  if (!(await ajustes(page).evaluate((d) => d.open))) await ajustes(page).locator('summary').click();
+  if (!(await ajustes(page).evaluate((d) => d.open))) await ajustes(page).locator(':scope > summary').click();
   await expect(ajustes(page).locator('#imp-destinos')).toBeVisible();
 }
 
@@ -134,7 +135,7 @@ test('ajustes solo a las fichas 1 y 3; la 2 conserva todo (también al releer); 
   ]);
   const [f1, f2, f3] = [ficha(page, 0), ficha(page, 1), ficha(page, 2)];
   // Datos propios de la ficha 2 y un precio de venta escrito a mano en la 3.
-  await categoria(f2).fill('CASUALES');
+  await elegirCategoria(f2, 'CASUALES');
   await venta(f3).fill('200000');
 
   await abrirAjustes(page);
@@ -146,7 +147,7 @@ test('ajustes solo a las fichas 1 y 3; la 2 conserva todo (también al releer); 
   await bloque.getByRole('button', { name: 'Quitar selección' }).click();
   await expect(bloque.getByRole('button', { name: 'Aplicar ajustes a 0 fichas' })).toBeVisible();
   // Sin destinos: se indica junto al bloque y no cambia nada.
-  await bloque.getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await elegirCategoria(bloque, 'Urbanas');
   await bloque.getByRole('button', { name: 'Aplicar ajustes a 0 fichas' }).click();
   await expect(bloque.locator('#imp-ajustes-estado')).toContainText('Marca al menos una ficha en «Fichas que recibirán los ajustes».');
   await expect(categoria(f1)).toHaveValue('');
@@ -158,8 +159,8 @@ test('ajustes solo a las fichas 1 y 3; la 2 conserva todo (también al releer); 
   for (const f of [f1, f2, f3]) await expect(f.getByRole('checkbox', { name: 'Incluir en el guardado' })).toBeChecked();
 
   // La selección se mantiene al plegar y desplegar, al editar los ajustes y al añadir una ficha.
-  await bloque.locator('summary').click();
-  await bloque.locator('summary').click();
+  await bloque.locator(':scope > summary').click();
+  await bloque.locator(':scope > summary').click();
   await bloque.getByRole('group', { name: 'Tabla de la guía de tallas' }).getByRole('radio', { name: 'Mujer', exact: true }).check();
   await bloque.getByLabel('Sumar al precio del proveedor (COP)').fill('30000');
   await importador(page).getByRole('button', { name: 'Añadir otra publicación' }).click();

@@ -53,8 +53,51 @@
     })
   });
   const NOMBRES_PUBLICO = Object.freeze({ hombre: "Hombre", dama: "Dama", unisex: "Unisex" });
+
+  /* ---------------------------------------------------------------- perfiles de proveedor (etapa 20)
+     Un perfil son reglas DECLARATIVAS y acotadas de un proveedor; nunca código ni expresiones regulares
+     escritas a mano. Cada expresión se compara sin tildes ni mayúsculas y solo como palabras completas.
+     - marcas: alias → marca («NB» = NEW BALANCE). La coincidencia más larga gana; un alias de una o dos
+       letras solo cuenta como primera palabra de la línea (la misma protección que «ON»).
+     - publico: expresión → público («chicas» = dama).
+     - numeracion: palabra que sigue a «numeración» → público («numeración niña» = dama).
+     - rangos: tallas que proponen «todas las tallas» y «numeración <público>» para cada público. Vacío
+       (null) = el rango del Perfil general. Son convenciones del proveedor, no límites del catálogo.
+     - categoria: categoría habitual (opcional); nunca pisa una escrita a mano.
+     - promociones: frases que se omiten («envío gratis a todo el país»).
+     El «Perfil general» es la tabla REGLAS_PROVEEDOR: sin perfil, el lector se comporta como antes. */
+  const LIMITES_PERFIL = Object.freeze({ nombre: 60, expresion: 40, marca: 60, categoria: 60, promocion: 80, entradas: 60, rangoMax: 15 });
+  const SINONIMOS_PUBLICO = Object.freeze({
+    hombre: "hombre", hombres: "hombre", caballero: "hombre", caballeros: "hombre", masculino: "hombre",
+    dama: "dama", damas: "dama", mujer: "dama", mujeres: "dama", femenino: "dama", unisex: "unisex", ambos: "unisex"
+  });
+  function rangoDeLista(lista) {
+    const n = lista.map(Number);
+    return n.length ? Object.freeze({ desde: n[0], hasta: n[n.length - 1] }) : null;
+  }
+  const PERFIL_GENERAL = Object.freeze({
+    id: "general", nombre: "Perfil general", revision: 0, general: true,
+    marcas: Object.freeze([]), publico: Object.freeze([]),
+    numeracion: Object.freeze(Object.entries(REGLAS_PROVEEDOR.numeracion).map(([expresion, publico]) => Object.freeze({ expresion, publico }))),
+    rangos: Object.freeze(Object.fromEntries(Object.entries(REGLAS_PROVEEDOR.todasLasTallas).map(([p, lista]) => [p, rangoDeLista(lista)]))),
+    categoria: "", promociones: Object.freeze([])
+  });
+  const esGeneral = (perfil) => !perfil || perfil.id === PERFIL_GENERAL.id;
+  // Rango que aplica: el del perfil; si el perfil lo deja vacío, el del Perfil general (respaldo).
+  function rangoPara(publico, perfil) {
+    const propio = esGeneral(perfil) ? null : perfil.rangos?.[publico];
+    if (propio) return { ...propio, origen: "perfil" };
+    const general = PERFIL_GENERAL.rangos[publico];
+    return general ? { ...general, origen: "general" } : null;
+  }
   // Tallas que propone la regla para un público ([] si el público no está claro).
-  const tallasPorRegla = (publico) => [...(REGLAS_PROVEEDOR.todasLasTallas[publico] || [])];
+  function tallasPorRegla(publico, perfil = null) {
+    const r = rangoPara(publico, perfil);
+    if (!r) return [];
+    const lista = [];
+    for (let n = r.desde; n <= r.hasta; n += 1) lista.push(String(n));
+    return lista;
+  }
   function describirTallas(lista) {
     const n = lista.map(Number);
     const seguidas = n.length > 2 && n.every((v, i) => Number.isInteger(v) && (i === 0 || v === n[i - 1] + 1));
@@ -62,9 +105,11 @@
   }
   const citar = (expresion) => String(expresion || "todas las tallas").split(" y ").map((e) => `«${e}»`).join(" y ");
   // Nota breve que acompaña a las tallas propuestas por la regla («todas las tallas», «numeración dama»…).
-  function notaRegla(publico, expresion = "todas las tallas") {
-    const tallas = tallasPorRegla(publico);
-    return tallas.length ? `Tallas propuestas por ${citar(expresion)} (${NOMBRES_PUBLICO[publico]}: ${describirTallas(tallas)}).` : NOTA_SIN_PUBLICO;
+  function notaRegla(publico, expresion = "todas las tallas", perfil = null) {
+    const tallas = tallasPorRegla(publico, perfil);
+    if (!tallas.length) return NOTA_SIN_PUBLICO;
+    const delPerfil = rangoPara(publico, perfil)?.origen === "perfil" ? `, perfil «${perfil.nombre}»` : "";
+    return `Tallas propuestas por ${citar(expresion)} (${NOMBRES_PUBLICO[publico]}: ${describirTallas(tallas)}${delPerfil}).`;
   }
   const NOTA_SIN_PUBLICO = "Dice «todas las tallas»: elige el público para proponer las tallas.";
 
@@ -76,7 +121,9 @@
     "Kappa", "Le Coq Sportif", "Diadora", "Umbro", "Lotto", "Champion", "Tommy Hilfiger", "Calvin Klein", "Guess",
     "Steve Madden", "Crocs", "Dr. Martens", "Onitsuka Tiger", "Yeezy", "Off-White", "Veja", "K-Swiss", "Polo Ralph Lauren",
     // Etapa 19: On (On Running). Corta: solo se reconoce como primera palabra de la línea (ver buscarMarca).
-    "On"
+    "On",
+    // Etapa 20.
+    "Hugo Boss"
   ];
 
   const sinTildes = (t) => String(t ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "");
@@ -95,6 +142,17 @@
   /* Frase de contacto en su propia línea, sin teléfono al lado («Dinos y te ayudamos sin falta», «Estamos
      atentos de una»): se omite si la línea no nombra ninguna marca. */
   const FRASE_CONTACTO = /(?<!\p{L})(?:dinos|te ayudamos|te asesoramos|estamos atentos|te atiendo|te atendemos|escr[ií]be(?:me|nos)|preg[uú]nta(?:me|nos)|cons[uú]lta(?:me|nos)|cont[aá]cta(?:me|nos)|ll[aá]ma(?:me|nos)|whats?app|wsp|haz tu pedido|m[aá]nda(?:me|nos)|pide (?:el|la|los|las) tuy[oa]s?|ap[aá]rta(?:la|lo|las|los)?|aprov[eé]cha(?:la|lo)?|p[ií]de(?:la|lo|las|los)|s[eé]para(?:la|lo)?|res[eé]rva(?:la|lo)?)(?!\p{L})/iu;
+  // Etapa 20: enlaces (https://wa.link/…, wa.me/…, www.…): son de contacto, no datos de la zapatilla.
+  const ENLACE = /(?:https?:\/\/|www\.)\S+|\b(?:wa\.link|wa\.me|api\.whatsapp\.com|bit\.ly)\/\S*/giu;
+  /* Etapa 20: cantidad de colores que tendrá la zapatilla, como dato de preparación: «(2 colores)» en
+     cualquier parte de una línea, o «3 colores» sola en su línea. No es modelo, talla ni precio.
+     Se reconoce la EXPRESIÓN aunque su valor no sirva («(-2 colores)», «(2.5 colores)», «(2,5 colores)»,
+     «(1000 colores)»): sale del texto que se lee y después se valida el valor (nunca se redondea). */
+  const VALOR_CANTIDAD = String.raw`[-+−]?\s*\d+(?:[.,]\d+)?`;
+  const CANTIDAD_COLORES = new RegExp(String.raw`\(\s*(${VALOR_CANTIDAD})\s*colou?r(?:es|s)?\s*\)`, "giu");
+  const CANTIDAD_SOLA = new RegExp(String.raw`^\s*(${VALOR_CANTIDAD})\s*colou?r(?:es|s)?\s*\.?\s*$`, "iu");
+  // Límite real de colores por zapatilla: el del catálogo (editor.js, LIM.colores) o el que pase quien llama.
+  const limiteColores = (maximo) => (Number.isInteger(maximo) && maximo > 0 ? maximo : window.GamaTallaEditor?.comun?.LIM?.colores ?? null);
   // Frases del proveedor que no describen la zapatilla.
   const PROMO = /^(?:recarga|nuevo ingreso|nueva coleccion|novedad|promo(?:cion)?|oferta|disponible|llegaron|llego|te atiendo|atencion|escribeme|escribenos|pedidos?|hago envios?|envios?|calidad|importad[oa]s?|original(?:es)?|ultimas? unidades|preventa|stock)\b/i;
 
@@ -152,10 +210,45 @@
   /* «Numeración dama», «NUMERACIÓN: HOMBRE», «y numeración de caballero»: la expresión completa fija el
      público y pide el rango de REGLAS_PROVEEDOR. Se sustituye por «numeración» sola para que unas tallas
      escritas detrás («Numeración dama: 37; 38») se sigan leyendo como tallas concretas. */
-  const NUMERACION_PUBLICO = new RegExp(String.raw`(?<!\p{L})(?:(?:y|e|con|en)\s+)?numeraci[oó]n(?:es)?\s*:?\s*(?:(?:de|para)\s+)?(${Object.keys(REGLAS_PROVEEDOR.numeracion).join("|")})(?!\p{L})`, "giu");
-
   const FIN_NUMERACION = /(?<!\p{L})numeraci[oó]n(?:es)?\s*:?$/iu;
-  const INICIO_PUBLICO_NUMERACION = new RegExp(String.raw`^(?:(?:de|para)\s+)?(?:${Object.keys(REGLAS_PROVEEDOR.numeracion).join("|")})(?!\p{L})`, "iu");
+
+  /* Etapa 20: las palabras de «numeración» vienen del perfil. Una expresión se convierte en un patrón
+     LITERAL (letras con y sin tilde, espacios flexibles) y siempre como palabra completa: el perfil no
+     puede introducir expresiones regulares. */
+  const VARIANTES_LETRA = { a: "aáàâä", e: "eéèêë", i: "iíìîï", o: "oóòôö", u: "uúùûü", n: "nñ", c: "cç" };
+  function patronLiteral(expresion) {
+    return [...sinTildes(expresion).toLowerCase().trim().replace(/\s+/g, " ")].map((ch) => {
+      if (ch === " ") return String.raw`\s+`;
+      if (VARIANTES_LETRA[ch]) return `[${VARIANTES_LETRA[ch]}]`;
+      // Solo los caracteres de sintaxis (en modo «u» no se admite escapar otros, como «-»).
+      return ch.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+    }).join("");
+  }
+  const alternativa = (lista) => [...lista].sort((a, b) => b.length - a.length).map(patronLiteral).join("|");
+  const BORDE_INICIO = String.raw`(?<![\p{L}\p{N}])`;
+  const BORDE_FIN = String.raw`(?![\p{L}\p{N}])`;
+
+  // Reglas de un perfil ya convertidas en patrones (una vez por perfil).
+  const compilados = new WeakMap();
+  function compilar(perfil) {
+    const p = perfil || PERFIL_GENERAL;
+    if (compilados.has(p)) return compilados.get(p);
+    const numeracion = new Map(p.numeracion.map((n) => [clave(n.expresion), n.publico]));
+    const palabras = alternativa(p.numeracion.map((n) => n.expresion));
+    // Las expresiones se comparan con la línea ya limpia (sin emojis, flechas ni *, _ y ~): se limpian igual.
+    const limpias = (lista) => lista.map((t) => limpiarLinea(String(t))).filter(Boolean);
+    const c = {
+      numeracion,
+      numeracionPublico: palabras ? new RegExp(String.raw`(?<!\p{L})(?:(?:y|e|con|en)\s+)?numeraci[oó]n(?:es)?\s*:?\s*(?:(?:de|para)\s+)?(${palabras})(?!\p{L})`, "giu") : null,
+      inicioNumeracion: palabras ? new RegExp(String.raw`^(?:(?:de|para)\s+)?(?:${palabras})(?!\p{L})`, "iu") : null,
+      publico: new Map(p.publico.map((x) => [clave(x.expresion), x.publico])),
+      publicoExtra: limpias(p.publico.map((x) => x.expresion)).length ? new RegExp(`${BORDE_INICIO}(?:${alternativa(limpias(p.publico.map((x) => x.expresion)))})${BORDE_FIN}`, "giu") : null,
+      promociones: limpias(p.promociones).length ? new RegExp(`${BORDE_INICIO}(?:${alternativa(limpias(p.promociones))})${BORDE_FIN}`, "giu") : null,
+      alias: p.marcas.map((m) => ({ texto: m.alias, marca: m.marca, alias: true }))
+    };
+    compilados.set(p, c);
+    return c;
+  }
 
   /* «Todas las tallas» y sus variantes, completas y con su conector («y todas las tallas»). */
   const TODAS_LAS_TALLAS = /(?<!\p{L})(?:(?:y|e|en|con)\s+)?(?:todas\s+(?:las\s+)?(?:tallas|numeraciones)|toda\s+la\s+(?:numeraci[oó]n|talla)|tallas\s+completas|numeraci[oó]n\s+completa)(?:\s+disponibles?)?(?!\p{L})/giu;
@@ -334,19 +427,23 @@
   }
 
   // ------------------------------------------------------------------ marca
+  /* marcas: textos («Nike») o entradas { texto, marca, alias } (etapa 20: alias del perfil, «NB» → NEW
+     BALANCE). Devuelve { marca, texto, alias, k, pos }: «texto» es lo que aparece en la línea. */
   function buscarMarca(linea, marcas) {
     const l = ` ${clave(linea)} `;
     let mejor = null;
-    for (const marca of marcas) {
-      const k = clave(marca);
+    for (const entrada of marcas) {
+      const e = typeof entrada === "string" ? { texto: entrada, marca: entrada, alias: false } : entrada;
+      const k = clave(e.texto);
       if (!k) continue;
       const pos = l.indexOf(` ${k} `);
       if (pos < 0) continue;
       // Palabras completas siempre (« on » no está dentro de «Onitsuka» ni de «Cloud»). Una marca de una o
       // dos letras («ON») solo cuenta como primera palabra de la línea: «Vans Slip On» no es ON.
       if (k.length <= 2 && pos !== 0) continue;
-      // La más larga gana («New Balance» antes que «Balance»); a igual longitud, la primera.
-      if (!mejor || k.length > mejor.k.length || (k.length === mejor.k.length && pos < mejor.pos)) mejor = { marca, k, pos };
+      // La más larga gana («New Balance» antes que «Balance»); a igual longitud, la primera (los alias
+      // del perfil van delante: son la regla más específica del proveedor).
+      if (!mejor || k.length > mejor.k.length || (k.length === mejor.k.length && pos < mejor.pos)) mejor = { marca: e.marca, texto: e.texto, alias: e.alias, k, pos };
     }
     return mejor;
   }
@@ -378,8 +475,13 @@
      Orden de extracción en cada línea, de lo más reconocible a lo menos: teléfono y su frase de contacto,
      «Color:», precio, «todas las tallas», tallas, público. Cada dato sale completo, con sus conectores; lo
      que queda (sin bordes sueltos) es la marca y el modelo, o un color. */
-  function analizar(texto, { marcas = [] } = {}) {
-    const listaMarcas = [...new Set([...marcas.map(String).filter(Boolean), ...MARCAS_BASE])];
+  function analizar(texto, { marcas = [], perfil = null, maxColores = null } = {}) {
+    // Etapa 20: el perfil del proveedor (sin perfil, el general: mismo comportamiento que antes).
+    const regla = perfil && !esGeneral(perfil) ? perfil : PERFIL_GENERAL;
+    const comp = compilar(regla);
+    const listaMarcas = [...comp.alias, ...new Set([...marcas.map(String).filter(Boolean), ...MARCAS_BASE])];
+    const reglas = []; // reglas del perfil que se usaron, para explicarlas en la revisión
+    const anotarRegla = (t) => { if (!reglas.includes(t)) reglas.push(t); };
     const notas = [];
     const revisar = new Set();
     const omitido = { telefonos: 0, promocional: 0, contacto: 0 };
@@ -399,13 +501,29 @@
       if (!FIN_NUMERACION.test(limpiarLinea(lineas[i]))) continue;
       let j = i + 1;
       while (j < lineas.length && !limpiarLinea(lineas[j])) j += 1;
-      if (j < lineas.length && INICIO_PUBLICO_NUMERACION.test(limpiarLinea(lineas[j]))) {
+      if (j < lineas.length && comp.inicioNumeracion?.test(limpiarLinea(lineas[j]))) {
         lineas[i] = `${lineas[i]} ${lineas[j]}`;
         lineas.splice(i + 1, j - i);
       }
     }
+    const cantidades = []; // etapa 20: «(2 colores)», «3 colores» (valor tal cual, sin espacios)
     for (const original of lineas) {
       let linea = limpiarLinea(original);
+      if (!linea) continue;
+      // Etapa 20: los enlaces (wa.link, wa.me, URL) son de contacto: se omiten.
+      let conEnlace = false;
+      linea = linea.replace(ENLACE, () => { conEnlace = true; return " "; });
+      if (conEnlace) {
+        omitido.contacto += 1;
+        linea = limpiarLinea(linea);
+        if (!linea) continue;
+      }
+      // Etapa 20: cantidad de colores (dato de preparación): sale de la línea antes que tallas y precios.
+      const anotar = (v) => { const t = v.replace(/\s+/g, "").replace("−", "-"); if (!cantidades.includes(t)) cantidades.push(t); };
+      linea = linea.replace(CANTIDAD_COLORES, (_, v) => { anotar(v); return " "; });
+      const sola = CANTIDAD_SOLA.exec(linea);
+      if (sola) { anotar(sola[1]); continue; }
+      linea = limpiarLinea(linea);
       if (!linea) continue;
       // Un teléfono se quita de la línea y lo demás se conserva («Reebok … $80.000 Escríbeme al +57 …»). Su
       // frase de contacto («Estamos atentos…», «Escríbeme al…») también se omite.
@@ -416,6 +534,16 @@
         if (contacto) linea = linea.slice(0, contacto.index); // cuenta con su teléfono, no como otra línea
         linea = limpiarLinea(linea);
         if (!linea) continue;
+      }
+      // Frases promocionales del perfil: se quitan de la línea (lo demás se sigue leyendo).
+      if (comp.promociones) {
+        let quitada = false;
+        linea = linea.replace(comp.promociones, (frase) => { quitada = true; anotarRegla(`Se omitió «${frase}» (frase promocional del perfil).`); return " "; });
+        if (quitada) {
+          omitido.promocional += 1;
+          linea = limpiarLinea(linea);
+          if (!linea) continue;
+        }
       }
       const k = clave(linea);
       if (!k) continue;
@@ -429,13 +557,16 @@
         linea = linea.replace(p.texto, " ");
       }
       // «Numeración dama/hombre» y «todas las tallas» (con su conector): la regla decide las tallas al final.
-      linea = linea.replace(NUMERACION_PUBLICO, (_, palabra) => {
-        const p = REGLAS_PROVEEDOR.numeracion[palabra.toLowerCase()];
-        publicos[p] = true;
-        const etiqueta = `numeración ${palabra.toLowerCase()}`;
-        if (!expresiones.includes(etiqueta)) expresiones.push(etiqueta);
-        return " numeración "; // la palabra sola: «Numeración dama: 37; 38» sigue leyéndose como tallas
-      });
+      if (comp.numeracionPublico) {
+        linea = linea.replace(comp.numeracionPublico, (todo, palabra) => {
+          const p = comp.numeracion.get(clave(palabra));
+          if (!p) return todo;
+          publicos[p] = true;
+          const etiqueta = `numeración ${palabra.toLowerCase()}`;
+          if (!expresiones.includes(etiqueta)) expresiones.push(etiqueta);
+          return " numeración "; // la palabra sola: «Numeración dama: 37; 38» sigue leyéndose como tallas
+        });
+      }
       linea = linea.replace(TODAS_LAS_TALLAS, () => { todas = true; if (!expresiones.includes("todas las tallas")) expresiones.unshift("todas las tallas"); return " "; });
       if (!clave(linea)) continue;
       // Una talla sola en su línea («37»): se decide al final, cuando se sabe si el texto trae otras tallas.
@@ -449,6 +580,17 @@
       linea = leidas.resto;
       if (!clave(linea)) continue;
 
+      // Expresiones de público del perfil («chicas» = dama): antes que las generales.
+      if (comp.publicoExtra) {
+        linea = linea.replace(comp.publicoExtra, (expresion) => {
+          const p = comp.publico.get(clave(expresion));
+          if (!p) return expresion;
+          publicos[p] = true;
+          anotarRegla(`«${expresion}» = ${NOMBRES_PUBLICO[p]} (público, perfil «${regla.nombre}»).`);
+          return " ";
+        });
+        if (!clave(linea)) continue;
+      }
       // Público: la expresión entera sale de la línea; se suma lo de todas las líneas.
       const pub = extraerPublico(linea);
       for (const k of Object.keys(publicos)) publicos[k] = publicos[k] || pub[k];
@@ -469,7 +611,8 @@
     const conMarca = leidas.find((x) => x.m);
     if (conMarca) {
       marca = conMarca.m.marca;
-      modelo = quitarMarca(conMarca.l, conMarca.m.marca);
+      modelo = quitarMarca(conMarca.l, conMarca.m.texto);
+      if (conMarca.m.alias) anotarRegla(`«${conMarca.m.texto}» = ${conMarca.m.marca} (alias de marca, perfil «${regla.nombre}»).`);
       // La marca sola en su línea («ON⏎CLOUD REMIX»): el modelo es la siguiente línea sin marca.
       if (!clave(modelo)) modelo = leidas.slice(leidas.indexOf(conMarca) + 1).find((x) => !x.m)?.l || "";
     } else if (candidatas.length) {
@@ -481,8 +624,9 @@
     }
     modelo = modelo.replace(/\s+/g, " ").trim();
     if (!modelo) revisar.add("modelo");
-    // Una marca del catálogo se escribe como está allí; una de la lista base, con mayúscula inicial.
-    if (marca && !marcas.includes(marca)) marca = titulo(marca);
+    // Una marca del catálogo (o la de un alias del perfil) se escribe como está allí; una de la lista base,
+    // con mayúscula inicial.
+    if (marca && !marcas.includes(marca) && !conMarca?.m.alias) marca = titulo(marca);
 
     if (publico === "unisex" && !publicos.unisex) notas.push("Nombra caballero y dama: público Unisex.");
     if (!publico) revisar.add("publico");
@@ -525,21 +669,21 @@
     let porRegla = false;
     const notasRegla = [];
     if (pideRegla) {
-      const regla = tallasPorRegla(publico);
+      const propuestas = tallasPorRegla(publico, regla);
       if (explicitas) {
-        const iguales = regla.length === tallasUnicas.length && regla.every((t, i) => t === tallasUnicas[i]);
+        const iguales = propuestas.length === tallasUnicas.length && propuestas.every((t, i) => t === tallasUnicas[i]);
         if (!todas) {
           if (!iguales) notasRegla.push(`${citar(expresion)} con tallas concretas: se usaron esas (${describirTallas(tallasUnicas)}).`);
-        } else if (!regla.length) {
+        } else if (!propuestas.length) {
           notasRegla.push(`Dice «todas las tallas» y también trae tallas concretas: se usaron las concretas (${describirTallas(tallasUnicas)}).`);
         } else if (!iguales) {
           revisar.add("tallas");
-          notasRegla.push(`Dice «todas las tallas», pero trae tallas concretas: se usaron las concretas (${describirTallas(tallasUnicas)}); para ${NOMBRES_PUBLICO[publico]} la regla propone ${describirTallas(regla)}. Compruébalas.`);
+          notasRegla.push(`Dice «todas las tallas», pero trae tallas concretas: se usaron las concretas (${describirTallas(tallasUnicas)}); para ${NOMBRES_PUBLICO[publico]} la regla propone ${describirTallas(propuestas)}. Compruébalas.`);
         }
-      } else if (regla.length) {
-        tallasUnicas = regla;
+      } else if (propuestas.length) {
+        tallasUnicas = propuestas;
         porRegla = true;
-        notasRegla.push(notaRegla(publico, expresion));
+        notasRegla.push(notaRegla(publico, expresion, regla));
       } else {
         revisar.add("publico");
         notasRegla.push(NOTA_SIN_PUBLICO);
@@ -548,12 +692,153 @@
     }
     if (!tallasUnicas.length) revisar.add("tallas");
     if (!color) revisar.add("color");
+    // Etapa 20: cantidad de colores. Una sola cantidad positiva es válida (el límite del catálogo lo
+    // comprueba el importador); varias distintas o un cero quedan por revisar.
+    // Válida: un único entero (sin signo ni decimales) entre 1 y el límite del catálogo. Lo demás queda
+    // «Revisar» con el valor tal como lo escribió el proveedor; nunca se redondea ni se corrige.
+    const distintas = cantidades;
+    const limite = limiteColores(maxColores);
+    let cantidadColores = null;
+    let notaCantidad = "";
+    const cantidadTexto = distintas.length === 1 ? distintas[0] : "";
+    if (distintas.length > 1) notaCantidad = `El mensaje indica cantidades de colores distintas (${distintas.join(" y ")}): revisa cuántos colores tendrá.`;
+    else if (distintas.length === 1) {
+      const t = distintas[0];
+      const n = /^\d+$/.test(t) ? Number(t) : NaN;
+      if (/^-/.test(t)) notaCantidad = `«${t} colores» no es una cantidad válida (es negativa): revisa cuántos colores tendrá.`;
+      else if (/[.,]/.test(t)) notaCantidad = `«${t} colores» no es una cantidad válida (debe ser un número entero): revisa cuántos colores tendrá.`;
+      else if (!Number.isInteger(n) || n < 1) notaCantidad = `«${t} colores» no es una cantidad válida: revisa cuántos colores tendrá.`;
+      else if (limite && n > limite) notaCantidad = `«${t} colores» supera el máximo de ${limite} colores por zapatilla: revisa cuántos colores tendrá.`;
+      else cantidadColores = n;
+    }
+    if (notaCantidad) { revisar.add("colores"); notas.push(notaCantidad); }
 
     return {
       marca, modelo, publico, precio, tallas: tallasUnicas, color, revisar: [...revisar], notas, omitido,
       todasLasTallas: todas, tallasExplicitas: explicitas, tallasPorRegla: porRegla, notasRegla,
-      precios, notaPrecios, reglaTallas: pideRegla, expresionRegla: expresion
+      precios, notaPrecios, reglaTallas: pideRegla, expresionRegla: expresion,
+      // Etapa 20: perfil con el que se leyó y reglas suyas que se aplicaron (alias, público, promociones).
+      perfil: regla.id, reglas,
+      // Etapa 20: cantidad de colores pedida en el mensaje (null si no la dice o no es válida).
+      cantidadColores, cantidadesColores: distintas, cantidadTexto, notaCantidad
     };
+  }
+
+  // ------------------------------------------------------------------ perfiles: validación (etapa 20)
+  const tieneLetra = (t) => /\p{L}/u.test(String(t));
+  const textoPlano = (t, max) => String(t ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, max + 1);
+  const publicoValido = (t) => SINONIMOS_PUBLICO[clave(t)] || "";
+  /* Valida un perfil (lo que llega del formulario, de IndexedDB o de un respaldo) y devuelve una copia
+     congelada y limpia: { perfil, errores: [{ campo, mensaje }] }. Con errores, perfil es null.
+     Solo texto, números y valores conocidos: nada se interpreta como código. */
+  function normalizarPerfil(entrada) {
+    const e = entrada && typeof entrada === "object" ? entrada : {};
+    const errores = [];
+    const error = (campo, mensaje) => errores.push({ campo, mensaje });
+    const L = LIMITES_PERFIL;
+    const nombre = textoPlano(e.nombre, L.nombre);
+    if (!nombre) error("nombre", "Escribe el nombre del proveedor.");
+    else if (nombre.length > L.nombre) error("nombre", `El nombre admite hasta ${L.nombre} caracteres.`);
+    else if (clave(nombre) === clave(PERFIL_GENERAL.nombre)) error("nombre", "Ese nombre es el del Perfil general: elige otro.");
+    const id = String(e.id || "");
+    if (!/^[a-z0-9][a-z0-9-]{0,63}$/i.test(id) || id === PERFIL_GENERAL.id) error("id", "Identificador de perfil no válido.");
+    const revision = Number.isInteger(e.revision) && e.revision >= 0 ? e.revision : 0;
+
+    const lista = (valor, campo) => {
+      if (valor === undefined || valor === null) return [];
+      if (!Array.isArray(valor)) { error(campo, "Formato no válido."); return []; }
+      if (valor.length > L.entradas) error(campo, `Como mucho ${L.entradas} reglas en este apartado.`);
+      return valor.slice(0, L.entradas);
+    };
+    const expresionValida = (t, campo, n) => {
+      const x = textoPlano(t, L.expresion);
+      if (!x || !tieneLetra(x)) { error(campo, `Regla ${n}: la expresión debe tener letras.`); return ""; }
+      if (x.length > L.expresion) { error(campo, `Regla ${n}: la expresión admite hasta ${L.expresion} caracteres.`); return ""; }
+      return x;
+    };
+    const vistas = (campo) => {
+      const set = new Set();
+      return (x, n) => { const k = clave(x); if (set.has(k)) { error(campo, `Regla ${n}: «${x}» está repetida.`); return false; } set.add(k); return true; };
+    };
+
+    const marcas = [];
+    const unaMarca = vistas("marcas");
+    lista(e.marcas, "marcas").forEach((m, i) => {
+      const alias = expresionValida(m?.alias, "marcas", i + 1);
+      const marca = textoPlano(m?.marca, L.marca).toLocaleUpperCase("es");
+      if (!marca || !tieneLetra(marca) || marca.length > L.marca) { error("marcas", `Regla ${i + 1}: escribe la marca (hasta ${L.marca} caracteres).`); return; }
+      if (alias && unaMarca(alias, i + 1)) marcas.push(Object.freeze({ alias, marca }));
+    });
+    const equivalencias = (valor, campo) => {
+      const salida = [];
+      const una = vistas(campo);
+      lista(valor, campo).forEach((x, i) => {
+        const expresion = expresionValida(x?.expresion, campo, i + 1);
+        const publico = publicoValido(x?.publico);
+        if (!publico) { error(campo, `Regla ${i + 1}: el público debe ser dama, hombre o unisex.`); return; }
+        if (expresion && una(expresion, i + 1)) salida.push(Object.freeze({ expresion, publico }));
+      });
+      return salida;
+    };
+    const publico = equivalencias(e.publico, "publico");
+    const numeracion = equivalencias(e.numeracion, "numeracion");
+
+    const rangos = {};
+    for (const p of ["dama", "hombre", "unisex"]) {
+      const r = e.rangos?.[p];
+      if (r === undefined || r === null || r === "") { rangos[p] = null; continue; }
+      const desde = Number(r.desde);
+      const hasta = Number(r.hasta);
+      if (!Number.isInteger(desde) || !Number.isInteger(hasta) || desde < TALLA_MIN || hasta > TALLA_MAX || hasta < desde || hasta - desde > L.rangoMax) {
+        error(`rango-${p}`, `${NOMBRES_PUBLICO[p]}: el rango debe ser de tallas EU enteras entre ${TALLA_MIN} y ${TALLA_MAX}, de menor a mayor (como mucho ${L.rangoMax + 1} tallas).`);
+        rangos[p] = null;
+        continue;
+      }
+      rangos[p] = Object.freeze({ desde, hasta });
+    }
+
+    const categoria = textoPlano(e.categoria, L.categoria).toLocaleUpperCase("es");
+    if (categoria.length > L.categoria) error("categoria", `La categoría admite hasta ${L.categoria} caracteres.`);
+    const promociones = [];
+    const unaPromo = vistas("promociones");
+    lista(e.promociones, "promociones").forEach((t, i) => {
+      const x = textoPlano(t, L.promocion);
+      if (!x || !tieneLetra(x) || x.length < 3) { error("promociones", `Frase ${i + 1}: escribe al menos 3 caracteres con letras.`); return; }
+      if (x.length > L.promocion) { error("promociones", `Frase ${i + 1}: admite hasta ${L.promocion} caracteres.`); return; }
+      if (unaPromo(x, i + 1)) promociones.push(x);
+    });
+    if (errores.length) return { perfil: null, errores };
+    return {
+      errores,
+      perfil: Object.freeze({
+        id, nombre, revision, general: false,
+        marcas: Object.freeze(marcas), publico: Object.freeze(publico), numeracion: Object.freeze(numeracion),
+        rangos: Object.freeze(rangos), categoria, promociones: Object.freeze(promociones)
+      })
+    };
+  }
+  // Perfil nuevo a partir del general: mismas palabras de numeración, rangos vacíos (= los del general).
+  function perfilInicial(id, nombre) {
+    return {
+      id, nombre, revision: 0, marcas: [], publico: [],
+      numeracion: PERFIL_GENERAL.numeracion.map((n) => ({ ...n })),
+      rangos: { dama: null, hombre: null, unisex: null }, categoria: "", promociones: []
+    };
+  }
+  // ¿El texto contiene la expresión como palabras completas? (para proponer reglas del perfil)
+  const contieneExpresion = (textoBuscar, expresion) => new RegExp(`${BORDE_INICIO}(?:${patronLiteral(expresion)})${BORDE_FIN}`, "iu").test(String(textoBuscar || ""));
+  // Utilidades para separar publicaciones (etapa 20): marca al principio de una línea y precios.
+  function marcaAlInicio(linea, { marcas = [], perfil = null } = {}) {
+    const comp = compilar(perfil && !esGeneral(perfil) ? perfil : PERFIL_GENERAL);
+    const limpia = limpiarLinea(String(linea || "").replace(TELEFONOS, " "));
+    const m = buscarMarca(limpia, [...comp.alias, ...new Set([...marcas.map(String).filter(Boolean), ...MARCAS_BASE])]);
+    return m && m.pos === 0 ? m.marca : "";
+  }
+  const tienePrecio = (linea) => leerPrecios(limpiarLinea(String(linea || "").replace(TELEFONOS, " "))).length > 0;
+  // Línea de cierre de un mensaje: teléfono o frase de contacto («Dinos y te ayudamos», «Aparta la tuya»).
+  function esContacto(linea) {
+    const limpia = limpiarLinea(String(linea || ""));
+    return TELEFONO.test(limpia) || FRASE_CONTACTO.test(limpia);
   }
 
   // Clave para comparar modelos (lote y catálogo): sin tildes, mayúsculas ni signos, y sin la marca.
@@ -566,6 +851,9 @@
 
   window.GamaTallaTextoProveedor = Object.freeze({
     analizar, leerCampoTallas, tallasDe, racional, claveModelo, clave, MARCAS_BASE,
-    REGLAS_PROVEEDOR, tallasPorRegla, notaRegla, NOTA_SIN_PUBLICO
+    REGLAS_PROVEEDOR, tallasPorRegla, notaRegla, NOTA_SIN_PUBLICO,
+    // Etapa 20: perfiles de proveedor y utilidades del pegado de varias publicaciones.
+    PERFIL_GENERAL, LIMITES_PERFIL, normalizarPerfil, perfilInicial, esGeneral, rangoPara, publicoValido,
+    contieneExpresion, marcaAlInicio, tienePrecio, esContacto, limpiarLinea
   });
 })();

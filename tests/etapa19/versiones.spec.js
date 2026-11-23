@@ -17,6 +17,7 @@ import {
   PANEL, entorno, servicio, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin, configurarPanel, ingresar,
   revisarDisposicion, borrarCatalogo, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180000);
@@ -121,29 +122,30 @@ async function filas(page) {
 test('orden: ajustes plegables primero, después fotos por lote y las fichas; el bloque conserva su estado y sus valores', async ({ page, browserName }) => {
   const problemas = await abrirPanel(page);
   const orden = await page.evaluate(() => [...document.querySelector('#importador-cuerpo').children].filter((n) => !n.hidden).map((n) => n.id || n.className));
-  expect(orden.slice(0, 4)).toEqual(['imp-ajustes', 'imp-reparto', 'imp-fichas', 'importador-agregar']);
+  // Etapa 20: delante va «Publicaciones del proveedor» (pegar varias y perfil); el orden de la 19 sigue igual.
+  expect(orden.slice(0, 5)).toEqual(['imp-entrada', 'imp-ajustes', 'imp-reparto', 'imp-fichas', 'importador-agregar']);
   const ajustes = importador(page).locator('#imp-ajustes');
   await expect(ajustes).not.toHaveAttribute('open', '');
   // El cuadro del mensaje de la primera ficha recibe el foco y se ve, también en celular.
   await expect(color(ficha(page, 0), 0).getByLabel(MENSAJE)).toBeFocused();
 
   // Abierto, con valores escritos: añadir publicaciones y repintar no lo cierra ni borra lo escrito.
-  await ajustes.locator('summary').click();
-  await ajustes.getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await ajustes.locator(':scope > summary').click();
+  await elegirCategoria(ajustes, 'Urbanas');
   await ajustes.getByLabel('Sumar al precio del proveedor (COP)').fill('30000');
   await color(ficha(page, 0), 0).getByLabel(MENSAJE).fill(DAMA);
   await importador(page).getByRole('button', { name: 'Añadir otra publicación' }).click();
   await color(ficha(page, 1), 0).getByLabel(MENSAJE).fill(HOMBRE);
   await expect(ficha(page, 1).getByRole('textbox', { name: /^Modelo/ })).toHaveValue(MODELO);
   await expect(ajustes).toHaveAttribute('open', '');
-  await expect(ajustes.getByLabel('Categoría', { exact: true })).toHaveValue('URBANAS');
+  await expect(campoCategoria(ajustes)).toHaveValue('URBANAS');
   await expect(ajustes.getByLabel('Sumar al precio del proveedor (COP)')).toHaveValue('30000');
   // Plegado: sigue plegado tras repintar.
-  await ajustes.locator('summary').click();
+  await ajustes.locator(':scope > summary').click();
   await importador(page).getByRole('button', { name: 'Añadir otra publicación' }).click();
   await expect(ajustes).not.toHaveAttribute('open', '');
-  await ajustes.locator('summary').click();
-  await expect(ajustes.getByLabel('Categoría', { exact: true })).toHaveValue('URBANAS');
+  await ajustes.locator(':scope > summary').click();
+  await expect(campoCategoria(ajustes)).toHaveValue('URBANAS');
 
   // Celular 390 × 844 y 360 × 560: una sola zona de desplazamiento; cabecera y pie a la vista.
   for (const [ancho, alto] of [[390, 844], [360, 560]]) {
@@ -258,8 +260,8 @@ test('Nike 7 CAMARAS: Dama y Hombre independientes; precio elegido y conservado;
   // Ajustes en bloque (arriba): categoría y precio de venta = proveedor + 30.000. El GRIS aún no tiene
   // precio del proveedor (dos candidatos): queda por revisar hasta elegirlo; el de venta se calcula entonces.
   const ajustes = importador(page).locator('#imp-ajustes');
-  await ajustes.locator('summary').click();
-  await ajustes.getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await ajustes.locator(':scope > summary').click();
+  await elegirCategoria(ajustes, 'Urbanas');
   await ajustes.getByLabel('Sumar al precio del proveedor (COP)').fill('30000');
   await ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(ajustes.locator('#imp-ajustes-estado')).toContainText('2 fichas actualizadas');
@@ -337,7 +339,7 @@ test('catálogo con solo la versión para otro público: se informa y se puede g
   await expect(f.getByLabel('Crear otra ficha con este mismo modelo de todas formas')).toHaveCount(0);
   await campoColor(c).fill('BLANCO');
   await precios(c).getByRole('radio', { name: /125\.000/ }).click();
-  await f.getByRole('combobox', { name: /^Categoría/ }).fill('URBANAS');
+  await elegirCategoria(f, 'URBANAS');
   await c.getByLabel(/^Precio de venta/).fill('160000');
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(f.locator('.importador-estado')).toContainText(/Guardada oculta · GT-/, { timeout: 30000 });

@@ -216,3 +216,23 @@ export async function revisarDisposicion(page) {
     return { desborde, pequenos, fuera };
   });
 }
+
+/* Etapa 20 · Selector de categorías común (admin/categorias.js). «ambito» es el contenedor que tiene UN
+   campo de categoría (el editor, una ficha, el bloque de ajustes o el formulario de perfil). Se abre el
+   menú y se elige la opción; si no existe, «Otra categoría…» y se escribe. */
+export function campoCategoria(ambito) {
+  return ambito.locator('.campo-categoria .selector-categoria-dato').first();
+}
+export async function elegirCategoria(ambito, valor) {
+  const campo = ambito.locator('.campo-categoria').first();
+  const menu = campo.locator('details.selector-categoria');
+  if (!(await menu.evaluate((d) => d.open))) await menu.locator('summary').click();
+  const normal = String(valor).replace(/\s+/g, ' ').trim().toLocaleUpperCase('es');
+  const opcion = menu.getByRole('radio', { name: normal, exact: true });
+  // click() y no check(): check() se queda esperando si el formulario repinta la opción (trampa conocida).
+  if (await opcion.count()) await opcion.click();
+  else {
+    await menu.getByRole('radio', { name: 'Otra categoría…', exact: true }).click();
+    await campo.getByLabel('Escribe la nueva categoría', { exact: true }).fill(valor);
+  }
+}

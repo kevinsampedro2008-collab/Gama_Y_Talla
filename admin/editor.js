@@ -402,7 +402,10 @@
       campo({ id: "ed-marca", etiqueta: "Marca", valor: d.marca, max: LIM.marca, lista: "ed-marcas", obligatorio: true, mayusculas: true, datos: { campo: "marca" } }));
     const fila2 = nodo("div", "campos-fila");
     fila2.append(
-      campo({ id: "ed-categoria", etiqueta: "Categoría", valor: d.categoria, max: LIM.categoria, lista: "ed-categorias", obligatorio: true, mayusculas: true, ayuda: "Por ejemplo: RUNNING, URBANAS, CASUALES. Se guarda en mayúsculas.", datos: { campo: "categoria" } }),
+      // Etapa 20: selector común de categorías (base, las del catálogo y «Otra categoría…»). Abrir una
+      // zapatilla no cambia su categoría: el valor guardado se muestra tal cual.
+      window.GamaTallaCategorias.crear({ id: "ed-categoria", valor: d.categoria, modo: "obligatorio", catalogo: unicos("categoria"),
+        ayuda: "Elige una de la lista o «Otra categoría…» para escribir una nueva. Se guarda en mayúsculas.", datos: { campo: "categoria" } }),
       campoCodigoProducto());
     const fila3 = nodo("div", "campos-fila");
     fila3.append(
@@ -476,7 +479,7 @@
     marcas.append(casilla("ed-destacado", "Destacada", d.destacado, { campo: "destacado" }), casilla("ed-nuevo", "Nuevo ingreso", d.nuevo_ingreso, { campo: "nuevo_ingreso" }));
     modelo.append(h, avisoCodigos, avisoPublico, fila1, fila2, fila3, publico, segmento, orden,
       campo({ id: "ed-descripcion", etiqueta: "Descripción (opcional)", valor: d.descripcion, tipo: "textarea", max: LIM.descripcion, ayuda: "Solo información real del modelo. La tienda la muestra en «Sobre este modelo».", datos: { campo: "descripcion" } }),
-      marcas, listaDatos("ed-marcas", unicos("marca")), listaDatos("ed-categorias", unicos("categoria")));
+      marcas, listaDatos("ed-marcas", unicos("marca")));
 
     const colores = nodo("section", "editor-seccion");
     colores.setAttribute("aria-labelledby", "ed-colores-titulo");

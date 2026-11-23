@@ -17,6 +17,7 @@ import {
   limpiarRestosDePruebas, revisarDisposicion, borrarCatalogo, prepararFotos, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
 import { abrirDetalle } from '../etapa9/ayudas.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180000);
@@ -173,13 +174,13 @@ test('importador: el mensaje primero, luego fotos, datos y ajustes; añadir enfo
   await expect(c2.getByRole('textbox', { name: /^Color \(obligatorio\)/ })).toHaveValue('NEGRO MATE');
 
   // Ajustes por lote: siguen funcionando desde el plegable.
-  await ajustes.locator('summary').click();
-  await ajustes.getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await ajustes.locator(':scope > summary').click();
+  await elegirCategoria(ajustes, 'Urbanas');
   await ajustes.getByRole('radio', { name: 'Mujer' }).check();
   await ajustes.getByLabel('Sumar al precio del proveedor (COP)').fill('40000');
   await ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(c1.getByLabel(/^Precio de venta/)).toHaveValue('240000');
-  await expect(f1.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('URBANAS');
+  await expect(campoCategoria(f1)).toHaveValue('URBANAS');
 
   // Celular: todo es alcanzable, sin desplazamiento horizontal y el final queda sobre el pie.
   const cuerpo = importador(page).locator('.editor-cuerpo');
@@ -241,7 +242,7 @@ test('importador: un mensaje en una sola línea (Reebok) llega a los campos; lo 
   await expect(campo(c, 'Precio del proveedor')).toHaveValue('80000');
 
   // Guardado con datos ficticios en el Supabase local.
-  await f.getByRole('combobox', { name: /^Categoría/ }).fill('URBANAS');
+  await elegirCategoria(f, 'URBANAS');
   await campo(c, 'Precio de venta').fill('120000');
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(f.locator('.importador-estado')).toContainText(/Guardada oculta · GT-/, { timeout: 30000 });
@@ -305,7 +306,7 @@ test('importador: el recuadro abre el selector y sincroniza el hexadecimal; vali
   // Se guarda el tono elegido con el recuadro.
   await recuadro(c).fill('#e8dcc8');
   await c.getByLabel(/^Precio de venta/).fill('190000');
-  await ficha(page, 0).getByRole('combobox', { name: /^Categoría/ }).fill('URBANAS');
+  await elegirCategoria(ficha(page, 0), 'URBANAS');
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(ficha(page, 0).locator('.importador-estado')).toContainText(/Guardada oculta/, { timeout: 30000 });
   const p = await leerProducto('REV IMP P18');
@@ -360,7 +361,7 @@ test('importador: quitar la principal, la última y una que se está optimizando
   await c.locator('input[type=file]').setInputFiles([archivos.adecuada, archivos.otra]);
   await listas(c, 2);
   await c.getByLabel(/^Precio de venta/).fill('190000');
-  await f.getByRole('combobox', { name: /^Categoría/ }).fill('URBANAS');
+  await elegirCategoria(f, 'URBANAS');
   await page.route('**/rest/v1/rpc/fn_admin_guardar_producto', (r) => r.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'PT422', message: 'Rechazo simulado.' }) }));
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(f.locator('.importador-estado')).toContainText('Rechazo simulado', { timeout: 30000 });

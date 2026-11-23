@@ -16,6 +16,7 @@ import {
   PANEL, entorno, servicio, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin, configurarPanel, ingresar,
   revisarDisposicion, borrarCatalogo, prepararFotos, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180000);
@@ -208,7 +209,7 @@ test('mensaje Reebok: PRINCENSA, Unisex y tallas 36–44; sin público se pide y
   // Se guarda la ficha 1: tallas «por revisar» y público Unisex.
   await f1.getByRole('textbox', { name: /^Modelo/ }).fill('PRINCENSA P19');
   await c1.getByRole('textbox', { name: /^Color \(obligatorio\)/ }).fill('NEGRO');
-  await f1.getByRole('combobox', { name: /^Categoría/ }).fill('URBANAS');
+  await elegirCategoria(f1, 'URBANAS');
   await c1.getByLabel(/^Precio de venta/).fill('150000');
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(f1.locator('.importador-estado')).toContainText(/Guardada oculta · GT-/, { timeout: 30000 });
@@ -327,8 +328,8 @@ test('reparto: orden de fichas y colores, salta la foto manual, agrupar durante 
   await expect(color(f1, 1).locator('.editor-foto').nth(0)).toContainText('Asignada por lote · b-verde.webp');
 
   // Guardar: las fotos se suben al guardar y cada una queda en su color.
-  await importador(page).locator('#imp-ajustes summary').click();
-  await importador(page).getByLabel('Categoría', { exact: true }).fill('URBANAS');
+  await importador(page).locator('#imp-ajustes > summary').click();
+  await elegirCategoria(importador(page), 'URBANAS');
   await importador(page).getByLabel('Sumar al precio del proveedor (COP)').fill('20000');
   await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();

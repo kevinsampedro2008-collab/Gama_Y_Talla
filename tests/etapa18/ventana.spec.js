@@ -16,6 +16,7 @@ import {
   PANEL, entorno, servicio, crearUsuario, borrarUsuario, hacerAdmin, quitarAdmin, configurarPanel, ingresar,
   limpiarRestosDePruebas, borrarCatalogo, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 test.setTimeout(180000);
@@ -138,7 +139,7 @@ test('una sola zona de desplazamiento: extremos con la rueda en cuerpo, cabecera
     await color(ficha(page, i), 0).getByLabel(MENSAJE).fill(t);
     await expect(color(ficha(page, i), 0).getByLabel(/^Tallas EU/)).not.toHaveValue('');
   }
-  await ajustes(page).locator('summary').click();
+  await ajustes(page).locator(':scope > summary').click();
 
   for (const vista of [{ width: 1280, height: 800 }, { width: 390, height: 844 }, { width: 360, height: 560 }]) {
     await page.setViewportSize(vista);
@@ -238,13 +239,13 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   const [a, b, c] = [ficha(page, 0), ficha(page, 1), ficha(page, 2)];
   await expect(a.locator('.importador-color')).toHaveCount(2);
   // Antes de aplicar: B con categoría y guía propias; A con un precio de venta escrito a mano; C sin marcar.
-  await b.getByRole('combobox', { name: /^Categoría/ }).fill('CASUALES');
+  await elegirCategoria(b, 'CASUALES');
   await b.getByRole('group', { name: 'Tabla de la guía de tallas' }).getByRole('radio', { name: 'Hombre', exact: true }).check();
   await color(a, 1).getByLabel(/^Precio de venta/).fill('199000');
   await c.getByLabel('Incluir en el guardado').uncheck();
 
   const bloque = ajustes(page);
-  await bloque.locator('summary').click();
+  await bloque.locator(':scope > summary').click();
   await expect(bloque.getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: 'Sin cambiar' })).toBeChecked();
   await expect(bloque.getByRole('group', { name: /Tabla de la guía de tallas/ }).getByRole('radio', { name: 'Sin cambiar' })).toBeChecked();
   // Nada configurado: indicación clara, nada cambia.
@@ -281,8 +282,8 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   await capturar(page, problemas, browserName, `ajustes-aplicados-${browserName}-1280.png`);
   for (const f of [a, b]) await expect(f.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: 'Unisex', exact: true })).toBeChecked();
   await expect(b.getByRole('group', { name: 'Tabla de la guía de tallas' }).getByRole('radio', { name: /^Sin indicar/ })).toBeChecked();
-  await expect(b.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('CASUALES');
-  await expect(a.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('');
+  await expect(campoCategoria(b)).toHaveValue('CASUALES');
+  await expect(campoCategoria(a)).toHaveValue('');
   await expect(color(a, 0).getByLabel(/^Precio de venta/)).toHaveValue('240000');
   await expect(color(a, 1).getByLabel(/^Precio de venta/)).toHaveValue('199000');
   // B no trae precio del proveedor: su precio de venta queda «Revisar»; lo demás sí se aplicó.
@@ -294,15 +295,15 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   // Repetir: no se acumula el aumento; ahora con categoría (público y guía «Sin cambiar» se conservan).
   await bloque.getByRole('group', { name: 'Público en la tienda' }).getByRole('radio', { name: 'Sin cambiar' }).check();
   await bloque.getByRole('group', { name: /Tabla de la guía de tallas/ }).getByRole('radio', { name: 'Sin cambiar' }).check();
-  await bloque.getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await elegirCategoria(bloque, 'Urbanas');
   await bloque.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(color(a, 0).getByLabel(/^Precio de venta/)).toHaveValue('240000');
   for (const f of [a, b]) {
-    await expect(f.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('URBANAS');
+    await expect(campoCategoria(f)).toHaveValue('URBANAS');
     await expect(f.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: 'Unisex', exact: true })).toBeChecked();
   }
   await expect(b.getByRole('group', { name: 'Tabla de la guía de tallas' }).getByRole('radio', { name: /^Sin indicar/ })).toBeChecked();
-  await expect(c.getByRole('combobox', { name: /^Categoría/ })).toHaveValue('');
+  await expect(campoCategoria(c)).toHaveValue('');
 
   // Releer el mensaje: el público aplicado se conserva y el precio de venta sigue la regla proveedor + importe.
   await color(a, 0).getByLabel(MENSAJE).fill('New Balance VENTANA A P18\nBlanco\nHombre $205.000\n40 al 43');
@@ -335,7 +336,7 @@ test('«Aplicar todos los ajustes»: dos fichas marcadas (una con dos colores), 
   await page.locator('.producto', { hasText: 'VENTANA A P18' }).getByRole('button', { name: /^Editar/ }).click();
   const editor = page.locator('#editor');
   await expect(editor.getByRole('radio', { name: 'Unisex', exact: true })).toBeChecked();
-  await expect(editor.getByRole('textbox', { name: /^Categoría/ }).or(editor.getByRole('combobox', { name: /^Categoría/ }))).toHaveValue('URBANAS');
+  await expect(campoCategoria(editor)).toHaveValue('URBANAS');
   await expect(editor.locator('.editor-variante').nth(0).getByLabel(/^Precio actual/)).toHaveValue('245000');
   await expect(editor.getByRole('radio', { name: /^Sin indicar/ })).toBeChecked();
   expect(problemas).toEqual([]);

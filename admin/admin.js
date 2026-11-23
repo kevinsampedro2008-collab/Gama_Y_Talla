@@ -309,6 +309,7 @@
     // El editor guarda en memoria lo que no se llegó a guardar (por ejemplo, si la sesión vence).
     window.GamaTallaEditor?.alPerderAcceso?.();
     window.GamaTallaImportador?.alPerderAcceso?.();
+    usuarioActual = null; // etapa 20: se vuelve a fijar al comprobar el acceso (los borradores van por usuario)
     catalogo = [];
     seleccion = new Set();
     accionAbierta = null;
@@ -2159,6 +2160,9 @@
   window.GamaTallaPanel = Object.freeze({
     cliente: () => cliente,
     configuracion: () => configuracionPanel,
+    // Etapa 20: UUID del administrador con sesión (solo el identificador; nunca el token). El importador
+    // separa sus borradores locales por proyecto y usuario.
+    usuario: () => (usuarioActual?.id ? { id: usuarioActual.id } : null),
     comprobarAcceso,
     aplicarAcceso,
     generacion: () => generacion,

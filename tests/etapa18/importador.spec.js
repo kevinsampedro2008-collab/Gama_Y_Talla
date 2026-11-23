@@ -17,6 +17,7 @@ import {
   limpiarRestosDePruebas, revisarDisposicion, borrarCatalogo, prepararFotos, objetosDe, borrarObjetos
 } from '../etapa16/ayudas-catalogo.js';
 import { abrirDetalle } from '../etapa9/ayudas.js';
+import { elegirCategoria, campoCategoria } from '../etapa15/ayudas-panel.js'; // etapa 20: selector de categorías
 
 test.describe.configure({ mode: 'serial' });
 // Lotes con fotos reales, la tienda en dos tamaños y recargas: más que los 30 s por omisión.
@@ -102,7 +103,7 @@ async function pegar(colorLoc, textoPublicacion) {
 // «Ajustes para varias fichas» es un bloque plegable: se abre antes de usarlo.
 async function abrirAjustes(page) {
   const ajustes = importador(page).locator('#imp-ajustes');
-  if (!(await ajustes.evaluate((d) => d.open))) await ajustes.locator('summary').click();
+  if (!(await ajustes.evaluate((d) => d.open))) await ajustes.locator(':scope > summary').click();
   await expect(ajustes.getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ })).toBeVisible();
 }
 const radioPublico = (f, nombre) => f.getByRole('group', { name: /^Público en la tienda/ }).getByRole('radio', { name: nombre, exact: true });
@@ -220,7 +221,7 @@ test('agrupa colores, fija el precio de venta, guarda oculto y la tienda mezcla 
 
   // Ajustes del lote: categoría y guía para todas; precio = proveedor + 40.000, con un ajuste a mano.
   await abrirAjustes(page);
-  await importador(page).getByLabel('Categoría', { exact: true }).fill('Urbanas');
+  await elegirCategoria(importador(page), 'Urbanas');
   await importador(page).locator('.importador-ajustes').getByRole('radio', { name: 'Mujer' }).check();
   await importador(page).getByLabel('Sumar al precio del proveedor (COP)').fill('40000');
   await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
@@ -232,7 +233,7 @@ test('agrupa colores, fija el precio de venta, guarda oculto y la tienda mezcla 
   await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
   await expect(importador(page).locator('#importador-resultado')).toContainText('en 2 colores. 1 precio escrito a mano se conservó.');
   await expect(color(f, 1).getByLabel(/^Precio de venta/)).toHaveValue('245000');
-  await expect(campoFicha(f, 'Categoría')).toHaveValue('URBANAS');
+  await expect(campoCategoria(f)).toHaveValue('URBANAS');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await importador(page).locator('.importador-color').nth(0).scrollIntoViewIfNeeded();
@@ -386,7 +387,7 @@ test('coincidencia con el catálogo: muestra código y colores, abre el editor y
   await expect(aviso).toContainText(codigo);
   await expect(aviso).toContainText('Colores: ROSA');
   await expect(aviso).toContainText('oculta');
-  await campoFicha(f, 'Categoría').fill('URBANAS');
+  await elegirCategoria(f, 'URBANAS');
   await color(f, 0).getByLabel(/^Precio de venta/).fill('170000');
   await importador(page).getByRole('button', { name: /Guardar lote como oculto/ }).click();
   await expect(f.locator('.importador-errores')).toContainText('ya está en el catálogo');
@@ -419,7 +420,7 @@ test('fallo parcial: una ficha rechazada y otra con la respuesta perdida; se com
     await expect(campoFicha(ficha(page, i), 'Marca')).toHaveValue('NEW BALANCE');
   }
   await abrirAjustes(page);
-  await importador(page).getByLabel('Categoría', { exact: true }).fill('Running');
+  await elegirCategoria(importador(page), 'Running');
   await importador(page).getByLabel('Sumar al precio del proveedor (COP)').fill('30000');
   await importador(page).getByRole('button', { name: /^Aplicar ajustes a [0-9]+ fichas?$/ }).click();
 

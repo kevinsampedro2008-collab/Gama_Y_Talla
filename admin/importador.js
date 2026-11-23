@@ -16,6 +16,19 @@
  *    vuelven a enviar.
  *  - Fotos: se suben al guardar, con la ruta de su ficha y su color (el servidor lo exige), con
  *    nombres únicos y sin sobrescribir. Una foto ya subida no se vuelve a subir al reintentar.
+ *
+ * Etapa 20
+ *  - «Pegar varias publicaciones» (separar-publicaciones.js): se pega todo junto, se revisa la división
+ *    (separar, unir, dudosas señaladas) y solo «Crear N publicaciones» añade las fichas al lote.
+ *  - Perfiles de proveedor (texto-proveedor.js valida y aplica sus reglas; borradores.js los guarda en
+ *    este navegador). Cada ficha conserva la instantánea del perfil con el que se leyó: editar o borrar
+ *    un perfil no cambia lo ya leído. Volver a leer con otro perfil es una acción expresa.
+ *  - Guardado automático del lote en IndexedDB (borradores.js), fotos incluidas: sobrevive a cerrar la
+ *    ventana, recargar, cerrar el navegador y cerrar sesión. Separado por proyecto y usuario. No sube
+ *    nada a Supabase: eso sigue siendo «Guardar lote como oculto».
+ *  - Antes de cada escritura en Supabase (subir fotos, fn_admin_guardar_producto) se guarda el borrador
+ *    con los nombres de archivo y la operación: tras una recarga se comprueba (solo lectura) qué se
+ *    completó antes de repetir nada.
  */
 (() => {
   "use strict";
@@ -23,6 +36,8 @@
   const panel = () => window.GamaTallaPanel;
   const fotos = () => window.GamaTallaFotos;
   const texto = () => window.GamaTallaTextoProveedor;
+  const separador = () => window.GamaTallaSeparador;
+  const almacen = () => window.GamaTallaBorradores;
   const comun = () => window.GamaTallaEditor?.comun;
   const $ = (selector, raiz = document) => raiz.querySelector(selector);
   const pesos = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
@@ -32,7 +47,7 @@
   let claves = 0;
   const nuevaClave = (prefijo) => `${prefijo}${++claves}`;
 
-  const NOMBRES_CAMPO = { marca: "marca", modelo: "modelo", publico: "público", precio: "precio del proveedor", tallas: "tallas", color: "color", venta: "precio de venta" };
+  const NOMBRES_CAMPO = { marca: "marca", modelo: "modelo", publico: "público", precio: "precio del proveedor", tallas: "tallas", color: "color", venta: "precio de venta", colores: "cantidad de colores" };
   // Valor de «Sin cambiar» en los ajustes por lote (distinto de «Sin indicar» de la guía, que es "").
   const CONSERVAR = "conservar";
 
@@ -43,24 +58,55 @@
   let formaMuestra = null;  // ¿el servidor guarda la forma de cada color?
   const temporizadores = new Map();
 
-  function loteNuevo() {
+  // Etapa 20: ámbito local (proyecto + usuario), perfiles y estado del guardado en este navegador.
+  const CLAVE_GENERAL = "general";
+  const pestana = uuid();    // identifica esta pestaña frente a otras con el mismo borrador
+  let ambitoActual = null;   // «URL del proyecto|UUID del administrador»
+  let perfiles = [];         // perfiles guardados de este ámbito (sin el general), ya validados
+  let ultimoBorrador = null; // { ambito, id }: lote con trabajo pendiente que esta pestaña tenía abierto
+  let vistaBorradores = false;
+  let borradoresLista = [];  // resumen de los borradores del ámbito (para la lista)
+  let espacio = null;        // estimación del navegador { usado, cuota }
+  let editorPerfil = null;   // formulario de perfil abierto: { id, valores, errores, nuevo }
+  let confirmarBorrar = null; // { tipo: "perfil"|"borrador", id }
+  let importacion = null;    // respaldo leído que espera una decisión
+  let avisoPerfil = "";      // explicación tras cambiar o editar el perfil del lote
+  const persistencia = { estado: "inactivo", mensaje: "", cuando: null, tipo: "" };
+
+  function loteNuevo(perfilElegido = null) {
     /* destinos (etapa 19): fichas que recibirán los ajustes, independientes de «Incluir en el guardado».
        null = todas las editables (mientras no se elija nada); un Set de claves de ficha = elegidas a mano
-       (las fichas nuevas no se añaden solas). avisoDestinos explica cambios en esa selección. */
-    return { fichas: [fichaNueva()], margen: "", categoria: "", segmento: CONSERVAR, publico: CONSERVAR,
+       (las fichas nuevas no se añaden solas). avisoDestinos explica cambios en esa selección.
+       Etapa 20: id del borrador local, ámbito (proyecto + usuario), perfil del lote (clave de su
+       instantánea en «instantaneas») y el pegado de varias publicaciones en curso. */
+    const base = { id: uuid(), ambito: ambitoActual, creado: new Date().toISOString(), instantaneas: {}, perfilLote: CLAVE_GENERAL, pegado: null };
+    if (perfilElegido) base.perfilLote = guardarInstantanea(base, perfilElegido);
+    return { ...base, fichas: [fichaNueva(base.perfilLote)], margen: "", categoria: "", segmento: CONSERVAR, publico: CONSERVAR,
       ajustesAbiertos: false, erroresAjustes: {}, resumenAjustes: null, destinos: null, avisoDestinos: "" };
   }
-  function fichaNueva() {
+  function fichaNueva(perfil = lote?.perfilLote || CLAVE_GENERAL) {
     return {
       clave: nuevaClave("f"), id: uuid(), seleccionada: true,
       marca: "", modelo: "", publico: "", categoria: "", segmento: "",
       editados: new Set(), revisar: new Set(), colores: [colorNuevo()],
       estado: "borrador", mensaje: "", codigo: "", pendiente: null, operaciones: new Set(), ultimaOperacion: null,
-      decisionCatalogo: false, distintaDe: new Set(), errores: []
+      decisionCatalogo: false, distintaDe: new Set(), errores: [],
+      // Etapa 20: instantánea del perfil con el que se lee; categoría que puso el perfil (no a mano);
+      // propuestas de «Recordar para este proveedor» que se descartaron.
+      perfil, origenCategoria: "", descartadas: new Set(),
+      // Etapa 20: cantidad de colores pedida («(2 colores)» o escrita a mano). Dato de preparación: no se
+      // guarda en el catálogo. Texto tal cual ("" = sin indicar).
+      coloresPedidos: ""
     };
   }
   function colorNuevo() {
     return {
+      // Etapa 20: encabezado y texto original del pegado de varias publicaciones; lo que leyó el lector
+      // (para proponer reglas) y las reglas del perfil que se aplicaron.
+      encabezado: "", original: "", leido: null, reglas: [],
+      // Etapa 20: color preparado a partir de la publicación de otro color de la ficha («(2 colores)»):
+      // propone sus tallas y su precio mientras no se corrijan a mano ni tenga su propio mensaje.
+      preparado: false, origen: "",
       clave: nuevaClave("c"), id: uuid(), texto: "", color: "", proveedor: "", venta: "", ventaManual: false,
       tallasTexto: "", muestra: "", errorTono: "", forma: "circulo", fotos: [], editados: new Set(), revisar: new Set(), notas: [], omitido: null,
       // Etapa 19: el mensaje dice «todas las tallas» sin tallas concretas: las tallas salen de la regla
@@ -167,7 +213,9 @@
   function coincidenciasCatalogo(f) {
     const k = claveFicha(f);
     if (!k) return [];
-    return panel().productos().filter((p) => texto().claveModelo(p.marca, p.nombre) === k);
+    // Etapa 20: el producto con el MISMO identificador es esta ficha (guardada con una respuesta perdida),
+    // no otra zapatilla: no cuenta como coincidencia.
+    return panel().productos().filter((p) => p.id !== f.id && texto().claveModelo(p.marca, p.nombre) === k);
   }
   /* Etapa 19: las coincidencias tienen en cuenta el público. Con la misma marca y modelo:
      - mismo público → otro color de la misma zapatilla: se propone agrupar (la ficha anterior);
@@ -198,7 +246,10 @@
 
   // ------------------------------------------------------------------ leer la publicación
   function aplicarTexto(f, c) {
-    const r = texto().analizar(c.texto, { marcas: marcasConocidas() });
+    // Etapa 20: con el perfil de la ficha (su instantánea). Prioridad: corrección a mano, dato explícito
+    // del mensaje, regla del perfil y, por último, el valor general.
+    const perfil = perfilDe(f);
+    const r = texto().analizar(c.texto, { marcas: marcasConocidas(), perfil });
     const esPrincipal = f.colores[0] === c;
     // Solo se rellena lo que la persona no cambió a mano.
     if (esPrincipal) {
@@ -208,7 +259,14 @@
       for (const k of ["marca", "modelo", "publico"]) {
         if (r.revisar.includes(k) && !f.editados.has(k)) f.revisar.add(k); else f.revisar.delete(k);
       }
+      c.leido = { marca: r.marca, modelo: r.modelo, publico: r.publico };
+      // Categoría habitual del perfil: solo si nadie la escribió (a mano o con «Aplicar ajustes»).
+      if (!f.editados.has("categoria") && (!f.categoria.trim() || f.origenCategoria === "perfil")) {
+        if (perfil.categoria) { f.categoria = perfil.categoria; f.origenCategoria = "perfil"; }
+        else if (f.origenCategoria === "perfil") { f.categoria = ""; f.origenCategoria = ""; }
+      }
     }
+    c.reglas = r.reglas || [];
     if (!c.editados.has("color")) c.color = r.color ? mayus(r.color) : "";
     if (!c.editados.has("proveedor")) c.proveedor = r.precio ? String(r.precio) : "";
     if (!c.editados.has("tallas")) c.tallasTexto = r.tallas.join("; ");
@@ -227,19 +285,74 @@
     c.notaRegla = r.reglaTallas && r.tallasExplicitas ? r.notasRegla.join(" ") : "";
     c.omitido = r.omitido;
     if (!c.ventaManual) ventaAutomatica(c);
+    if (esPrincipal && !f.editados.has("colores")) {
+      // Etapa 20: cantidad de colores del mensaje. Solo se anota: los colores se preparan con una acción expresa
+      // (o al crear desde «Pegar varias publicaciones»); volver a leer nunca añade colores.
+      // Una cantidad no válida se muestra tal como llegó (no se redondea ni se cambia por otra) y queda «Revisar».
+      f.coloresPedidos = r.cantidadColores ? String(r.cantidadColores) : (r.notaCantidad ? r.cantidadTexto || "" : "");
+      if (r.notaCantidad || (r.cantidadColores && r.cantidadColores > comun().LIM.colores)) f.revisar.add("colores"); else f.revisar.delete("colores");
+    }
     aplicarRegla(f);
+    // Los colores preparados desde esta publicación siguen sus tallas y su precio (salvo lo corregido a mano).
+    for (const otro of f.colores) if (otro !== c && otro.preparado && otro.origen === c.clave && !otro.texto.trim()) proponerDesde(c, otro);
+  }
+
+  /* Etapa 20: un color preparado propone las tallas y el precio del proveedor de la publicación de la que
+     sale. Lo que se corrigió a mano en ese color no se toca. El nombre queda vacío y «Revisar». */
+  function proponerDesde(o, c2) {
+    if (!c2.editados.has("tallas")) {
+      c2.tallasTexto = o.tallasTexto;
+      c2.todas = o.todas;
+      c2.expresionRegla = o.expresionRegla;
+      c2.notaRegla = o.notaRegla;
+      if (o.revisar.has("tallas")) c2.revisar.add("tallas"); else c2.revisar.delete("tallas");
+    }
+    if (!c2.editados.has("proveedor")) {
+      c2.proveedor = o.proveedor;
+      c2.precios = [...(o.precios || [])];
+      c2.notaPrecios = o.notaPrecios;
+      if (o.revisar.has("precio")) c2.revisar.add("precio"); else c2.revisar.delete("precio");
+    }
+    if (!c2.color.trim()) c2.revisar.add("color");
+    if (!c2.ventaManual) ventaAutomatica(c2);
+  }
+  // Cantidad de colores pedida: { vacio } | { n, valido }.
+  function pedidosDe(f) {
+    const t = String(f.coloresPedidos ?? "").trim();
+    if (!t) return { vacio: true, valido: false, n: 0 };
+    const n = /^\d{1,3}$/.test(t) ? Number(t) : NaN;
+    return { vacio: false, n, valido: Number.isInteger(n) && n >= 1 && n <= comun().LIM.colores };
+  }
+  /* Añade los colores que faltan hasta «total» (nunca quita ninguno). Cada uno nace preparado desde el
+     primer color: sus propias fotos (ninguna), forma, tono y tallas, con el precio y las tallas propuestas. */
+  function prepararColores(f, total) {
+    const objetivo = Math.min(total, comun().LIM.colores);
+    const origen = f.colores[0];
+    const nuevos = [];
+    while (f.colores.length < objetivo) {
+      const c = colorNuevo();
+      c.preparado = true;
+      c.origen = origen.clave;
+      c.margenAplicado = origen.margenAplicado ?? null;
+      proponerDesde(origen, c);
+      f.colores.push(c);
+      nuevos.push(c);
+    }
+    if (nuevos.length) { f.pendiente = null; aplicarRegla(f); }
+    return nuevos;
   }
 
   /* «Todas las tallas» o «numeración <público>»: las tallas de cada color que lo dice salen de la regla
      del proveedor según el público de la ficha. Unas tallas escritas a mano no se tocan. Sin público, se
      pide elegirlo. */
   function aplicarRegla(f) {
+    const perfil = perfilDe(f);
     for (const c of f.colores) {
       if (!c.todas) continue;
       if (c.editados.has("tallas")) { c.notaRegla = ""; continue; }
-      const tallas = texto().tallasPorRegla(f.publico);
+      const tallas = texto().tallasPorRegla(f.publico, perfil);
       c.tallasTexto = tallas.join("; ");
-      c.notaRegla = texto().notaRegla(f.publico, c.expresionRegla);
+      c.notaRegla = texto().notaRegla(f.publico, c.expresionRegla, perfil);
       if (tallas.length) c.revisar.delete("tallas"); else c.revisar.add("tallas");
     }
   }
@@ -255,10 +368,25 @@
   // ------------------------------------------------------------------ pintar
   function pintar() {
     const cuerpo = $("#importador-cuerpo");
-    if (!cuerpo || !lote) return;
+    if (!cuerpo) return;
+    pintarLocal();
+    // Etapa 20: sin lote (al abrir con borradores guardados) o con la lista pedida, primero los borradores.
+    if (!lote || vistaBorradores) {
+      cuerpo.replaceChildren(pintarBorradores());
+      pintarPie();
+      return;
+    }
+    // Otra pestaña continúa este borrador: aquí se detiene para no mezclar cambios.
+    if (persistencia.estado === "desconectado") {
+      cuerpo.replaceChildren(pintarDesconectado());
+      pintarPie();
+      return;
+    }
     // Etapa 19: primero lo que afecta a varias fichas (ajustes plegables y fotos por lote), después las fichas.
-    cuerpo.replaceChildren(pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
+    // Etapa 20: delante, el proveedor y el pegado de varias publicaciones.
+    cuerpo.replaceChildren(pintarEntrada(), ...(lote.pegado ? [pintarPegado()] : []), pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
     pintarPie();
+    programarGuardado();
   }
 
   // Sugerencias de marca y categoría: una sola vez para todo el lote.
@@ -268,10 +396,7 @@
     const marcas = nodo("datalist");
     marcas.id = "imp-marcas";
     for (const v of [...new Set([...marcasCatalogo(), ...texto().MARCAS_BASE.map(mayus)])]) { const o = nodo("option"); o.value = v; marcas.append(o); }
-    const categorias = nodo("datalist");
-    categorias.id = "imp-categorias";
-    for (const v of categoriasCatalogo()) { const o = nodo("option"); o.value = v; categorias.append(o); }
-    caja.append(marcas, categorias);
+    caja.append(marcas); // las categorías usan el selector común (categorias.js)
     return caja;
   }
 
@@ -290,15 +415,16 @@
 
     const publico = radios({ nombre: "imp-lote-publico", id: "imp-lote-publico", leyenda: "Público en la tienda", valor: lote.publico,
       opciones: [[CONSERVAR, "Sin cambiar"], ...comun().PUBLICOS], datos: { lote: "publico" } });
-    const categoria = campo({ id: "imp-categoria", etiqueta: "Categoría", valor: lote.categoria, lista: "imp-categorias", max: 60, mayusculas: true,
-      ayuda: "Vacía: cada ficha conserva la suya. Por ejemplo: RUNNING, URBANAS, CASUALES.", datos: { lote: "categoria" } });
+    // Etapa 20: selector común; «Sin cambiar» conserva la categoría de cada ficha.
+    const categoria = window.GamaTallaCategorias.crear({ id: "imp-categoria", valor: lote.categoria, modo: "bloque", catalogo: categoriasCatalogo(),
+      error: lote.erroresAjustes?.categoria || "", ayuda: "«Sin cambiar»: cada ficha conserva la suya.", datos: { lote: "categoria" } });
     const guia = radios({ nombre: "imp-segmento", id: "imp-lote-segmento", leyenda: "Tabla de la guía de tallas", valor: lote.segmento,
       opciones: [[CONSERVAR, "Sin cambiar"], ...comun().SEGMENTOS], datos: { lote: "segmento" } });
     guia.append(nodo("p", "campo-ayuda", "Independiente del público. «Sin indicar» se aplica si lo eliges expresamente."));
     const margen = campo({ id: "imp-margen", etiqueta: "Sumar al precio del proveedor (COP)", valor: lote.margen, modo: "numeric",
       ayuda: "Precio de venta = precio del proveedor + este importe, siempre desde el del proveedor (aplicarlo dos veces no suma dos veces). Vacío: los precios no cambian. Los escritos a mano se conservan.",
       datos: { lote: "margen" } });
-    for (const [clave, caja] of [["categoria", categoria], ["margen", margen]]) {
+    for (const [clave, caja] of [["margen", margen]]) {
       const error = lote.erroresAjustes?.[clave];
       if (!error) continue;
       const entrada = $("input", caja);
@@ -599,16 +725,29 @@
     const ayudaMensaje = nodo("p", "campo-ayuda", "Se lee en este navegador. Los teléfonos y el texto promocional no pasan a la ficha.");
     ayudaMensaje.id = `imp-${c.clave}-texto-ayuda`;
     area.setAttribute("aria-describedby", ayudaMensaje.id);
+    if (c.encabezado) mensajeCaja.append(nodo("p", "importador-encabezado", `Mensaje de WhatsApp: ${c.encabezado}`));
+    // Etapa 20: color preparado desde la publicación de la ficha («(2 colores)»).
+    if (c.preparado && !c.texto.trim()) {
+      const nota = nodo("p", "importador-preparado", "Color preparado desde la publicación de esta ficha: propone sus tallas y su precio del proveedor. Escribe su nombre y añade sus fotos; si el proveedor envió un mensaje propio para este color, pégalo aquí.");
+      nota.id = `imp-${c.clave}-preparado`;
+      mensajeCaja.append(nota);
+    }
     mensajeCaja.append(etiqueta, area, ayudaMensaje);
+    // Etapa 20: el texto tal cual se pegó (con encabezado y líneas de multimedia), solo para revisar.
+    if (c.original && c.original.trim() !== c.texto.trim()) {
+      const original = nodo("details", "importador-original");
+      original.append(nodo("summary", "", "Ver el texto original pegado"), nodo("p", "importador-original-texto", c.original));
+      mensajeCaja.append(original);
+    }
     const omitido = [];
     if (c.omitido?.telefonos) omitido.push(c.omitido.telefonos === 1 ? "un teléfono" : `${c.omitido.telefonos} teléfonos`);
     if (c.omitido?.contacto) omitido.push(c.omitido.contacto === 1 ? "una frase de contacto" : `${c.omitido.contacto} frases de contacto`);
     if (c.omitido?.promocional) omitido.push(c.omitido.promocional === 1 ? "una línea promocional" : `${c.omitido.promocional} líneas promocionales`);
     const listaOmitido = omitido.length > 1 ? `${omitido.slice(0, -1).join(", ")} y ${omitido[omitido.length - 1]}` : omitido[0];
-    const avisos = [...(omitido.length ? [`Se omitió ${listaOmitido}.`] : []), ...c.notas,
+    const avisos = [...(omitido.length ? [`Se omitió ${listaOmitido}.`] : []), ...(c.reglas || []), ...c.notas,
       ...(c.notaPrecios && c.revisar.has("precio") ? [c.notaPrecios] : []), ...(c.notaRegla ? [c.notaRegla] : [])];
     const revisar = [...c.revisar].map((k) => NOMBRES_CAMPO[k]).concat(i === 0 ? [...f.revisar].map((k) => NOMBRES_CAMPO[k]) : []);
-    if (c.texto.trim() && revisar.length) avisos.push(`Revisa: ${revisar.join(", ")}.`);
+    if ((c.texto.trim() || c.preparado) && revisar.length) avisos.push(`Revisa: ${revisar.join(", ")}.`);
     if (avisos.length) {
       const p = nodo("p", "editor-nota importador-lectura", avisos.join(" "));
       p.id = `imp-${c.clave}-lectura`;
@@ -629,7 +768,7 @@
         campo({ id: `imp-${f.clave}-marca`, etiqueta: "Marca", valor: f.marca, max: 60, lista: "imp-marcas", obligatorio: true, mayusculas: true, revisar: f.revisar.has("marca"), datos: { ficha: f.clave, fcampo: "marca" } }),
         campo({ id: `imp-${f.clave}-modelo`, etiqueta: "Modelo", valor: f.modelo, max: 120, obligatorio: true, mayusculas: true, revisar: f.revisar.has("modelo"), datos: { ficha: f.clave, fcampo: "modelo" } }));
       datos.push(filaModelo, radios({ nombre: `imp-${f.clave}-publico`, id: `imp-${f.clave}-publico`, leyenda: "Público en la tienda", opciones: comun().PUBLICOS, valor: f.publico,
-        obligatorio: true, revisar: f.revisar.has("publico"), datos: { ficha: f.clave, fcampo: "publico" } }));
+        obligatorio: true, revisar: f.revisar.has("publico"), datos: { ficha: f.clave, fcampo: "publico" } }), pintarCantidadColores(f));
     }
     const filaA = nodo("div", "campos-fila");
     filaA.append(campo({ id: `imp-${c.clave}-color`, etiqueta: "Color", valor: c.color, max: 60, obligatorio: true, mayusculas: true, revisar: c.revisar.has("color"),
@@ -681,13 +820,16 @@
     const notaDatos = nodo("p", "campo-ayuda importador-datos-nota", pendientes
       ? `${pendientes === 1 ? "Un dato necesita" : `${pendientes} datos necesitan`} revisión (marcados «Revisar»). Lo que cambies a mano no se sobrescribe al volver a leer el mensaje.`
       : "Puedes corregir cualquier dato. Lo que cambies a mano no se sobrescribe al volver a leer el mensaje.");
-    li.append(paso("importador-datos", `imp-${c.clave}-datos-titulo`, "Datos reconocidos", notaDatos, ...datos));
+    const recordar = i === 0 ? pintarPropuestas(f, c) : null;
+    li.append(paso("importador-datos", `imp-${c.clave}-datos-titulo`, "Datos reconocidos", notaDatos, ...datos, ...(recordar ? [recordar] : [])));
 
     // 4. Ajustes adicionales: categoría y guía (de la zapatilla) y cómo se muestra este color.
     const ajustes = [];
     if (i === 0) {
       const filaCategoria = nodo("div", "campos-fila");
-      filaCategoria.append(campo({ id: `imp-${f.clave}-categoria`, etiqueta: "Categoría", valor: f.categoria, max: 60, lista: "imp-categorias", obligatorio: true, mayusculas: true, datos: { ficha: f.clave, fcampo: "categoria" } }));
+      filaCategoria.append(window.GamaTallaCategorias.crear({ id: `imp-${f.clave}-categoria`, valor: f.categoria, modo: "obligatorio", catalogo: categoriasCatalogo(),
+        datos: { ficha: f.clave, fcampo: "categoria" },
+        ayuda: f.origenCategoria === "perfil" && f.categoria ? `Categoría habitual del perfil «${perfilDe(f).nombre}». Puedes cambiarla.` : "" }));
       ajustes.push(filaCategoria,
         radios({ nombre: `imp-${f.clave}-segmento`, leyenda: "Tabla de la guía de tallas", opciones: comun().SEGMENTOS, valor: f.segmento, datos: { ficha: f.clave, fcampo: "segmento" } }),
         nodo("p", "campo-ayuda", "El público decide dónde aparece en la tienda; la guía de tallas, qué tabla de equivalencias se muestra. Son independientes."));
@@ -705,6 +847,44 @@
     ajustes.push(forma);
     li.append(paso("importador-ajustes-color", `imp-${c.clave}-ajustes-titulo`, "Ajustes adicionales", ...ajustes));
     return li;
+  }
+
+  /* Etapa 20: «Cantidad de colores» de la ficha. Muestra cuántos tiene y cuántos se piden; los que faltan
+     se añaden con una acción expresa. Una cantidad menor no quita nada: la retirada sigue siendo
+     «Separar en otra ficha» y quitar esa ficha. */
+  function pintarCantidadColores(f) {
+    const lim = comun().LIM.colores;
+    const p = pedidosDe(f);
+    const tiene = f.colores.length;
+    const plural = (n) => `${n} ${n === 1 ? "color" : "colores"}`;
+    const caja = campo({ id: `imp-${f.clave}-colores`, etiqueta: "Cantidad de colores", valor: String(f.coloresPedidos ?? ""), modo: "numeric", max: 3,
+      revisar: f.revisar.has("colores"), datos: { ficha: f.clave, fcampo: "coloresPedidos" },
+      ayuda: "Dato de preparación (no se guarda en el catálogo). Los colores nuevos proponen las tallas y el precio de la publicación; corrígelos por separado." });
+    caja.classList.add("importador-cantidad");
+    const estado = nodo("div", "importador-cantidad-estado");
+    estado.id = `imp-${f.clave}-colores-estado`;
+    estado.setAttribute("role", "status");
+    let textoEstado;
+    let clase = "campo-ayuda";
+    if (p.vacio) textoEstado = `Sin cantidad indicada: la ficha tiene ${plural(tiene)}. Escribe cuántos tendrá para preparar los que falten.`;
+    else if (!p.valido) { textoEstado = `Escribe un número entero entre 1 y ${lim} (el máximo de colores por zapatilla).`; clase = "campo-error"; }
+    else if (p.n > tiene) textoEstado = `La ficha tiene ${plural(tiene)}; se piden ${p.n}. Faltan ${p.n - tiene}.`;
+    else if (p.n < tiene) textoEstado = `La ficha tiene ${plural(tiene)}; se piden ${p.n}. No se quita ninguno solo: para retirar uno, usa «Separar en otra ficha» y quita esa ficha.`;
+    else textoEstado = `La ficha tiene ${p.n === 1 ? "el color que se pide" : `los ${p.n} colores que se piden`}.`;
+    const linea = nodo("p", clase, textoEstado);
+    estado.append(linea);
+    if (p.valido && p.n > tiene && editable(f)) {
+      const faltan = p.n - tiene;
+      const anadir = boton(faltan === 1 ? "Añadir 1 color" : `Añadir ${faltan} colores`, "preparar-colores", "boton boton-secundario boton-compacto", { ficha: f.clave });
+      anadir.id = `imp-${f.clave}-preparar`;
+      anadir.setAttribute("aria-describedby", estado.id);
+      estado.append(anadir);
+    }
+    const entrada = $("input", caja);
+    entrada.setAttribute("aria-describedby", `${estado.id} ${entrada.getAttribute("aria-describedby") || ""}`.trim());
+    if (!p.vacio && !p.valido) entrada.setAttribute("aria-invalid", "true");
+    caja.append(estado);
+    return caja;
   }
 
   function textoVenta(c) {
@@ -795,7 +975,11 @@
 
   function pintarPie() {
     const guardar = $("#importador-guardar");
-    if (!guardar || !lote) return;
+    if (!guardar) return;
+    // Sin lote a la vista (lista de borradores, o el borrador sigue en otra pestaña) no hay nada que guardar.
+    const sinLote = !lote || vistaBorradores || persistencia.estado === "desconectado";
+    guardar.hidden = sinLote;
+    if (sinLote) return;
     const marcadas = lote.fichas.filter((f) => editable(f) && f.seleccionada).length;
     guardar.textContent = marcadas ? `Guardar lote como oculto (${marcadas})` : "Guardar lote como oculto";
     document.querySelectorAll("#importador button, #importador input, #importador textarea").forEach((n) => {
@@ -806,13 +990,21 @@
   }
 
   // Repinta una ficha conservando el foco y la posición del cursor.
+  /* Etapa 20: un menú de categorías abierto sigue abierto tras un repintado diferido (p. ej. el que
+     programa escribir el nombre de un color): si no, se cerraría bajo el dedo o el ratón. */
+  const menusAbiertos = (raiz) => [...raiz.querySelectorAll(".selector-categoria[open]")].map((d) => d.id).filter(Boolean);
+  function reabrirMenus(ids) {
+    for (const id of ids) { const d = document.getElementById(id); if (d && !d.open) d.open = true; }
+  }
   function repintarFicha(f) {
     const actual = document.getElementById(`imp-${f.clave}`);
     if (!actual) return;
     const activo = document.activeElement;
     const id = activo && actual.contains(activo) ? activo.id : null;
     const seleccion = id && typeof activo.selectionStart === "number" ? [activo.selectionStart, activo.selectionEnd] : null;
+    const abiertos = menusAbiertos(actual);
     actual.replaceWith(pintarFicha(f));
+    reabrirMenus(abiertos);
     if (id) {
       const n = document.getElementById(id);
       if (n) {
@@ -823,6 +1015,7 @@
     // Los destinos del reparto de fotos dependen de los nombres y de las fotos de las fichas.
     if (lote.reparto?.items.length) repintarReparto();
     pintarPie();
+    programarGuardado();
   }
   // Las coincidencias de las demás fichas dependen de la marca y el modelo de esta.
   function repintarOtras(f) {
@@ -834,8 +1027,11 @@
     const actual = $("#imp-ajustes");
     if (!actual) return;
     const activo = document.activeElement?.id;
+    const abiertos = menusAbiertos(actual);
     actual.replaceWith(pintarAjustes());
+    reabrirMenus(abiertos);
     if (activo && document.getElementById(activo)) document.getElementById(activo).focus({ preventScroll: true });
+    programarGuardado();
   }
 
   function mensaje(textoMensaje, tipo = "info", acciones = []) {
@@ -861,9 +1057,17 @@
       mensaje(`Solo caben ${Math.max(0, libres)} ${libres === 1 ? "foto" : "fotos"} más en este color (máximo ${L.fotosPorColor}).`, "aviso");
       lista = lista.slice(0, Math.max(0, libres));
     }
-    const items = lista.map((archivo) => ({ clave: nuevaClave("p"), estado: "procesando", archivo }));
+    // Etapa 20: «ref» identifica la foto en el borrador local. El original se guarda en este navegador
+    // en cuanto se añade: si se recarga mientras se optimiza, se vuelve a procesar al recuperarlo.
+    const items = lista.map((archivo) => ({ clave: nuevaClave("p"), ref: uuid(), estado: "procesando", archivo, nombre: archivo.name || "" }));
     c.fotos.push(...items);
     repintarFicha(f);
+    guardarBorrador({ inmediato: true });
+    await procesarFotos(f, c, items);
+  }
+
+  // Optimiza (WebP de fotos.js) unas fotos de un color, de una en una, y repinta cada una al terminar.
+  async function procesarFotos(f, c, items) {
     const loteActual = lote;
     for (const item of items) {
       if (item.quitada) continue;
@@ -1145,6 +1349,7 @@
     const accion = dentro ? activo.dataset?.imp : "";
     const item = dentro ? activo.dataset?.item : "";
     actual.replaceWith(pintarReparto());
+    programarGuardado();
     if (!dentro) return;
     const destino = (id && document.getElementById(id))
       || (accion && document.querySelector(`#imp-reparto [data-imp="${accion}"]${item ? `[data-item="${item}"]` : ""}`))
@@ -1174,10 +1379,11 @@
       aviso = `La revisión admite ${MAX_REPARTO} imágenes a la vez: se añadieron ${Math.max(0, libres)}. Asigna estas y elige las demás después.`;
       lista = lista.slice(0, Math.max(0, libres));
     }
-    for (const archivo of lista) r.items.push({ clave: nuevaClave("r"), nombre: archivo.name || "imagen sin nombre", archivo, version: 1, estado: "procesando", destino: null });
+    for (const archivo of lista) r.items.push({ clave: nuevaClave("r"), ref: uuid(), nombre: archivo.name || "imagen sin nombre", archivo, version: 1, estado: "procesando", destino: null });
     r.aplicado = false;
     r.estado = aviso ? { texto: aviso, tipo: "aviso" } : null;
     repintarReparto();
+    guardarBorrador({ inmediato: true }); // los originales, por si se recarga mientras se optimizan
     $("#imp-reparto-revision-titulo")?.focus({ preventScroll: true });
     $("#imp-reparto")?.scrollIntoView({ block: "start" });
     procesarReparto();
@@ -1272,11 +1478,12 @@
     const it = itemDe(claveItem);
     if (!it || !(archivo instanceof Blob)) return;
     if (it.vistaPrevia) URL.revokeObjectURL(it.vistaPrevia);
-    Object.assign(it, { nombre: archivo.name || it.nombre, archivo, version: it.version + 1, estado: "procesando", mensaje: "", info: null, blob: null, vistaPrevia: null });
+    Object.assign(it, { nombre: archivo.name || it.nombre, archivo, ref: uuid(), version: it.version + 1, estado: "procesando", mensaje: "", info: null, blob: null, vistaPrevia: null });
     reparto().aplicado = false;
     reparto().estado = { texto: `Reemplazada por «${it.nombre}»: conserva su destino.`, tipo: "ok" };
     repintarReparto();
     document.querySelector(`#imp-reparto [data-imp="reparto-quitar"][data-item="${it.clave}"]`)?.focus({ preventScroll: true });
+    guardarBorrador({ inmediato: true });
     procesarReparto();
   }
 
@@ -1308,7 +1515,8 @@
     for (const it of listos) {
       const d = destinoDe(plan.asignacion.get(it.clave).color.clave);
       if (!d || !editable(d.ficha) || !d.ficha.seleccionada || tieneFoto(d.color)) continue;
-      d.color.fotos.unshift({ clave: nuevaClave("p"), estado: "lista", blob: it.blob, vistaPrevia: it.vistaPrevia, info: it.info, archivoLote: it.nombre });
+      // La foto conserva la «ref» de la imagen: en el borrador local es el mismo archivo, no se reescribe.
+      d.color.fotos.unshift({ clave: nuevaClave("p"), ref: it.ref, estado: "lista", blob: it.blob, vistaPrevia: it.vistaPrevia, info: it.info, archivoLote: it.nombre });
       d.ficha.pendiente = null;
       d.ficha.errores = [];
       if (!tocadas.includes(d.ficha)) tocadas.push(d.ficha);
@@ -1343,30 +1551,38 @@
     try { token = (await panel().cliente().auth.getSession()).data?.session?.access_token || null; } catch { token = null; }
     if (!token) return "La sesión terminó o no se pudo leer. Vuelve a ingresar y reintenta.";
     const conf = panel().configuracion();
+    /* Etapa 20: primero se fijan los nombres de archivo de todas las fotos por subir y se guarda el
+       borrador local; después se suben. Si la página se recarga a mitad, el borrador conserva esos
+       nombres: al reintentar se sube con el MISMO nombre y, si ya estaba, se comprueba y no se duplica. */
+    const porSubir = [];
     for (const c of f.colores) {
       for (const foto of c.fotos) {
         if (foto.estado === "subida" && foto.producto === f.id && foto.variante === c.id) continue;
         if (!foto.blob) return `Una foto de ${c.color.trim() || "un color"} no está lista. Quítala o vuelve a añadirla.`;
-        let anterior = null;
         if (!foto.objeto || foto.producto !== f.id || foto.variante !== c.id) {
-          anterior = foto.estado === "subida" ? foto.objeto : null;
+          if (foto.estado === "subida") foto.anterior = foto.objeto;
           foto.objeto = fotos().nombreObjeto(f.id, c.id);
           foto.producto = f.id;
           foto.variante = c.id;
         }
-        foto.estado = "subiendo";
-        const r = await fotos().subir({ base: conf.url, clave: conf.clave, token, objeto: foto.objeto, blob: foto.blob });
-        if (r.ok || ((r.tipo === "duplicado" || r.tipo === "red") && (await existeObjeto(foto.objeto)) === true)) {
-          foto.estado = "subida";
-          foto.ruta = fotos().urlPublica(conf.url, foto.objeto);
-          if (anterior) comun().limpiarArchivoSinUso(anterior);
-          continue;
-        }
-        foto.estado = "lista";
-        return r.tipo === "red" || r.tipo === "duplicado"
-          ? `Se perdió la conexión al subir una foto de ${c.color.trim() || "un color"} y no pudimos comprobar si llegó. Reintenta: usa el mismo nombre y no se duplicará.`
-          : `${r.mensaje || "El servidor rechazó una foto."} (${c.color.trim() || "un color"})`;
+        porSubir.push({ c, foto });
       }
+    }
+    if (porSubir.length) await guardarBorrador({ inmediato: true });
+    for (const { c, foto } of porSubir) {
+      foto.estado = "subiendo";
+      const r = await fotos().subir({ base: conf.url, clave: conf.clave, token, objeto: foto.objeto, blob: foto.blob });
+      if (r.ok || ((r.tipo === "duplicado" || r.tipo === "red") && (await existeObjeto(foto.objeto)) === true)) {
+        foto.estado = "subida";
+        foto.ruta = fotos().urlPublica(conf.url, foto.objeto);
+        if (foto.anterior) comun().limpiarArchivoSinUso(foto.anterior);
+        delete foto.anterior;
+        continue;
+      }
+      foto.estado = "lista";
+      return r.tipo === "red" || r.tipo === "duplicado"
+        ? `Se perdió la conexión al subir una foto de ${c.color.trim() || "un color"} y no pudimos comprobar si llegó. Reintenta: usa el mismo nombre y no se duplicará.`
+        : `${r.mensaje || "El servidor rechazó una foto."} (${c.color.trim() || "un color"})`;
     }
     return "";
   }
@@ -1458,8 +1674,22 @@
         await panel().aplicarAcceso(acceso);
         return;
       }
-      for (const [i, f] of validas.entries()) {
-        mensaje(`Guardando la ficha ${numero(f)} (${i + 1} de ${validas.length})…`);
+      /* Etapa 20: una ficha «sin confirmar» (respuesta perdida o recarga a mitad del guardado) se
+         comprueba primero, solo lectura, con la operación que conserva el borrador. Si ya se guardó, no
+         se reenvía; si sigue sin aparecer, se reintenta con la MISMA operación (no se duplica). */
+      const enviar = [];
+      for (const f of validas) {
+        if (f.estado === "sin-confirmar" && (f.pendiente || f.ultimaOperacion)) {
+          mensaje(`Comprobando la ficha ${numero(f)} antes de reintentar…`);
+          await comprobar(f);
+          if (!lote) return;
+          if (f.estado === "guardada") { resumen.guardadas += 1; continue; }
+          if (f.estado === "fallida") { resumen.fallidas += 1; continue; }
+        }
+        enviar.push(f);
+      }
+      for (const [i, f] of enviar.entries()) {
+        mensaje(`Guardando la ficha ${numero(f)} (${i + 1} de ${enviar.length})…`);
         await guardarFicha(f);
         if (f.estado === "guardada") resumen.guardadas += 1;
         else if (f.estado === "sin-confirmar") resumen.sinConfirmar += 1;
@@ -1476,6 +1706,7 @@
           lote.avisoDestinos = `${salen.length === 1 ? "La ficha" : "Las fichas"} ${listaNumeros(salen)} ya ${salen.length === 1 ? "está guardada y deja" : "están guardadas y dejan"} de recibir ajustes.`;
         }
         pintar();
+        guardarBorrador({ inmediato: true }); // el resultado de cada ficha, en el borrador local
         panel().recargar();
       }
     }
@@ -1514,6 +1745,10 @@
     }
     f.operaciones.add(f.pendiente.operacion);
     f.ultimaOperacion = f.pendiente.operacion;
+    // Etapa 20: la operación queda en el borrador local ANTES de enviarla. Tras una recarga a mitad, la
+    // ficha vuelve «sin confirmar» con esta misma operación y se comprueba antes de repetir nada.
+    await guardarBorrador({ inmediato: true });
+    if (!lote) return;
     let r;
     try {
       r = await panel().cliente().rpc("fn_admin_guardar_producto", { p_datos: f.pendiente.datos, p_version: null, p_operacion: f.pendiente.operacion });
@@ -1530,6 +1765,16 @@
       panel().comprobarAcceso().then((a) => panel().aplicarAcceso(a));
       return;
     }
+    /* Etapa 20: antes de darla por fallida, ¿ya existe esta zapatilla con una operación de esta ficha?
+       (Una escritura anterior cuya respuesta se perdió llegó a la vez que el reintento: el servidor
+       rechaza el segundo alta.) Si es así, es la nuestra: se reconcilia, no se repite nada. */
+    let existente = null;
+    try {
+      const q = await panel().cliente().from("productos").select("id,ultima_operacion").eq("id", f.id).maybeSingle();
+      existente = q.error ? null : q.data;
+    } catch { existente = null; }
+    if (!lote) return;
+    if (existente && f.operaciones.has(existente.ultima_operacion)) { await comprobar(f); return; }
     f.pendiente = null;
     f.estado = "fallida";
     f.mensaje = `${r.error?.message || "El servidor rechazó los datos."} No se guardó la ficha; corrígela y vuelve a guardar.`;
@@ -1625,8 +1870,9 @@
     ficha.colores = ficha.colores.filter((x) => x !== color);
     ficha.pendiente = null;
     const nueva = fichaNueva();
-    Object.assign(nueva, { marca: ficha.marca, modelo: ficha.modelo, publico: ficha.publico, categoria: ficha.categoria, segmento: ficha.segmento, colores: [color] });
-    nueva.editados = new Set(["marca", "modelo", "publico"]);
+    Object.assign(nueva, { marca: ficha.marca, modelo: ficha.modelo, publico: ficha.publico, categoria: ficha.categoria, segmento: ficha.segmento, colores: [color],
+      perfil: ficha.perfil, origenCategoria: ficha.origenCategoria });
+    nueva.editados = new Set(["marca", "modelo", "publico", ...(ficha.editados.has("categoria") ? ["categoria"] : [])]);
     // Separarla es decidir que es otra zapatilla: no se vuelve a proponer agruparla.
     nueva.distintaDe.add(ficha.clave);
     lote.fichas.splice(lote.fichas.indexOf(ficha) + 1, 0, nueva);
@@ -1720,7 +1966,8 @@
     let sinProveedor = 0;
     for (const f of marcadas) {
       if (publico) { f.publico = publico; f.editados.add("publico"); f.revisar.delete("publico"); aplicarRegla(f); }
-      if (categoria) f.categoria = categoria;
+      // Una categoría aplicada al lote cuenta como escrita a mano: el perfil no la sustituye.
+      if (categoria) { f.categoria = categoria; f.editados.add("categoria"); f.origenCategoria = ""; }
       if (segmento !== null) f.segmento = segmento;
       if (margen !== null) {
         for (const c of f.colores) {
@@ -1755,12 +2002,1666 @@
     $("#imp-aplicar-ajustes")?.focus({ preventScroll: true });
   }
 
+  // ================================================================== etapa 20
+  // ------------------------------------------------------------------ perfiles: instantáneas
+  const general = () => texto().PERFIL_GENERAL;
+  const esGeneral = (p) => texto().esGeneral(p);
+  function claveInstantanea(p) { return !p || esGeneral(p) ? CLAVE_GENERAL : `${p.id}@${p.revision}`; }
+  // Guarda en el lote una copia (congelada) del perfil y devuelve su clave. Editar o borrar el perfil
+  // después no cambia esta copia: las fichas leídas con ella se restauran igual.
+  function guardarInstantanea(l, p) {
+    const k = claveInstantanea(p);
+    if (k !== CLAVE_GENERAL && !l.instantaneas[k]) l.instantaneas[k] = p;
+    return k;
+  }
+  function instantanea(k, l = lote) { return (k && k !== CLAVE_GENERAL && l?.instantaneas?.[k]) || general(); }
+  const perfilDe = (f) => instantanea(f?.perfil);
+  const perfilLote = () => instantanea(lote?.perfilLote);
+  // Versión guardada (vigente) del perfil de una instantánea; null para el general o si se eliminó.
+  const perfilVivo = (p) => (p && !esGeneral(p) ? perfiles.find((x) => x.id === p.id) || null : null);
+  const nombrePerfil = (p) => (esGeneral(p) ? "Perfil general" : p.nombre);
+  const rangoTexto = (r) => (r ? `${r.desde}–${r.hasta}` : "");
+  function resumenPerfil(p) {
+    if (esGeneral(p)) return "Reglas actuales: numeración dama o mujer 36–39; hombre o caballero 36–44; unisex 36–44.";
+    const partes = [];
+    if (p.marcas.length) partes.push(`${p.marcas.length} ${p.marcas.length === 1 ? "alias de marca" : "alias de marcas"}`);
+    if (p.publico.length) partes.push(`${p.publico.length} ${p.publico.length === 1 ? "expresión de público" : "expresiones de público"}`);
+    const rangos = ["dama", "hombre", "unisex"].filter((x) => p.rangos[x]).map((x) => `${textoPublico(x)} ${rangoTexto(p.rangos[x])}`);
+    if (rangos.length) partes.push(`tallas: ${rangos.join(", ")}`);
+    if (p.categoria) partes.push(`categoría ${p.categoria}`);
+    if (p.promociones.length) partes.push(`${p.promociones.length} ${p.promociones.length === 1 ? "frase omitida" : "frases omitidas"}`);
+    return partes.length ? `${partes.join(" · ")}.` : "Sin reglas propias todavía: lee como el Perfil general.";
+  }
+  const ordenarPerfiles = (lista) => [...lista].sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+  function validarPerfiles(lista) {
+    const salida = [];
+    for (const p of lista || []) { const r = texto().normalizarPerfil(p); if (r.perfil) salida.push(r.perfil); }
+    return ordenarPerfiles(salida);
+  }
+  async function recargarPerfiles() {
+    if (!almacenOk || !ambitoActual) return;
+    try { perfiles = validarPerfiles(await almacen().listarPerfiles(ambitoActual)); } catch { /* se conserva la lista anterior */ }
+    if ($("#importador")?.open && lote && !vistaBorradores && persistencia.estado !== "desconectado") { repintarEntrada(); repintarPropuestas(); }
+  }
+
+  // ------------------------------------------------------------------ entrada: proveedor y pegado
+  function pintarEntrada() {
+    const s = nodo("section", "editor-seccion importador-entrada");
+    s.id = "imp-entrada";
+    s.setAttribute("aria-labelledby", "imp-entrada-titulo");
+    const cabecera = nodo("div", "importador-entrada-cabecera");
+    const h = nodo("h3", "editor-seccion-titulo", "Publicaciones del proveedor");
+    h.id = "imp-entrada-titulo";
+    h.tabIndex = -1;
+    const pegar = boton("Pegar varias publicaciones", "pegado-abrir", "boton boton-secundario boton-compacto");
+    pegar.id = "imp-pegado-abrir";
+    pegar.setAttribute("aria-expanded", String(Boolean(lote.pegado)));
+    cabecera.append(h, pegar);
+    const ayuda = nodo("p", "campo-ayuda importador-entrada-ayuda", "Pega varios mensajes de WhatsApp a la vez y revisa cómo se separan, o pega cada publicación en su ficha, más abajo.");
+    s.append(cabecera, ayuda, pintarPerfiles());
+    return s;
+  }
+  function repintarEntrada() {
+    const actual = $("#imp-entrada");
+    if (!actual || !lote) return;
+    const activo = document.activeElement?.id;
+    const abiertos = menusAbiertos(actual);
+    actual.replaceWith(pintarEntrada());
+    reabrirMenus(abiertos);
+    if (activo && document.getElementById(activo)) document.getElementById(activo).focus({ preventScroll: true });
+    programarGuardado();
+  }
+
+  function pintarPerfiles() {
+    const actual = perfilLote();
+    const eliminado = !esGeneral(actual) && !perfilVivo(actual);
+    const d = nodo("details", "importador-perfiles");
+    d.id = "imp-perfiles";
+    d.open = Boolean(lote.perfilesAbierto || editorPerfil || confirmarBorrar?.tipo === "perfil" || avisoPerfil);
+    const resumen = nodo("summary", "importador-ajustes-resumen");
+    resumen.id = "imp-perfiles-resumen";
+    resumen.append(nodo("span", "importador-ajustes-titulo", `Perfil del proveedor: ${nombrePerfil(actual)}${eliminado ? " (eliminado)" : ""}`),
+      nodo("span", "importador-ajustes-pista", "Reglas para leer sus mensajes: alias de marcas, público, numeración, categoría y frases que se omiten."));
+    d.append(resumen);
+
+    const grupo = nodo("fieldset", "editor-opciones importador-perfiles-lista");
+    grupo.id = "imp-perfil-lote";
+    grupo.append(nodo("legend", "", "Perfil para las publicaciones nuevas de este lote"));
+    const lista = nodo("ul", "importador-perfiles-opciones");
+    const opciones = [general(), ...perfiles];
+    if (eliminado) opciones.push(actual);
+    opciones.forEach((p, i) => {
+      const li = nodo("li", "importador-perfil");
+      const caja = nodo("label", "casilla");
+      const r = nodo("input");
+      r.type = "radio";
+      r.name = "imp-perfil-lote";
+      r.id = `imp-perfil-lote-${i}`;
+      r.value = esGeneral(p) ? CLAVE_GENERAL : p.id;
+      r.checked = esGeneral(p) ? esGeneral(actual) : !esGeneral(actual) && actual.id === p.id;
+      r.dataset.perfilLote = r.value;
+      if (p === actual && eliminado) r.dataset.eliminado = "1";
+      const detalle = nodo("span", "importador-perfil-texto");
+      detalle.append(nodo("span", "importador-perfil-nombre", `${nombrePerfil(p)}${p === actual && eliminado ? " (eliminado: este lote conserva sus reglas)" : ""}`),
+        nodo("span", "importador-perfil-resumen", resumenPerfil(p)));
+      caja.append(r, detalle);
+      li.append(caja);
+      if (!esGeneral(p) && perfilVivo(p)) {
+        const acciones = nodo("div", "importador-perfil-acciones");
+        const editar = boton("Editar", "perfil-editar", "boton boton-texto boton-mini", { perfil: p.id });
+        editar.setAttribute("aria-label", `Editar el perfil ${p.nombre}`);
+        const borrar = boton("Eliminar", "perfil-eliminar", "boton boton-texto boton-mini", { perfil: p.id });
+        borrar.setAttribute("aria-label", `Eliminar el perfil ${p.nombre}`);
+        acciones.append(editar, borrar);
+        li.append(acciones);
+        if (confirmarBorrar?.tipo === "perfil" && confirmarBorrar.id === p.id) {
+          const confirma = nodo("div", "importador-confirmar");
+          confirma.setAttribute("role", "group");
+          confirma.setAttribute("aria-label", `Confirmar la eliminación del perfil ${p.nombre}`);
+          confirma.append(nodo("p", "", `¿Eliminar el perfil «${p.nombre}»? Las fichas y los borradores que ya lo usaron conservan sus reglas; solo deja de ofrecerse para lotes nuevos.`));
+          const fila = nodo("div", "editor-botones");
+          fila.append(boton("Eliminar el perfil", "perfil-eliminar-si", "boton boton-principal boton-compacto", { perfil: p.id }),
+            boton("Cancelar", "confirmar-cancelar", "boton boton-secundario boton-compacto"));
+          confirma.append(fila);
+          li.append(confirma);
+        }
+      }
+      lista.append(li);
+    });
+    grupo.append(lista);
+    d.append(grupo);
+
+    if (editorPerfil) d.append(pintarEditorPerfil());
+    else {
+      const crear = boton("Crear perfil de proveedor", "perfil-nuevo", "boton boton-secundario boton-compacto");
+      crear.id = "imp-perfil-nuevo";
+      if (!almacenOk) { crear.setAttribute("aria-disabled", "true"); crear.setAttribute("aria-describedby", "imp-perfiles-sin-almacen"); }
+      d.append(crear);
+      if (!almacenOk) {
+        const sin = nodo("p", "campo-ayuda", "Este navegador no permite guardar perfiles (almacenamiento local no disponible). Puedes seguir con el Perfil general.");
+        sin.id = "imp-perfiles-sin-almacen";
+        d.append(sin);
+      }
+    }
+    // Cambiar o editar el perfil no toca lo ya leído; volver a leer es una acción expresa.
+    const distintas = lote.fichas.filter((f) => editable(f) && f.perfil !== lote.perfilLote && f.colores.some((c) => c.texto.trim()));
+    if (avisoPerfil || distintas.length) {
+      const caja = nodo("div", "importador-perfil-aviso");
+      caja.id = "imp-perfil-aviso";
+      caja.setAttribute("role", "status");
+      if (avisoPerfil) caja.append(nodo("p", "", avisoPerfil));
+      if (distintas.length) {
+        caja.append(nodo("p", "campo-ayuda", `${distintas.length === 1 ? "1 ficha sin guardar se leyó" : `${distintas.length} fichas sin guardar se leyeron`} con otro perfil o con una versión anterior de este. Solo cambian si las vuelves a leer; lo que corregiste a mano se conserva.`));
+        const reaplicar = boton(`Volver a leer ${distintas.length === 1 ? "1 ficha" : `${distintas.length} fichas`} con «${nombrePerfil(actual)}»`, "perfil-reaplicar", "boton boton-secundario boton-compacto");
+        reaplicar.id = "imp-perfil-reaplicar";
+        caja.append(reaplicar);
+      }
+      d.append(caja);
+    }
+    return d;
+  }
+
+  /* Las fichas que aún no tienen ningún mensaje no han leído nada: pasan al perfil del lote. Las que ya
+     se leyeron conservan el suyo hasta que se vuelvan a leer expresamente. */
+  function adoptarPerfilEnVacias() {
+    for (const f of lote.fichas) if (editable(f) && !f.colores.some((c) => c.texto.trim())) f.perfil = lote.perfilLote;
+  }
+  // «Recordar para este proveedor» depende de los perfiles guardados y del perfil del lote.
+  function repintarPropuestas() {
+    for (const f of lote?.fichas || []) if (editable(f) && f.colores[0]?.texto.trim()) repintarFicha(f);
+  }
+  function elegirPerfilLote(valor) {
+    if (valor === CLAVE_GENERAL) lote.perfilLote = CLAVE_GENERAL;
+    else {
+      const p = perfiles.find((x) => x.id === valor);
+      if (!p) return; // el eliminado que conserva el lote: ya es el elegido
+      lote.perfilLote = guardarInstantanea(lote, p);
+    }
+    adoptarPerfilEnVacias();
+    const n = lote.fichas.filter((f) => editable(f) && f.colores.some((c) => c.texto.trim())).length;
+    avisoPerfil = `Las publicaciones nuevas de este lote se leerán con «${nombrePerfil(perfilLote())}».${n ? " Las fichas ya creadas no cambian." : ""}`;
+    lote.perfilesAbierto = true;
+    repintarEntrada();
+    repintarPropuestas();
+    if (lote.pegado?.fase === "revision") repintarPegado();
+  }
+
+  function reaplicarPerfil() {
+    const fichas = lote.fichas.filter((f) => editable(f) && f.perfil !== lote.perfilLote && f.colores.some((c) => c.texto.trim()));
+    if (!fichas.length) return;
+    for (const f of fichas) {
+      f.perfil = lote.perfilLote;
+      f.pendiente = null;
+      for (const c of f.colores) if (c.texto.trim()) aplicarTexto(f, c);
+    }
+    avisoPerfil = `Se volvieron a leer ${fichas.length === 1 ? "1 ficha" : `${fichas.length} fichas`} (${listaNumeros(fichas)}) con «${nombrePerfil(perfilLote())}». Lo que corregiste a mano se conservó.`;
+    pintar();
+    mensaje(avisoPerfil, "ok");
+    $("#imp-perfiles-resumen")?.focus({ preventScroll: true });
+  }
+
+  // ------------------------------------------------------------------ perfiles: formulario
+  const lineasDe = (lista, f) => lista.map(f).join("\n");
+  function valoresDe(p) {
+    return {
+      nombre: p?.nombre || "",
+      marcas: lineasDe(p?.marcas || [], (m) => `${m.alias} = ${m.marca}`),
+      publico: lineasDe(p?.publico || [], (x) => `${x.expresion} = ${x.publico}`),
+      numeracion: lineasDe(p?.numeracion || general().numeracion, (x) => `${x.expresion} = ${x.publico}`),
+      rangos: Object.fromEntries(["dama", "hombre", "unisex"].map((x) => [x, { desde: p?.rangos?.[x] ? String(p.rangos[x].desde) : "", hasta: p?.rangos?.[x] ? String(p.rangos[x].hasta) : "" }])),
+      categoria: p?.categoria || "",
+      promociones: (p?.promociones || []).join("\n")
+    };
+  }
+  function abrirEditorPerfil(id) {
+    const p = id ? perfiles.find((x) => x.id === id) : null;
+    editorPerfil = { id: p?.id || null, valores: valoresDe(p), errores: [] };
+    confirmarBorrar = null;
+    lote.perfilesAbierto = true;
+    repintarEntrada();
+    $("#imp-perfil-nombre")?.focus();
+  }
+
+  function pintarEditorPerfil() {
+    const e = editorPerfil;
+    const v = e.valores;
+    const caja = nodo("div", "importador-perfil-editor");
+    caja.id = "imp-perfil-editor";
+    caja.setAttribute("role", "group");
+    caja.setAttribute("aria-labelledby", "imp-perfil-editor-titulo");
+    const h = nodo("h4", "importador-paso-titulo", e.id ? `Editar el perfil «${v.nombre || "sin nombre"}»` : "Nuevo perfil de proveedor");
+    h.id = "imp-perfil-editor-titulo";
+    caja.append(h, nodo("p", "campo-ayuda", "Reglas sencillas, una por línea. No admiten fórmulas ni código: cada expresión se compara como palabras completas, sin tildes ni mayúsculas. Se guardan solo en este navegador."));
+    const errorDe = (campoPerfil) => e.errores.filter((x) => x.campo === campoPerfil).map((x) => x.mensaje);
+    const conError = (nodoCampo, campoPerfil) => {
+      const errores = errorDe(campoPerfil);
+      if (!errores.length) return nodoCampo;
+      const entrada = $("input, textarea", nodoCampo);
+      const p = nodo("p", "campo-error", errores.join(" "));
+      p.id = `imp-perfil-${campoPerfil}-error`;
+      entrada?.setAttribute("aria-invalid", "true");
+      entrada?.setAttribute("aria-describedby", `${p.id} ${entrada.getAttribute("aria-describedby") || ""}`.trim());
+      nodoCampo.append(p);
+      return nodoCampo;
+    };
+    const L = texto().LIMITES_PERFIL;
+    caja.append(
+      conError(campo({ id: "imp-perfil-nombre", etiqueta: "Nombre del proveedor", valor: v.nombre, max: L.nombre, obligatorio: true, datos: { perfilCampo: "nombre" } }), "nombre"),
+      conError(campo({ id: "imp-perfil-marcas", etiqueta: "Alias de marcas", tipo: "textarea", valor: v.marcas, datos: { perfilCampo: "marcas" },
+        ayuda: "alias = marca. Por ejemplo: NB = NEW BALANCE. Un alias de una o dos letras solo cuenta al principio de la línea." }), "marcas"),
+      conError(campo({ id: "imp-perfil-publico", etiqueta: "Expresiones de público", tipo: "textarea", valor: v.publico, datos: { perfilCampo: "publico" },
+        ayuda: "expresión = dama, hombre o unisex. Por ejemplo: chicas = dama. Las generales (dama, caballero, unisex…) siguen funcionando." }), "publico"),
+      conError(campo({ id: "imp-perfil-numeracion", etiqueta: "Palabras de «numeración»", tipo: "textarea", valor: v.numeracion, datos: { perfilCampo: "numeracion" },
+        ayuda: "palabra que sigue a «numeración» = público. Por ejemplo: niña = dama («numeración niña»)." }), "numeracion"));
+    const rangos = nodo("fieldset", "editor-opciones importador-perfil-rangos");
+    rangos.append(nodo("legend", "", "Tallas de «todas las tallas» y «numeración», por público"));
+    rangos.append(nodo("p", "campo-ayuda", "Tallas EU enteras. Vacío: se usa el del Perfil general (Dama 36–39, Hombre 36–44, Unisex 36–44). Son convenciones de este proveedor, no límites del catálogo. Las tallas escritas en el mensaje siempre mandan."));
+    for (const x of ["dama", "hombre", "unisex"]) {
+      const fila = nodo("div", "importador-perfil-rango");
+      fila.append(nodo("span", "importador-perfil-rango-nombre", textoPublico(x)),
+        campo({ id: `imp-perfil-${x}-desde`, etiqueta: "Desde", valor: v.rangos[x].desde, modo: "numeric", max: 2, datos: { perfilCampo: `rango-${x}-desde` } }),
+        campo({ id: `imp-perfil-${x}-hasta`, etiqueta: "Hasta", valor: v.rangos[x].hasta, modo: "numeric", max: 2, datos: { perfilCampo: `rango-${x}-hasta` } }));
+      rangos.append(fila);
+      for (const m of errorDe(`rango-${x}`)) {
+        const p = nodo("p", "campo-error", m);
+        p.id = `imp-perfil-rango-${x}-error`;
+        fila.querySelectorAll("input").forEach((n) => { n.setAttribute("aria-invalid", "true"); n.setAttribute("aria-describedby", p.id); });
+        rangos.append(p);
+      }
+    }
+    caja.append(rangos,
+      window.GamaTallaCategorias.crear({ id: "imp-perfil-categoria", etiqueta: "Categoría habitual", valor: v.categoria, modo: "perfil", catalogo: categoriasCatalogo(),
+        error: errorDe("categoria").join(" "), datos: { perfilCampo: "categoria" },
+        ayuda: "Opcional. Se propone en las fichas nuevas; nunca sustituye una categoría elegida a mano." }),
+      conError(campo({ id: "imp-perfil-promociones", etiqueta: "Frases promocionales que se omiten", tipo: "textarea", valor: v.promociones, datos: { perfilCampo: "promociones" },
+        ayuda: "Una por línea. Por ejemplo: envío gratis a todo el país. No pasan a la ficha." }), "promociones"));
+    const acciones = nodo("div", "editor-botones importador-perfil-botones");
+    const guardar = boton("Guardar perfil", "perfil-guardar", "boton boton-principal boton-compacto");
+    guardar.id = "imp-perfil-guardar";
+    acciones.append(guardar, boton("Cancelar", "perfil-cancelar", "boton boton-secundario boton-compacto"));
+    caja.append(acciones);
+    return caja;
+  }
+
+  // «expresión = valor», una por línea. Devuelve [[izquierda, derecha]] o anota el error.
+  function leerEquivalencias(valor, campoPerfil, errores) {
+    const salida = [];
+    String(valor || "").split(/\r?\n/).forEach((linea, i) => {
+      if (!linea.trim()) return;
+      const n = linea.indexOf("=");
+      if (n < 0) { errores.push({ campo: campoPerfil, mensaje: `Línea ${i + 1}: escribe «expresión = valor».` }); return; }
+      salida.push([linea.slice(0, n).trim(), linea.slice(n + 1).trim()]);
+    });
+    return salida;
+  }
+  async function guardarPerfilEditado() {
+    const e = editorPerfil;
+    if (!e || !almacenOk) return;
+    const v = e.valores;
+    const errores = [];
+    const rangos = {};
+    for (const x of ["dama", "hombre", "unisex"]) {
+      const desde = String(v.rangos[x].desde).trim();
+      const hasta = String(v.rangos[x].hasta).trim();
+      if (!desde && !hasta) { rangos[x] = null; continue; }
+      if (!/^\d{2}$/.test(desde) || !/^\d{2}$/.test(hasta)) { errores.push({ campo: `rango-${x}`, mensaje: `${textoPublico(x)}: escribe «desde» y «hasta» (dos cifras) o deja los dos vacíos.` }); continue; }
+      rangos[x] = { desde: Number(desde), hasta: Number(hasta) };
+    }
+    const entrada = {
+      id: e.id || uuid(), nombre: v.nombre,
+      revision: (perfiles.find((p) => p.id === e.id)?.revision ?? -1) + 1,
+      marcas: leerEquivalencias(v.marcas, "marcas", errores).map(([alias, marca]) => ({ alias, marca })),
+      publico: leerEquivalencias(v.publico, "publico", errores).map(([expresion, publico]) => ({ expresion, publico })),
+      numeracion: leerEquivalencias(v.numeracion, "numeracion", errores).map(([expresion, publico]) => ({ expresion, publico })),
+      rangos, categoria: v.categoria, promociones: String(v.promociones || "").split(/\r?\n/).map((t) => t.trim()).filter(Boolean)
+    };
+    const r = texto().normalizarPerfil(entrada);
+    errores.push(...r.errores.filter((x) => !(x.campo.startsWith("rango-") && errores.some((y) => y.campo === x.campo))));
+    if (r.perfil && perfiles.some((p) => p.id !== r.perfil.id && texto().clave(p.nombre) === texto().clave(r.perfil.nombre))) {
+      errores.push({ campo: "nombre", mensaje: "Ya hay un perfil con ese nombre." });
+    }
+    if (errores.length || !r.perfil) {
+      e.errores = errores;
+      repintarEntrada();
+      const primero = errores[0]?.campo || "nombre";
+      const id = primero.startsWith("rango-") ? `imp-perfil-${primero.slice(6)}-desde` : `imp-perfil-${primero}`;
+      document.getElementById(id)?.focus();
+      mensaje("Revisa el perfil: hay reglas por corregir. No se guardó.", "aviso");
+      return;
+    }
+    try {
+      await almacen().guardarPerfil(ambitoActual, r.perfil);
+    } catch (error) {
+      mensaje(error instanceof almacen().ErrorCuota ? "No hay espacio en este navegador para guardar el perfil. Libera espacio eliminando borradores que no necesites." : "No se pudo guardar el perfil en este navegador.", "aviso");
+      return;
+    }
+    const nuevo = !e.id;
+    perfiles = ordenarPerfiles([...perfiles.filter((p) => p.id !== r.perfil.id), r.perfil]);
+    almacen().avisar({ tipo: "perfiles", ambito: ambitoActual, de: pestana });
+    editorPerfil = null;
+    // Lo nuevo se usa en las publicaciones nuevas del lote si es su perfil (o si se acaba de crear).
+    if (nuevo || perfilLote().id === r.perfil.id) { lote.perfilLote = guardarInstantanea(lote, r.perfil); adoptarPerfilEnVacias(); }
+    avisoPerfil = `Perfil «${r.perfil.nombre}» guardado en este navegador${nuevo ? " y elegido para este lote" : ""}. Se aplica a las publicaciones nuevas; las fichas ya creadas no cambian.`;
+    repintarEntrada();
+    repintarPropuestas();
+    if (lote.pegado?.fase === "revision") repintarPegado();
+    mensaje(avisoPerfil, "ok");
+    $("#imp-perfiles-resumen")?.focus({ preventScroll: true });
+  }
+
+  async function eliminarPerfil(id) {
+    const p = perfiles.find((x) => x.id === id);
+    if (!p) return;
+    try { await almacen().eliminarPerfil(ambitoActual, id); } catch { mensaje("No se pudo eliminar el perfil.", "aviso"); return; }
+    perfiles = perfiles.filter((x) => x.id !== id);
+    almacen().avisar({ tipo: "perfiles", ambito: ambitoActual, de: pestana });
+    confirmarBorrar = null;
+    avisoPerfil = `Perfil «${p.nombre}» eliminado de este navegador.${perfilLote().id === id ? " Este lote conserva sus reglas para las publicaciones nuevas; elige otro perfil si prefieres." : ""}`;
+    repintarEntrada();
+    repintarPropuestas();
+    mensaje(avisoPerfil, "ok");
+    $("#imp-perfiles-resumen")?.focus({ preventScroll: true });
+  }
+
+  // ------------------------------------------------------------------ «Recordar para este proveedor»
+  /* Correcciones a mano que pueden convertirse en una regla del perfil. Solo se proponen; se guardan si
+     la persona lo confirma. Nunca se corrige la ortografía de un modelo ni se recuerda cada edición. */
+  function propuestasDe(f, c) {
+    const p = perfilDe(f);
+    // Se recuerda en el perfil de la ficha; si se leyó con el general, en el perfil que ya usa el lote.
+    const vivo = perfilVivo(p) || (esGeneral(p) ? perfilVivo(perfilLote()) : null);
+    const lista = [];
+    if (!c?.texto.trim() || !c.leido) return { lista, vivo, p };
+    const T = texto();
+    // Alias: el lector no reconoció la marca y se escribió a mano. Se propone la primera palabra leída como modelo.
+    if (f.editados.has("marca") && f.marca.trim() && !c.leido.marca && c.leido.modelo) {
+      const candidato = ((/^[\p{L}\p{N}][\p{L}\p{N}&'.-]*/u.exec(c.leido.modelo.trim()) || [""])[0]).replace(/[.'-]+$/u, "");
+      const marca = mayus(f.marca.trim());
+      if (candidato.length >= 2 && /\p{L}/u.test(candidato) && T.clave(candidato) !== T.clave(marca) && T.contieneExpresion(c.texto, candidato)
+        && !(vivo?.marcas || []).some((m) => T.clave(m.alias) === T.clave(candidato))) {
+        lista.push({ tipo: "alias", clave: `alias|${T.clave(candidato)}|${T.clave(marca)}`, regla: `«${candidato}» = ${marca}`, explicacion: "Alias de marca: cuando un mensaje lo diga, la marca será esa.", datos: { alias: candidato, marca } });
+      }
+    }
+    // Categoría escrita a mano distinta de la habitual del perfil.
+    if (f.editados.has("categoria") && f.categoria.trim()) {
+      const categoria = mayus(f.categoria.trim());
+      if (categoria.length <= T.LIMITES_PERFIL.categoria && categoria !== (vivo?.categoria || "")) {
+        lista.push({ tipo: "categoria", clave: `categoria|${categoria}`, regla: `Categoría habitual: ${categoria}`, explicacion: "Se propondrá en las fichas nuevas si nadie escribe otra.", datos: { categoria } });
+      }
+    }
+    // Rango: tallas corregidas a mano en un color que pedía la regla («todas las tallas», «numeración …»).
+    if (f.publico) {
+      for (const cc of f.colores) {
+        if (!cc.todas || !cc.editados.has("tallas")) continue;
+        const t = T.leerCampoTallas(cc.tallasTexto);
+        const n = t.tallas.map(Number);
+        if (t.error || n.length < 2 || !n.every((x, i) => Number.isInteger(x) && (i === 0 || x === n[i - 1] + 1)) || n[n.length - 1] - n[0] > T.LIMITES_PERFIL.rangoMax) continue;
+        const actual = T.rangoPara(f.publico, vivo || p);
+        if (actual && actual.desde === n[0] && actual.hasta === n[n.length - 1]) continue;
+        lista.push({ tipo: "rango", clave: `rango|${f.publico}|${n[0]}-${n[n.length - 1]}`, regla: `${textoPublico(f.publico)}: tallas ${n[0]} a ${n[n.length - 1]}`,
+          explicacion: `Tallas para «todas las tallas» y «numeración» de ${textoPublico(f.publico)}.`, datos: { publico: f.publico, desde: n[0], hasta: n[n.length - 1] } });
+        break;
+      }
+    }
+    // Público elegido a mano cuando el mensaje no lo decía con palabras conocidas: se pide la expresión.
+    if (f.editados.has("publico") && f.publico && !c.leido.publico) {
+      lista.push({ tipo: "publico", clave: `publico|${f.publico}`, regla: "", explicacion: "", datos: { publico: f.publico } });
+    }
+    return { lista: lista.filter((x) => !f.descartadas.has(x.clave)), vivo, p };
+  }
+
+  function pintarPropuestas(f, c) {
+    const { lista, vivo, p } = propuestasDe(f, c);
+    if (!lista.length) return null;
+    const caja = nodo("div", "importador-recordar");
+    caja.id = `imp-${f.clave}-recordar`;
+    caja.setAttribute("role", "group");
+    caja.setAttribute("aria-labelledby", `imp-${f.clave}-recordar-titulo`);
+    const h = nodo("h6", "importador-recordar-titulo", "Recordar para este proveedor");
+    h.id = `imp-${f.clave}-recordar-titulo`;
+    caja.append(h);
+    if (!vivo) {
+      caja.append(nodo("p", "campo-ayuda", esGeneral(p)
+        ? "Para guardar estas correcciones como reglas, elige o crea arriba el perfil de este proveedor (el Perfil general no se modifica)."
+        : `El perfil «${p.nombre}» ya no existe: estas correcciones no se pueden recordar.`));
+      return caja;
+    }
+    caja.append(nodo("p", "campo-ayuda", `Solo se guarda si lo confirmas. Se añadirá al perfil «${vivo.nombre}» y servirá para las publicaciones nuevas; esta ficha no cambia.`));
+    const ul = nodo("ul", "importador-recordar-lista");
+    for (const x of lista) {
+      const li = nodo("li", "importador-recordar-item");
+      if (x.tipo === "publico") {
+        const entrada = campo({ id: `imp-${f.clave}-recordar-publico`, etiqueta: `Palabras del mensaje que indican ${textoPublico(x.datos.publico)}`, valor: f.recordarPublico || "",
+          max: texto().LIMITES_PERFIL.expresion, datos: { recordarPublico: f.clave }, ayuda: "Cópialas tal como aparecen en el mensaje (palabras completas)." });
+        const previa = nodo("p", "importador-recordar-regla", textoPrevioPublico(f, x.datos.publico));
+        previa.id = `imp-${f.clave}-recordar-previa`;
+        previa.setAttribute("aria-live", "polite");
+        li.append(entrada, previa);
+      } else {
+        li.append(nodo("p", "importador-recordar-regla", `Se guardará: ${x.regla}`), nodo("p", "campo-ayuda", x.explicacion));
+      }
+      const fila = nodo("div", "editor-botones");
+      const si = boton("Recordar", "recordar", "boton boton-secundario boton-mini", { ficha: f.clave, propuesta: x.clave });
+      si.setAttribute("aria-label", x.tipo === "publico" ? `Recordar la expresión de público para ${vivo.nombre}` : `Recordar ${x.regla} para ${vivo.nombre}`);
+      const no = boton("No recordar", "recordar-no", "boton boton-texto boton-mini", { ficha: f.clave, propuesta: x.clave });
+      no.setAttribute("aria-label", x.tipo === "publico" ? "No recordar la expresión de público" : `No recordar ${x.regla}`);
+      fila.append(si, no);
+      li.append(fila);
+      ul.append(li);
+    }
+    caja.append(ul);
+    return caja;
+  }
+  const textoPrevioPublico = (f, publico) => {
+    const t = String(f.recordarPublico || "").trim();
+    return t ? `Se guardará: «${t}» = ${textoPublico(publico)}` : "Escribe las palabras para ver la regla que se guardará.";
+  };
+
+  async function recordar(f, claveProp) {
+    const c = f.colores[0];
+    const { lista, vivo } = propuestasDe(f, c);
+    const x = lista.find((y) => y.clave === claveProp);
+    if (!x || !vivo || !almacenOk) return;
+    const base = JSON.parse(JSON.stringify(vivo));
+    let descripcion = x.regla;
+    if (x.tipo === "alias") base.marcas.push({ alias: x.datos.alias, marca: x.datos.marca });
+    if (x.tipo === "categoria") base.categoria = x.datos.categoria;
+    if (x.tipo === "rango") base.rangos[x.datos.publico] = { desde: x.datos.desde, hasta: x.datos.hasta };
+    if (x.tipo === "publico") {
+      const expresion = String(f.recordarPublico || "").trim();
+      const T = texto();
+      const problema = !expresion || !/\p{L}/u.test(expresion) ? "Escribe las palabras del mensaje que indican el público."
+        : !T.contieneExpresion(c.texto, expresion) ? `«${expresion}» no aparece como palabras completas en el mensaje.`
+          : base.publico.some((y) => T.clave(y.expresion) === T.clave(expresion)) ? `«${expresion}» ya es una regla de este perfil.` : "";
+      if (problema) { mensaje(problema, "aviso"); document.getElementById(`imp-${f.clave}-recordar-publico`)?.focus(); return; }
+      base.publico.push({ expresion, publico: x.datos.publico });
+      descripcion = `«${expresion}» = ${textoPublico(x.datos.publico)}`;
+    }
+    base.revision = vivo.revision + 1;
+    const r = texto().normalizarPerfil(base);
+    if (!r.perfil) { mensaje(`No se pudo recordar: ${r.errores.map((y) => y.mensaje).join(" ")}`, "aviso"); return; }
+    try { await almacen().guardarPerfil(ambitoActual, r.perfil); } catch { mensaje("No se pudo guardar la regla en este navegador.", "aviso"); return; }
+    perfiles = ordenarPerfiles([...perfiles.filter((y) => y.id !== r.perfil.id), r.perfil]);
+    almacen().avisar({ tipo: "perfiles", ambito: ambitoActual, de: pestana });
+    if (perfilLote().id === r.perfil.id) { lote.perfilLote = guardarInstantanea(lote, r.perfil); adoptarPerfilEnVacias(); }
+    if (x.tipo === "publico") f.recordarPublico = "";
+    repintarFicha(f);
+    repintarEntrada();
+    mensaje(`Guardado en el perfil «${r.perfil.nombre}»: ${descripcion}. Se usará en las publicaciones nuevas; las fichas ya creadas no cambian.`, "ok");
+    document.getElementById(`imp-${f.clave}-recordar`)?.querySelector("button")?.focus({ preventScroll: true });
+  }
+
+  // ------------------------------------------------------------------ pegar varias publicaciones
+  let creandoPegado = false;
+  let cachePegado = { texto: null, cortes: "", perfil: "", lista: [] };
+  function fragmentosPegado() {
+    const p = lote.pegado;
+    const cortes = JSON.stringify(p.cortes);
+    if (cachePegado.texto !== p.texto || cachePegado.cortes !== cortes || cachePegado.perfil !== lote.perfilLote) {
+      cachePegado = { texto: p.texto, cortes, perfil: lote.perfilLote, lista: separador().bloques(p.texto, p.cortes, { marcas: marcasConocidas(), perfil: perfilLote() }) };
+    }
+    return cachePegado.lista;
+  }
+  const incluido = (b) => (lote.pegado.incluir[b.inicio] ?? separador().incluidoPorOmision(b));
+  const corteEn = (inicio) => lote.pegado.cortes.find((c) => c.linea === inicio);
+  function fichaVacia(f) {
+    const c = f.colores[0];
+    return editable(f) && f.colores.length === 1 && !f.marca.trim() && !f.modelo.trim() && !f.categoria.trim() && !f.publico && !f.editados.size
+      && !c.texto.trim() && !c.fotos.length && !c.color.trim() && !String(c.proveedor).trim() && !String(c.venta).trim() && !c.tallasTexto.trim() && !c.editados.size;
+  }
+  const recorte = (t, n) => (t.length > n ? `${t.slice(0, n - 1)}…` : t);
+
+  function pintarPegado() {
+    const p = lote.pegado;
+    const S = separador();
+    const s = nodo("section", "editor-seccion importador-pegado");
+    s.id = "imp-pegado";
+    s.setAttribute("aria-labelledby", "imp-pegado-titulo");
+    const h = nodo("h3", "editor-seccion-titulo", "Pegar varias publicaciones");
+    h.id = "imp-pegado-titulo";
+    h.tabIndex = -1;
+    s.append(h);
+    if (p.fase !== "revision") {
+      const caja = nodo("div", "campo importador-mensaje");
+      const etiqueta = nodo("label", "importador-mensaje-etiqueta", "Pega aquí los mensajes de WhatsApp");
+      etiqueta.htmlFor = "imp-pegado-texto";
+      const area = nodo("textarea");
+      area.id = "imp-pegado-texto";
+      area.value = p.texto;
+      area.rows = 10;
+      area.maxLength = S.MAX_TEXTO;
+      area.autocomplete = "off";
+      area.spellcheck = false;
+      area.dataset.pegado = "texto";
+      area.placeholder = "Copia varios mensajes del chat a la vez, con o sin la fecha y el nombre de cada mensaje.";
+      const ayuda = nodo("p", "campo-ayuda", "Se separan por el encabezado de cada mensaje (fecha y nombre), por líneas separadoras (-----) o cuando empieza otra marca después de un precio. Una línea en blanco sola no separa. Antes de crear nada revisas la división; nada se guarda en Supabase.");
+      ayuda.id = "imp-pegado-texto-ayuda";
+      area.setAttribute("aria-describedby", ayuda.id);
+      caja.append(etiqueta, area, ayuda);
+      if (p.error) {
+        const error = nodo("p", "campo-error", p.error);
+        error.id = "imp-pegado-error";
+        error.setAttribute("role", "alert");
+        area.setAttribute("aria-invalid", "true");
+        area.setAttribute("aria-describedby", `${error.id} ${ayuda.id}`);
+        caja.append(error);
+      }
+      const acciones = nodo("div", "importador-pegado-acciones");
+      const revisar = boton("Revisar la separación", "pegado-revisar", "boton boton-principal");
+      revisar.id = "imp-pegado-revisar";
+      acciones.append(revisar, boton("Cancelar", "pegado-cancelar", "boton boton-secundario"));
+      s.append(caja, acciones);
+      return s;
+    }
+    const lista = fragmentosPegado();
+    const crear = lista.filter(incluido);
+    const dudosas = p.cortes.filter((c) => c.dudosa).length;
+    // Etapa 20: publicaciones (fragmentos), fichas (una por publicación marcada) y colores (los de cada una).
+    const totalColores = crear.reduce((n, b) => n + coloresDe(b).crear, 0);
+    const porRevisar = crear.filter((b) => !coloresDe(b).valido).length;
+    const resumen = nodo("p", "importador-pegado-resumen",
+      `${lista.length} ${lista.length === 1 ? "publicación detectada" : "publicaciones detectadas"} · se ${crear.length === 1 ? "creará 1 ficha" : `crearán ${crear.length} fichas`} con ${totalColores === 1 ? "1 color" : `${totalColores} colores`}${dudosas ? ` · ${dudosas === 1 ? "1 división dudosa" : `${dudosas} divisiones dudosas`} por revisar` : ""}${porRevisar ? ` · ${porRevisar === 1 ? "1 cantidad de colores" : `${porRevisar} cantidades de colores`} por revisar` : ""}.`);
+    resumen.id = "imp-pegado-resumen";
+    resumen.setAttribute("role", "status");
+    s.append(resumen, nodo("p", "campo-ayuda", "Revisa cada una. «Unir con la anterior» junta dos fragmentos y «Separar» divide uno. El texto de cada publicación se conserva tal cual para revisarlo después."));
+    const ol = nodo("ol", "importador-pegado-lista");
+    ol.setAttribute("aria-label", "Publicaciones detectadas");
+    lista.forEach((b, i) => ol.append(pintarFragmento(b, i, lista.length)));
+    s.append(ol);
+    const acciones = nodo("div", "importador-pegado-acciones");
+    const boton1 = boton(crear.length === 1 ? "Crear 1 publicación" : `Crear ${crear.length} publicaciones`, "pegado-crear", "boton boton-principal");
+    boton1.id = "imp-pegado-crear";
+    boton1.setAttribute("aria-describedby", resumen.id);
+    if (!crear.length) boton1.setAttribute("aria-disabled", "true");
+    acciones.append(boton1, boton("Volver a editar el texto", "pegado-editar", "boton boton-secundario"), boton("Cancelar", "pegado-cancelar", "boton boton-texto"));
+    s.append(acciones);
+    return s;
+  }
+
+  function pintarFragmento(b, i, total) {
+    const corte = corteEn(b.inicio);
+    const li = nodo("li", `importador-fragmento${corte?.dudosa ? " es-dudosa" : ""}${incluido(b) ? "" : " es-excluido"}`);
+    li.dataset.inicio = String(b.inicio);
+    const cabecera = nodo("div", "importador-fragmento-cabecera");
+    const h = nodo("h4", "importador-fragmento-titulo", `Publicación ${i + 1}`);
+    h.id = `imp-frag-${b.inicio}-titulo`;
+    h.tabIndex = -1;
+    li.setAttribute("aria-labelledby", h.id);
+    cabecera.append(h);
+    const caja = nodo("label", "casilla");
+    const check = nodo("input");
+    check.type = "checkbox";
+    check.id = `imp-frag-${b.inicio}-incluir`;
+    check.checked = incluido(b);
+    check.dataset.pegadoIncluir = String(b.inicio);
+    if (b.vacio) { check.disabled = true; check.dataset.bloqueado = "1"; }
+    caja.append(check, nodo("span", "", "Crear esta publicación"));
+    cabecera.append(caja);
+    li.append(cabecera);
+    if (b.encabezado) li.append(nodo("p", "importador-encabezado", `Mensaje de WhatsApp: ${b.encabezado}`));
+    if (corte?.dudosa) {
+      const duda = nodo("p", "importador-fragmento-duda", `División dudosa: ${corte.motivo}`);
+      duda.id = `imp-frag-${b.inicio}-duda`;
+      li.append(duda);
+    }
+    const d = b.datos;
+    const partes = [d.marca && mayus(d.marca), d.modelo && mayus(d.modelo),
+      d.precios.length > 1 ? `${d.precios.map(formatoPesos).join(" o ")} (elegir)` : d.precio ? formatoPesos(d.precio) : "",
+      d.tallas.length ? `tallas ${d.tallas.length > 2 ? `${d.tallas[0]} a ${d.tallas[d.tallas.length - 1]}` : d.tallas.join(" y ")}` : "",
+      textoPublico(d.publico)].filter(Boolean);
+    li.append(nodo("p", "importador-fragmento-datos", b.vacio ? "Sin texto: solo fotos o un aviso de WhatsApp. No se crea." : partes.length ? `Se lee: ${partes.join(" · ")}` : "No se reconoce marca, precio ni tallas: por omisión no se crea."));
+    if (!b.vacio) li.append(pintarColoresFragmento(b));
+    if (!b.vacio) li.append(nodo("p", "importador-fragmento-texto", b.texto));
+    const acciones = nodo("div", "importador-fragmento-acciones");
+    if (i > 0) {
+      const unir = boton("Unir con la anterior", "pegado-unir", "boton boton-secundario boton-mini", { inicio: String(b.inicio) });
+      unir.setAttribute("aria-label", `Unir la publicación ${i + 1} con la ${i}`);
+      acciones.append(unir);
+    }
+    if (corte?.dudosa) {
+      const ok = boton("La división está bien", "pegado-ok", "boton boton-texto boton-mini", { inicio: String(b.inicio) });
+      ok.setAttribute("aria-label", `La división antes de la publicación ${i + 1} está bien`);
+      acciones.append(ok);
+    }
+    const lineas = b.lineasTexto.filter((x, n) => n > 0 && x.util);
+    if (lineas.length) {
+      const separar = nodo("details", "importador-fragmento-separar");
+      const resumen = nodo("summary", "", "Separar…");
+      resumen.setAttribute("aria-label", `Separar la publicación ${i + 1} en dos`);
+      separar.append(resumen, nodo("p", "campo-ayuda", "Elige la línea con la que empieza la siguiente publicación:"));
+      const fila = nodo("div", "importador-fragmento-lineas");
+      for (const x of lineas) {
+        const b2 = boton(`Separar antes de «${recorte(texto().limpiarLinea(x.texto) || x.texto.trim(), 48)}»`, "pegado-separar", "boton boton-texto boton-mini", { linea: String(x.linea) });
+        fila.append(b2);
+      }
+      separar.append(fila);
+      acciones.append(separar);
+    }
+    if (acciones.childElementCount) li.append(acciones);
+    if (total > 1 && i === total - 1) li.classList.add("es-ultimo");
+    return li;
+  }
+  function repintarPegado() {
+    const actual = $("#imp-pegado");
+    if (!actual || !lote?.pegado) return;
+    const activo = document.activeElement;
+    const id = activo?.id;
+    const seleccion = id && typeof activo.selectionStart === "number" ? [activo.selectionStart, activo.selectionEnd] : null;
+    actual.replaceWith(pintarPegado());
+    const n = id && document.getElementById(id);
+    if (n) {
+      n.focus({ preventScroll: true });
+      if (seleccion && typeof n.setSelectionRange === "function") { try { n.setSelectionRange(...seleccion); } catch { /* sin selección */ } }
+    }
+    programarGuardado();
+  }
+  /* Etapa 20: colores que se prepararán para un fragmento. La cantidad del mensaje («(2 colores)») o la
+     corregida en la revisión; sin cantidad, 1. Una cantidad no válida se señala y se crea con 1 color. */
+  function coloresDe(b) {
+    const lim = comun().LIM.colores;
+    const propia = lote.pegado.colores?.[b.inicio];
+    // Sin corregir: la cantidad del mensaje; si no es válida, su valor tal cual (queda «Revisar»); sin cantidad, 1.
+    const texto = propia !== undefined ? String(propia) : (b.datos.colores ? String(b.datos.colores) : (b.datos.notaColores ? b.datos.coloresTexto || "" : "1"));
+    const n = /^\d{1,3}$/.test(texto.trim()) ? Number(texto.trim()) : NaN;
+    const valido = Number.isInteger(n) && n >= 1 && n <= lim;
+    return { texto, n, valido, crear: valido ? n : 1, manual: propia !== undefined };
+  }
+  function pintarColoresFragmento(b) {
+    const lim = comun().LIM.colores;
+    const k = coloresDe(b);
+    const caja = campo({ id: `imp-frag-${b.inicio}-colores`, etiqueta: "Colores a preparar", valor: k.texto, modo: "numeric", max: 3,
+      revisar: !k.valido, datos: { pegadoColores: String(b.inicio) } });
+    caja.classList.add("importador-fragmento-colores");
+    const entrada = $("input", caja);
+    let nota = "";
+    if (!k.valido) nota = `${b.datos.notaColores && !k.manual ? `${b.datos.notaColores} ` : ""}Escribe un número entre 1 y ${lim}; si no, se creará con 1 color.`;
+    else nota = k.n === 1 ? "Una ficha con 1 color." : `Una ficha con ${k.n} colores (Color 1 a Color ${k.n}).`;
+    const p = nodo("p", k.valido ? "campo-ayuda" : "campo-error", nota);
+    p.id = `imp-frag-${b.inicio}-colores-nota`;
+    entrada.setAttribute("aria-describedby", p.id);
+    if (!k.valido) entrada.setAttribute("aria-invalid", "true");
+    caja.append(p);
+    return caja;
+  }
+
+  function abrirPegado() {
+    if (!lote.pegado) lote.pegado = { fase: "texto", texto: "", cortes: [], incluir: {}, colores: {}, error: "" };
+    pintar();
+    const destino = lote.pegado.fase === "revision" ? $("#imp-pegado-titulo") : $("#imp-pegado-texto");
+    $("#imp-pegado")?.scrollIntoView({ block: "start" });
+    destino?.focus({ preventScroll: true });
+  }
+  function revisarPegado() {
+    const p = lote.pegado;
+    const S = separador();
+    p.error = "";
+    if (!p.texto.trim()) p.error = "Pega primero los mensajes.";
+    else if (p.texto.length > S.MAX_TEXTO) p.error = `El texto es demasiado largo (máximo ${S.MAX_TEXTO.toLocaleString("es-CO")} caracteres). Pégalo en varias veces.`;
+    if (!p.error) {
+      const det = S.detectar(p.texto, { marcas: marcasConocidas(), perfil: perfilLote() });
+      const n = S.bloques(p.texto, det.cortes).length;
+      if (n > S.MAX_BLOQUES) p.error = `Se detectaron ${n} publicaciones; como mucho ${S.MAX_BLOQUES} de una vez. Pégalas en varias veces.`;
+      else { p.cortes = det.cortes; p.incluir = {}; p.colores = {}; p.fase = "revision"; }
+    }
+    pintar();
+    if (p.error) { $("#imp-pegado-texto")?.focus(); return; }
+    $("#imp-pegado")?.scrollIntoView({ block: "start" });
+    $("#imp-pegado-titulo")?.focus({ preventScroll: true });
+  }
+  function cambiarCortes(nuevos, foco) {
+    lote.pegado.cortes = nuevos;
+    repintarPegado();
+    document.getElementById(foco)?.focus({ preventScroll: true });
+  }
+
+  /* «Crear N publicaciones»: añade al FINAL del lote una ficha por publicación marcada (la ficha inicial
+     se aprovecha si está completamente vacía). Cada una se lee con el perfil del lote y conserva su texto
+     original. No agrupa nada sola ni escribe en Supabase. El pegado se cierra en la misma operación:
+     pulsar dos veces no crea nada más. */
+  function crearPublicaciones() {
+    if (creandoPegado || guardando) return;
+    const p = lote.pegado;
+    if (!p || p.fase !== "revision") return;
+    const lista = fragmentosPegado().filter(incluido);
+    if (!lista.length) { mensaje("Marca al menos una publicación para crear.", "aviso"); return; }
+    creandoPegado = true;
+    try {
+      const vacia = lote.fichas.length === 1 && fichaVacia(lote.fichas[0]) ? lote.fichas[0] : null;
+      const creadas = [];
+      lista.forEach((b, i) => {
+        let f = i === 0 ? vacia : null;
+        if (f) f.perfil = lote.perfilLote;
+        else { f = fichaNueva(lote.perfilLote); lote.fichas.push(f); }
+        const c = f.colores[0];
+        c.texto = b.texto.slice(0, 4000);
+        c.original = b.original.slice(0, 12000);
+        c.encabezado = b.encabezado.slice(0, 200);
+        aplicarTexto(f, c);
+        // Etapa 20: los colores de esta publicación (la cantidad revisada manda sobre la del mensaje).
+        const k = coloresDe(b);
+        if (k.manual) {
+          f.coloresPedidos = k.texto.trim();
+          f.editados.add("colores");
+          if (k.valido) f.revisar.delete("colores"); else f.revisar.add("colores");
+        }
+        if (k.valido && k.n > 1) prepararColores(f, k.n);
+        creadas.push(f);
+      });
+      lote.pegado = null;
+      const nuevas = creadas.filter((f) => f !== vacia);
+      if (lote.destinos && nuevas.length) lote.avisoDestinos = `${nuevas.length === 1 ? "La ficha" : "Las fichas"} ${listaNumeros(nuevas)} ${nuevas.length === 1 ? "es nueva y no está elegida" : "son nuevas y no están elegidas"} para los ajustes: márcalas si quieres ajustarlas.`;
+      pintar();
+      const primera = creadas[0];
+      document.getElementById(`imp-${primera.clave}`)?.scrollIntoView({ block: "start" });
+      document.getElementById(`imp-${primera.clave}-titulo`)?.focus({ preventScroll: true });
+      const colores = creadas.reduce((n, f) => n + f.colores.length, 0);
+      mensaje(`Se ${creadas.length === 1 ? "creó 1 publicación" : `crearon ${creadas.length} publicaciones`} (${creadas.length === 1 ? `ficha ${numero(primera)}` : `fichas ${numero(primera)} a ${numero(creadas[creadas.length - 1])}`}), con ${colores === 1 ? "1 color" : `${colores} colores`} en total. Revisa lo marcado «Revisar» y agrupa los colores de un mismo modelo. Nada se guardó en Supabase.`, "ok");
+      guardarBorrador({ inmediato: true });
+    } finally {
+      creandoPegado = false;
+    }
+  }
+
+  // ------------------------------------------------------------------ guardado local (IndexedDB)
+  let almacenOk = false;
+  const metas = new WeakMap(); // por lote: { persistidas: Map(ref → clase), revision, existe, sucio, descartado }
+  const meta = (l) => { if (!metas.has(l)) metas.set(l, { persistidas: new Map(), revision: null, existe: false, sucio: false, descartado: false }); return metas.get(l); };
+  let temporizadorGuardado = 0;
+  let primerCambio = 0;
+  let cadena = Promise.resolve();
+  const ESPERA_GUARDADO = 800;    // tras el último cambio
+  const ESPERA_MAXIMA = 4000;     // aunque se siga escribiendo
+  const TRANSITORIOS = new Set(["blob", "archivo", "vistaPrevia", "quitada", "enCurso", "cortar"]);
+  const horaCorta = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" });
+  const fechaLarga = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const formatoFecha = (iso, formato = fechaLarga) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : formato.format(d); };
+
+  function estadoLocal(estado, detalle = "", tipo = "", cuando = null) {
+    persistencia.estado = estado;
+    persistencia.mensaje = detalle;
+    persistencia.tipo = tipo;
+    if (estado === "guardado") persistencia.cuando = cuando || new Date().toISOString();
+    pintarLocal();
+  }
+  // Estado del guardado local, en la cabecera del importador.
+  function pintarLocal() {
+    const caja = $("#importador-local");
+    if (!caja) return;
+    caja.replaceChildren();
+    const e = persistencia;
+    let textoEstado = "";
+    if (!almacenOk && e.estado !== "desconectado") textoEstado = lote ? "Sin guardado local: este navegador no permite guardar borradores. El lote se conserva mientras no recargues la página." : "";
+    else if (e.estado === "pendiente" || e.estado === "guardando") textoEstado = "Guardando…";
+    else if (e.estado === "guardado") textoEstado = `Guardado en este navegador${e.cuando ? ` · ${formatoFecha(e.cuando, horaCorta)}` : ""}`;
+    else if (e.estado === "error") textoEstado = `No se pudo guardar en este navegador: ${e.mensaje}`;
+    else if (e.estado === "desconectado") textoEstado = e.tipo === "eliminado" ? "Este borrador se eliminó en otra pestaña." : "Este borrador continúa en otra pestaña.";
+    else if (lote && !vistaBorradores) textoEstado = "Borrador local: se guarda en este navegador en cuanto empieces.";
+    if (textoEstado) {
+      const p = nodo("p", `importador-local-estado es-${!almacenOk && e.estado !== "desconectado" ? "sin-almacen" : e.estado}`, textoEstado);
+      p.id = "importador-local-estado";
+      if (e.estado === "error" || e.estado === "desconectado") p.setAttribute("role", "alert");
+      caja.append(p);
+    }
+    const acciones = nodo("div", "importador-local-acciones");
+    if (e.estado === "error" && lote) acciones.append(boton("Exportar respaldo", "exportar-actual", "boton boton-texto boton-mini"));
+    if (almacenOk && ambitoActual && !vistaBorradores) {
+      const n = borradoresLista.filter((b) => b.id !== lote?.id).length;
+      const ver = boton(n ? `Borradores (${n + (lote && meta(lote).existe ? 1 : 0)})` : "Borradores", "borradores-ver", "boton boton-texto boton-mini");
+      ver.id = "importador-ver-borradores";
+      acciones.append(ver);
+    }
+    if (acciones.childElementCount) caja.append(acciones);
+  }
+
+  const contarPublicaciones = (l) => l.fichas.reduce((n, f) => n + f.colores.filter((c) => c.texto.trim() || c.fotos.length).length, 0);
+  /* Etapa 20: cualquier trabajo cuenta, aunque todavía no haya mensaje ni modelo: un dato escrito o
+     elegido a mano en la ficha (marca, categoría, público, guía, cantidad de colores…) o en un color
+     (nombre, precios, tallas, tono, forma, fotos), o un color preparado. */
+  const colorConContenido = (c) => Boolean(c.texto.trim() || c.fotos.length || c.color.trim() || String(c.proveedor).trim() || String(c.venta).trim()
+    || c.tallasTexto.trim() || String(c.muestra).trim() || c.forma !== "circulo" || c.editados.size || c.preparado);
+  const conContenido = (f) => Boolean(f.modelo.trim() || f.marca.trim() || f.categoria.trim() || f.segmento || f.editados.size
+    || String(f.coloresPedidos ?? "").trim() || f.colores.length > 1 || f.colores.some(colorConContenido));
+  // Ajustes del lote elegidos (aunque aún no haya fichas con datos): también son trabajo que recuperar.
+  const ajustesDe = (l) => Boolean(String(l.margen).trim() || String(l.categoria).trim() || l.segmento !== CONSERVAR || l.publico !== CONSERVAR
+    || l.destinos !== null || l.perfilLote !== CLAVE_GENERAL);
+  // Los ajustes solo son trabajo pendiente mientras quede alguna ficha sin guardar a la que aplicarlos: en un
+  // lote con todas sus fichas ya en Supabase, los ajustes ya se aplicaron y se guardaron.
+  const ajustesPendientes = (l) => ajustesDe(l) && l.fichas.some((f) => f.estado !== "guardada");
+  // Trabajo que aún no está confirmado en Supabase: fichas no guardadas con algo (también las que se estaban
+  // guardando o quedaron sin confirmar), imágenes del reparto, un pegado o ajustes del lote.
+  function pendientesDe(l) {
+    return l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length + (l.reparto?.items.length || 0) + (l.pegado?.texto.trim() ? 1 : 0)
+      + (ajustesPendientes(l) ? 1 : 0);
+  }
+  const hayContenido = (l) => pendientesDe(l) > 0 || l.fichas.some((f) => f.estado !== "borrador");
+
+  function serializar(l) {
+    return JSON.stringify({ version: 1, lote: l }, (k, v) => {
+      if (TRANSITORIOS.has(k)) return undefined;
+      if (v instanceof Set) return { $set: [...v] };
+      if (typeof Blob !== "undefined" && v instanceof Blob) return undefined;
+      return v;
+    });
+  }
+  const revivir = (k, v) => (v && typeof v === "object" && !Array.isArray(v) && Array.isArray(v.$set) && Object.keys(v).length === 1 ? new Set(v.$set) : v);
+
+  // Fotos del lote que deben estar en el borrador: { ref, clase («original» mientras se optimiza, «final» después), blob }.
+  function fotosDelLote(l, { todas = false } = {}) {
+    const lista = [];
+    const considerar = (x) => {
+      if (!x?.ref) return;
+      if (x.estado === "procesando" && x.archivo) lista.push({ ref: x.ref, clase: "original", blob: x.archivo, nombre: x.nombre || "" });
+      else if (x.blob && ["lista", "subida", "subiendo"].includes(x.estado)) lista.push({ ref: x.ref, clase: "final", blob: x.blob, nombre: x.archivoLote || x.nombre || "" });
+    };
+    for (const f of l.fichas) {
+      // Las fichas ya guardadas en Supabase no necesitan sus fotos en el borrador (ocupan espacio).
+      if (f.estado === "guardada" && !todas) continue;
+      for (const c of f.colores) for (const x of c.fotos) considerar(x);
+    }
+    for (const it of l.reparto?.items || []) considerar(it);
+    return lista;
+  }
+  function registroDe(l) {
+    return {
+      id: l.id, creado: l.creado, proveedor: nombrePerfil(instantanea(l.perfilLote, l)), publicaciones: contarPublicaciones(l),
+      fichas: l.fichas.length, guardadas: l.fichas.filter((f) => f.estado === "guardada").length, pendientes: pendientesDe(l),
+      // Etapa 20: qué está pendiente, para la lista de borradores.
+      detalle: { fichas: l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length, imagenes: l.reparto?.items.length || 0, pegado: Boolean(l.pegado?.texto.trim()), ajustes: ajustesPendientes(l) },
+      datos: serializar(l)
+    };
+  }
+
+  function programarGuardado() {
+    if (!lote || !almacenOk || !lote.ambito || persistencia.estado === "desconectado") return;
+    meta(lote).sucio = true;
+    // Hay cambios por guardar: el estado lo dice (un solo repintado por ráfaga, no en cada tecla).
+    if (["inactivo", "guardado"].includes(persistencia.estado) && hayContenido(lote)) estadoLocal("pendiente");
+    const ahora = Date.now();
+    if (!primerCambio) primerCambio = ahora;
+    clearTimeout(temporizadorGuardado);
+    temporizadorGuardado = setTimeout(() => { guardarBorrador(); }, Math.max(0, Math.min(ESPERA_GUARDADO, ESPERA_MAXIMA - (ahora - primerCambio))));
+  }
+  /* Guarda el lote (o «objetivo», p. ej. el que se suelta al cerrar sesión). Los guardados van en cola,
+     uno detrás de otro: nunca dos a la vez sobre el mismo borrador. Devuelve una promesa que no falla y
+     resuelve true solo si el borrador quedó al día en este navegador (o no había nada que guardar). */
+  function guardarBorrador({ objetivo = lote } = {}) {
+    if (!objetivo || !almacenOk || !objetivo.ambito) return Promise.resolve(false);
+    if (objetivo === lote) { clearTimeout(temporizadorGuardado); primerCambio = 0; }
+    const resultado = cadena.then(() => escribir(objetivo)).catch(() => false);
+    cadena = resultado;
+    return resultado;
+  }
+  async function escribir(l) {
+    const m = meta(l);
+    if (m.descartado || (l === lote && persistencia.estado === "desconectado")) return false;
+    if (!hayContenido(l) && !m.existe) { m.sucio = false; return true; } // un lote vacío no crea borrador (y no hay nada que perder)
+    const fotosLote = fotosDelLote(l);
+    const vigentes = new Set(fotosLote.map((x) => x.ref));
+    const nuevas = fotosLote.filter((x) => m.persistidas.get(x.ref) !== x.clase);
+    const registro = registroDe(l);
+    if (l === lote) estadoLocal("guardando");
+    m.sucio = false;
+    try {
+      const r = await almacen().guardarBorrador(l.ambito, registro, { pestana, revisionEsperada: m.existe ? m.revision : null, nuevas, vigentes });
+      m.revision = r.revision;
+      m.existe = true;
+      for (const x of nuevas) m.persistidas.set(x.ref, x.clase);
+      for (const ref of [...m.persistidas.keys()]) if (!vigentes.has(ref)) m.persistidas.delete(ref);
+      if (registro.pendientes > 0) ultimoBorrador = { ambito: l.ambito, id: l.id };
+      const i = borradoresLista.findIndex((b) => b.id === l.id);
+      const resumen = { ...registro, datos: undefined, revision: r.revision, actualizado: new Date().toISOString(), propietario: pestana };
+      if (i >= 0) borradoresLista[i] = resumen; else borradoresLista.unshift(resumen);
+      if (l === lote && persistencia.estado !== "desconectado") estadoLocal(m.sucio ? "pendiente" : "guardado");
+      return true;
+    } catch (error) {
+      m.sucio = true;
+      if (l !== lote) return false;
+      const A = almacen();
+      if (error instanceof A.ErrorConflicto) desconectar(error.message === "eliminado" ? "eliminado" : "otra-pestana");
+      else if (error instanceof A.ErrorCuota) estadoLocal("error", "falta espacio. Tu trabajo sigue abierto aquí: exporta un respaldo o elimina borradores que no necesites y se volverá a intentar.", "cuota");
+      else estadoLocal("error", "el navegador rechazó la escritura. Tu trabajo sigue abierto aquí; exporta un respaldo por si acaso.", "otro");
+      return false;
+    }
+  }
+  /* Antes de soltar el lote abierto (empezar otro, continuar otro borrador): se guarda y, si no se puede,
+     el lote se queda abierto y se explica. Devuelve true si se puede soltar sin perder nada. */
+  async function asegurarGuardado() {
+    if (!lote) return true;
+    if (!almacenOk) {
+      mensaje("Este navegador no permite guardar borradores: el lote abierto se perdería. Termina de guardarlo en Supabase o descártalo antes de cambiar de lote.", "aviso");
+      return false;
+    }
+    if (persistencia.estado === "desconectado") return true; // lo tiene otra pestaña: aquí no hay nada propio
+    const ok = await guardarBorrador();
+    if (ok && !meta(lote).sucio) return true;
+    vistaBorradores = false;
+    pintar();
+    mensaje("No se pudo guardar el lote abierto en este navegador, así que sigue abierto: no se cambió de lote para no perderlo. Exporta un respaldo o libera espacio eliminando borradores y vuelve a intentarlo.", "aviso");
+    $("#importador-local-estado")?.focus?.();
+    return false;
+  }
+
+  // ------------------------------------------------------------------ restaurar un borrador
+  const RE_CLAVE = /^[fcpr]\d{1,9}$/;
+  const ESTADOS_FICHA = new Set(["borrador", "guardando", "guardada", "fallida", "sin-confirmar"]);
+  const ESTADOS_FOTO = new Set(["procesando", "lista", "subiendo", "subida", "error"]);
+  // Comprueba la forma de un lote leído (de IndexedDB o de un respaldo). Lanza Error si no sirve.
+  function validarLote(l) {
+    const UUID = almacen().UUID;
+    const exigir = (ok, que) => { if (!ok) throw new Error(que); };
+    const cadenaHasta = (v, n) => typeof v === "string" && v.length <= n;
+    exigir(l && typeof l === "object" && Array.isArray(l.fichas) && l.fichas.length >= 1 && l.fichas.length <= 400, "La lista de fichas no es válida.");
+    exigir(l.destinos === null || l.destinos === undefined || l.destinos instanceof Set, "La selección de ajustes no es válida.");
+    exigir(!l.instantaneas || typeof l.instantaneas === "object", "Los perfiles del borrador no son válidos.");
+    for (const f of l.fichas) {
+      exigir(f && RE_CLAVE.test(f.clave) && UUID.test(f.id) && ESTADOS_FICHA.has(f.estado), "Una ficha no es válida.");
+      for (const k of ["marca", "modelo", "categoria", "segmento"]) exigir(cadenaHasta(f[k] ?? "", 200), `Una ficha tiene un ${k} no válido.`);
+      exigir(["", "hombre", "dama", "unisex"].includes(f.publico ?? ""), "Una ficha tiene un público no válido.");
+      for (const k of ["editados", "revisar", "operaciones", "distintaDe"]) exigir(f[k] instanceof Set, "Una ficha no es válida.");
+      if (!(f.descartadas instanceof Set)) f.descartadas = new Set();
+      // Etapa 20: cantidad de colores (texto). Los borradores anteriores no la tienen.
+      if (f.coloresPedidos === undefined || f.coloresPedidos === null) f.coloresPedidos = "";
+      exigir(cadenaHasta(String(f.coloresPedidos), 10), "Una ficha tiene una cantidad de colores no válida.");
+      exigir(Array.isArray(f.colores) && f.colores.length >= 1 && f.colores.length <= 40, "Una ficha tiene una lista de colores no válida.");
+      exigir(!f.pendiente || (UUID.test(f.pendiente.operacion) && typeof f.pendiente.huella === "string" && f.pendiente.datos), "Una operación de guardado no es válida.");
+      exigir(f.ultimaOperacion === null || f.ultimaOperacion === undefined || UUID.test(f.ultimaOperacion), "Una operación de guardado no es válida.");
+      if (!Array.isArray(f.errores)) f.errores = [];
+      for (const c of f.colores) {
+        exigir(c && RE_CLAVE.test(c.clave) && UUID.test(c.id) && cadenaHasta(c.texto ?? "", 4000) && cadenaHasta(c.original ?? "", 20000), "Un color no es válido.");
+        for (const k of ["color", "proveedor", "venta", "tallasTexto", "muestra"]) exigir(cadenaHasta(String(c[k] ?? ""), 400), "Un color no es válido.");
+        exigir(c.editados instanceof Set && c.revisar instanceof Set, "Un color no es válido.");
+        exigir(Array.isArray(c.fotos) && c.fotos.length <= fotos().LIMITES.fotosPorColor, "Un color tiene demasiadas fotos.");
+        if (!Array.isArray(c.notas)) c.notas = [];
+        if (!Array.isArray(c.reglas)) c.reglas = [];
+        if (!Array.isArray(c.precios)) c.precios = [];
+        for (const x of c.fotos) exigir(x && RE_CLAVE.test(x.clave) && ESTADOS_FOTO.has(x.estado) && (!x.ref || UUID.test(x.ref)), "Una foto no es válida.");
+      }
+    }
+    if (l.reparto) {
+      exigir(Array.isArray(l.reparto.items) && l.reparto.items.length <= MAX_REPARTO, "El reparto de fotos no es válido.");
+      for (const it of l.reparto.items) exigir(it && RE_CLAVE.test(it.clave) && ["procesando", "lista", "error"].includes(it.estado) && (!it.ref || UUID.test(it.ref)), "Una imagen del reparto no es válida.");
+    }
+    if (l.pegado) {
+      exigir(typeof l.pegado.texto === "string" && l.pegado.texto.length <= separador().MAX_TEXTO && Array.isArray(l.pegado.cortes), "El pegado no es válido.");
+      for (const c of l.pegado.cortes) exigir(c && Number.isInteger(c.linea) && c.linea >= 0, "El pegado no es válido.");
+      if (!l.pegado.incluir || typeof l.pegado.incluir !== "object") l.pegado.incluir = {};
+      if (!l.pegado.colores || typeof l.pegado.colores !== "object") l.pegado.colores = {};
+    }
+  }
+
+  function restaurarFoto(x, fotosGuardadas, guardada) {
+    const g = x.ref ? fotosGuardadas.get(x.ref) : null;
+    // «Subiendo» al recargar: no se sabe si llegó. Vuelve a «lista» con su mismo nombre de archivo: al
+    // guardar se sube con ese nombre y, si ya estaba, se comprueba y no se duplica.
+    if (x.estado === "subiendo") x.estado = "lista";
+    delete x.enCurso;
+    if (guardada) return;
+    if (x.estado === "procesando") {
+      if (g?.clase === "original") x.archivo = g.blob;
+      else if (g?.clase === "final") { x.blob = g.blob; x.vistaPrevia = URL.createObjectURL(g.blob); x.estado = "lista"; }
+      else { x.estado = "error"; x.mensaje = "Se perdió el archivo al recargar mientras se optimizaba. Quítala y vuelve a añadirla."; }
+      return;
+    }
+    if (x.estado === "lista" || x.estado === "subida") {
+      if (g?.clase === "final") { x.blob = g.blob; x.vistaPrevia = URL.createObjectURL(g.blob); return; }
+      // Ya subida (de esta misma ficha y color): se ve desde Storage y no hace falta volver a subirla.
+      if (x.estado === "subida" && x.ruta) { x.vistaPrevia = x.ruta; return; }
+      x.estado = "error";
+      x.mensaje = "No pudimos recuperar esta foto del borrador. Quítala y vuelve a añadirla.";
+    }
+  }
+  /* Convierte un registro guardado en un lote listo para usar. Las fichas que estaban «guardando» al
+     recargar pasan a «sin confirmar» (con su operación) o a «fallida» (si no llegó a enviarse). */
+  function restaurar(registro, fotosGuardadas, ambito) {
+    let raiz;
+    try { raiz = JSON.parse(registro.datos, revivir); } catch { throw new Error("Los datos del borrador están dañados."); }
+    if (!raiz || raiz.version !== 1) throw new Error("Versión de borrador no admitida.");
+    const l = raiz.lote;
+    validarLote(l);
+    l.id = registro.id;
+    l.ambito = ambito;
+    l.creado = typeof l.creado === "string" ? l.creado : registro.creado;
+    const instantaneas = {};
+    for (const [k, p] of Object.entries(l.instantaneas || {})) {
+      const r = texto().normalizarPerfil(p);
+      if (r.perfil && k === claveInstantanea(r.perfil)) instantaneas[k] = r.perfil;
+    }
+    l.instantaneas = instantaneas;
+    if (l.perfilLote !== CLAVE_GENERAL && !instantaneas[l.perfilLote]) l.perfilLote = CLAVE_GENERAL;
+    let mayor = 0;
+    const vistas = (k) => { const n = Number(String(k).slice(1)); if (n > mayor) mayor = n; };
+    for (const f of l.fichas) {
+      vistas(f.clave);
+      if (f.perfil !== CLAVE_GENERAL && !instantaneas[f.perfil]) f.perfil = CLAVE_GENERAL;
+      if (f.estado === "guardando") {
+        if (f.pendiente || f.ultimaOperacion) {
+          f.estado = "sin-confirmar";
+          f.mensaje = "El guardado se interrumpió (se recargó o se cerró la página) y no sabemos si terminó. Comprueba el resultado: al volver a guardar se comprueba primero y se usa la misma operación, sin duplicar.";
+        } else {
+          f.estado = "fallida";
+          f.mensaje = "El guardado se interrumpió antes de enviar la ficha. Vuelve a guardarla: las fotos que ya subieron se comprueban y no se duplican.";
+        }
+      }
+      for (const c of f.colores) {
+        vistas(c.clave);
+        for (const x of c.fotos) { vistas(x.clave); restaurarFoto(x, fotosGuardadas, f.estado === "guardada"); }
+      }
+    }
+    if (l.reparto) {
+      l.reparto.items.forEach((it) => { vistas(it.clave); restaurarFoto(it, fotosGuardadas, false); });
+      if (typeof l.reparto.abierto !== "string") l.reparto.abierto = null;
+    }
+    claves = Math.max(claves, mayor);
+    return l;
+  }
+  // Retoma lo que se estaba optimizando al recargar (los originales están en el borrador).
+  function reanudarProcesos() {
+    if (!lote) return;
+    for (const f of lote.fichas) for (const c of f.colores) {
+      const pendientes = c.fotos.filter((x) => x.estado === "procesando" && x.archivo);
+      if (pendientes.length) procesarFotos(f, c, pendientes);
+    }
+    if (lote.reparto?.items.some((x) => x.estado === "procesando")) procesarReparto();
+  }
+
+  // ------------------------------------------------------------------ dos pestañas
+  function esperarMensaje(condicion, ms) {
+    return new Promise((resolver) => {
+      let quitar = () => {};
+      const fin = setTimeout(() => { quitar(); resolver(null); }, ms);
+      quitar = almacen().escuchar((d) => { if (condicion(d)) { clearTimeout(fin); quitar(); resolver(d); } });
+    });
+  }
+  /* Pide el borrador a la pestaña que lo tenga abierto (intenta guardar lo suyo y se detiene) y lo toma.
+     Sin respuesta (pestaña cerrada o recargada), se toma igual: el guardado condicional evita mezclas.
+     Devuelve { otra: había otra pestaña, confirmado: la otra confirmó que sus últimos cambios se guardaron }.
+     Nunca se da por guardado lo que no se confirmó. */
+  async function tomarControl(ambito, id) {
+    const es = (tipo) => (d) => d?.tipo === tipo && d.ambito === ambito && d.borrador === id && d.de !== pestana;
+    const recibido = esperarMensaje(es("recibido"), 400);
+    const cedido = esperarMensaje(es("cedido"), 4000);
+    almacen().avisar({ tipo: "ceder", ambito, borrador: id, de: pestana });
+    const hubo = await recibido;
+    const respuesta = hubo ? await cedido : null;
+    await almacen().reclamar(ambito, id, pestana);
+    almacen().avisar({ tipo: "reclamado", ambito, borrador: id, de: pestana });
+    return { otra: Boolean(hubo), confirmado: Boolean(respuesta?.guardado) };
+  }
+  async function alMensaje(d) {
+    if (!d || d.de === pestana) return;
+    if (d.tipo === "perfiles" && d.ambito === ambitoActual) { recargarPerfiles(); return; }
+    if (!lote || d.ambito !== lote.ambito || d.borrador !== lote.id) {
+      if (["reclamado", "eliminado"].includes(d.tipo) && d.ambito === ambitoActual && vistaBorradores) refrescarBorradores();
+      return;
+    }
+    if (d.tipo === "ceder") {
+      almacen().avisar({ tipo: "recibido", ambito: d.ambito, borrador: d.borrador, de: pestana });
+      // Se intenta guardar lo pendiente; solo se dice «guardado» si de verdad quedó guardado.
+      const ok = persistencia.estado === "desconectado" ? false : await guardarBorrador();
+      const guardado = Boolean(ok && lote && !meta(lote).sucio);
+      desconectar("otra-pestana", { guardado });
+      almacen().avisar({ tipo: "cedido", ambito: d.ambito, borrador: d.borrador, de: pestana, guardado });
+    } else if (d.tipo === "reclamado" || d.tipo === "reemplazado") desconectar("otra-pestana");
+    else if (d.tipo === "eliminado") desconectar("eliminado");
+  }
+  /* La pestaña deja de guardar este borrador. «guardado»: sus últimos cambios quedaron guardados antes del
+     traspaso (confirmado). Si no, se dice que los cambios hechos aquí tras el último guardado NO están en
+     el borrador y se ofrece exportarlos desde esta pantalla. */
+  function desconectar(tipo, { guardado = null } = {}) {
+    if (!lote) return;
+    clearTimeout(temporizadorGuardado);
+    if (ultimoBorrador?.id === lote.id) ultimoBorrador = null;
+    if (persistencia.estado !== "desconectado") persistencia.alDesconectar = guardado === null ? !meta(lote).sucio : guardado;
+    estadoLocal("desconectado", "", tipo);
+    if ($("#importador")?.open) { pintar(); $("#imp-desconectado-titulo")?.focus(); }
+  }
+  function pintarDesconectado() {
+    const eliminado = persistencia.tipo === "eliminado";
+    const s = nodo("section", "editor-seccion importador-desconectado");
+    s.id = "imp-desconectado";
+    s.setAttribute("aria-labelledby", "imp-desconectado-titulo");
+    const h = nodo("h3", "editor-seccion-titulo", eliminado ? "Este borrador se eliminó en otra pestaña" : "Este borrador continúa en otra pestaña");
+    h.id = "imp-desconectado-titulo";
+    h.tabIndex = -1;
+    const alDia = persistencia.alDesconectar === true;
+    s.append(h, nodo("p", "", eliminado
+      ? "Esta pestaña dejó de guardarlo. Si quieres conservar lo que ves aquí, guárdalo como un borrador nuevo."
+      : `Para no mezclar cambios, esta pestaña dejó de guardarlo. ${alDia
+        ? "Sus últimos cambios se guardaron antes del traspaso."
+        : "Los cambios hechos aquí después del último guardado NO están en el borrador: si los necesitas, exporta un respaldo desde aquí antes de continuar."} Puedes seguir en la otra pestaña o traerlo aquí con la última versión guardada (la otra se detendrá).`));
+    const fila = nodo("div", "editor-botones importador-desconectado-botones");
+    if (eliminado) fila.append(boton("Guardar como borrador nuevo", "rescatar", "boton boton-principal boton-compacto"));
+    else fila.append(boton("Continuar aquí", "continuar-aqui", "boton boton-principal boton-compacto"));
+    if (!alDia && !eliminado) fila.append(boton("Exportar lo de esta pestaña", "exportar-actual", "boton boton-secundario boton-compacto"));
+    fila.append(boton("Ver borradores", "borradores-ver", "boton boton-secundario boton-compacto"));
+    s.append(fila);
+    return s;
+  }
+
+  // ------------------------------------------------------------------ lista de borradores
+  let avisoBorradores = null; // { texto, tipo }
+  // Trabajo pendiente de un borrador, desglosado (fichas, imágenes, pegado y ajustes).
+  function textoPendiente(b) {
+    if (!b.pendientes) return "sin trabajo pendiente";
+    const d = b.detalle;
+    if (!d) return `${b.pendientes} con trabajo pendiente`;
+    const partes = [d.fichas ? `${d.fichas} ${d.fichas === 1 ? "ficha" : "fichas"} sin guardar` : "", d.imagenes ? `${d.imagenes} ${d.imagenes === 1 ? "imagen" : "imágenes"} sin asignar` : "",
+      d.pegado ? "un pegado sin crear" : "", d.ajustes ? "ajustes del lote" : ""].filter(Boolean);
+    return `Pendiente: ${partes.join(", ")}`;
+  }
+  // Espacio legible: KB, MB o GB según el tamaño.
+  function tamano(bytes) {
+    const n = Number(bytes) || 0;
+    if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toLocaleString("es-CO", { maximumFractionDigits: 1 })} GB`;
+    if (n >= 1024 ** 2) return `${Math.round(n / 1024 ** 2).toLocaleString("es-CO")} MB`;
+    return `${Math.max(1, Math.round(n / 1024)).toLocaleString("es-CO")} KB`;
+  }
+  async function refrescarBorradores() {
+    if (!almacenOk || !ambitoActual) return;
+    try { borradoresLista = await almacen().listarBorradores(ambitoActual); } catch { /* se conserva la anterior */ }
+    espacio = await almacen().estimar();
+    if ($("#importador")?.open && (vistaBorradores || !lote)) pintar();
+    else pintarLocal();
+  }
+  function pintarBorradores() {
+    const s = nodo("section", "editor-seccion importador-borradores");
+    s.id = "imp-borradores";
+    s.setAttribute("aria-labelledby", "imp-borradores-titulo");
+    const h = nodo("h3", "editor-seccion-titulo", "Borradores guardados en este navegador");
+    h.id = "imp-borradores-titulo";
+    h.tabIndex = -1;
+    s.append(h, nodo("p", "editor-nota", "Cada borrador es un lote del importador con sus fotos, guardado solo en este navegador y para tu usuario. No es lo mismo que guardar en Supabase: las zapatillas llegan al catálogo con «Guardar lote como oculto». Si borras los datos del navegador, los borradores se pierden; exporta un respaldo para conservarlos o llevarlos a otro equipo."));
+    if (!almacenOk) {
+      s.append(nodo("p", "importador-borradores-aviso es-aviso", "Este navegador no permite guardar borradores (almacenamiento local no disponible o bloqueado)."));
+    }
+    if (espacio) s.append(nodo("p", "campo-ayuda importador-espacio", `Este sitio usa ${tamano(espacio.usado)} de unos ${tamano(espacio.cuota)} que permite el navegador (estimación del propio navegador; puede cambiar).`));
+    if (avisoBorradores) {
+      const p = nodo("p", `importador-borradores-aviso es-${avisoBorradores.tipo}`, avisoBorradores.texto);
+      p.id = "imp-borradores-aviso";
+      p.setAttribute("role", "status");
+      s.append(p);
+    }
+    if (importacion) s.append(pintarImportacion());
+    const ul = nodo("ul", "importador-borradores-lista");
+    ul.setAttribute("aria-label", "Borradores");
+    if (!borradoresLista.length) ul.append(nodo("li", "editor-vacio", "No hay borradores guardados en este navegador."));
+    for (const b of borradoresLista) {
+      const li = nodo("li", "importador-borrador");
+      li.dataset.borrador = b.id;
+      const abierto = lote?.id === b.id;
+      const titulo = nodo("p", "importador-borrador-titulo");
+      titulo.append(nodo("strong", "", b.proveedor || "Perfil general"), ` · ${b.publicaciones === 1 ? "1 publicación" : `${b.publicaciones} publicaciones`}`);
+      const meta1 = nodo("p", "importador-borrador-meta", [
+        b.guardadas ? `${b.guardadas} ${b.guardadas === 1 ? "guardada" : "guardadas"} en Supabase` : "Nada guardado en Supabase",
+        textoPendiente(b)].join(" · "));
+      const meta2 = nodo("p", "importador-borrador-meta", `Último cambio: ${formatoFecha(b.actualizado) || "sin fecha"}${abierto ? " · es el lote abierto" : ""}`);
+      li.append(titulo, meta1, meta2);
+      const fila = nodo("div", "editor-botones importador-borrador-botones");
+      const nombre = `${b.proveedor || "Perfil general"}, ${formatoFecha(b.actualizado)}`;
+      if (!abierto) {
+        const seguir = boton("Continuar", "borrador-continuar", "boton boton-principal boton-compacto", { borrador: b.id });
+        seguir.setAttribute("aria-label", `Continuar el borrador ${nombre}`);
+        fila.append(seguir);
+      }
+      const exportar = boton("Exportar respaldo", "borrador-exportar", "boton boton-secundario boton-compacto", { borrador: b.id });
+      exportar.setAttribute("aria-label", `Exportar un respaldo del borrador ${nombre}`);
+      fila.append(exportar);
+      if (!abierto) {
+        const borrar = boton("Eliminar", "borrador-eliminar", "boton boton-texto boton-compacto", { borrador: b.id });
+        borrar.setAttribute("aria-label", `Eliminar el borrador ${nombre}`);
+        fila.append(borrar);
+      }
+      li.append(fila);
+      if (confirmarBorrar?.tipo === "borrador" && confirmarBorrar.id === b.id) {
+        const confirma = nodo("div", "importador-confirmar");
+        confirma.setAttribute("role", "group");
+        confirma.setAttribute("aria-label", `Confirmar la eliminación del borrador ${nombre}`);
+        confirma.append(nodo("p", "", `¿Eliminar este borrador de este navegador? ${b.pendientes ? "Su trabajo pendiente se perderá (exporta un respaldo antes si lo necesitas). " : ""}Lo que ya esté guardado en Supabase no cambia y no se borra ningún archivo de Storage.`));
+        const filaConfirma = nodo("div", "editor-botones");
+        filaConfirma.append(boton("Eliminar el borrador", "borrador-eliminar-si", "boton boton-principal boton-compacto", { borrador: b.id }),
+          boton("Cancelar", "confirmar-cancelar", "boton boton-secundario boton-compacto"));
+        confirma.append(filaConfirma);
+        li.append(confirma);
+      }
+      ul.append(li);
+    }
+    s.append(ul);
+    const acciones = nodo("div", "importador-borradores-acciones");
+    if (lote) acciones.append(boton("Volver al lote abierto", "borradores-volver", "boton boton-secundario"));
+    const nuevo = boton(lote ? "Empezar otro lote" : "Empezar un lote nuevo", "borrador-nuevo", lote ? "boton boton-secundario" : "boton boton-principal");
+    nuevo.id = "imp-borrador-nuevo";
+    acciones.append(nuevo);
+    if (almacenOk) {
+      const importar = nodo("label", "boton boton-secundario importador-importar", "Importar un respaldo");
+      const archivo = nodo("input");
+      archivo.type = "file";
+      archivo.accept = "application/json,.json";
+      archivo.className = "solo-lectores";
+      archivo.id = "imp-respaldo-archivo";
+      archivo.dataset.respaldo = "1";
+      importar.htmlFor = archivo.id;
+      importar.append(archivo);
+      acciones.append(importar);
+    }
+    s.append(acciones);
+    return s;
+  }
+
+  function verBorradores() {
+    vistaBorradores = true;
+    confirmarBorrar = null;
+    avisoBorradores = null;
+    mensaje("");
+    guardarBorrador();
+    pintar();
+    $("#imp-borradores-titulo")?.focus();
+    refrescarBorradores();
+  }
+  function volverAlLote() {
+    vistaBorradores = false;
+    importacion = null;
+    confirmarBorrar = null;
+    pintar();
+    $("#importador-titulo")?.focus();
+  }
+  async function continuarBorrador(id) {
+    if (lote?.id === id) { volverAlLote(); return; }
+    // El lote abierto solo se suelta si quedó guardado en este navegador; si no, sigue abierto.
+    if (lote) { if (!(await asegurarGuardado())) return; soltarLote(); }
+    let control;
+    try {
+      control = await cargarBorrador(id);
+    } catch (error) {
+      lote = null;
+      vistaBorradores = true;
+      avisoBorradores = { texto: `No se pudo abrir el borrador: ${error?.message || "error desconocido"}. Sigue guardado; puedes exportarlo o eliminarlo.`, tipo: "aviso" };
+      pintar();
+      $("#imp-borradores-aviso")?.focus?.();
+      return;
+    }
+    pintar();
+    if (control?.otra && !control.confirmado) {
+      mensaje("Borrador traído de otra pestaña. Esa pestaña no confirmó que sus últimos cambios quedaran guardados: aquí está la última versión guardada, y lo que allí no se guardó no está incluido. Esa pestaña ya no lo guarda.", "aviso");
+    } else {
+      mensaje("Borrador recuperado de este navegador. Lo que ya está en Supabase no se vuelve a enviar.", "ok");
+    }
+    $("#importador-titulo")?.focus();
+  }
+  async function cargarBorrador(id) {
+    const ambito = ambitoActual;
+    const control = await tomarControl(ambito, id);
+    const leido = await almacen().leerBorrador(ambito, id);
+    if (!leido) throw new Error("ya no existe");
+    const l = restaurar(leido.registro, leido.fotos, ambito);
+    const m = meta(l);
+    m.existe = true;
+    m.revision = leido.registro.revision;
+    for (const [ref, g] of leido.fotos) m.persistidas.set(ref, g.clase);
+    lote = l;
+    vistaBorradores = false;
+    importacion = null;
+    estadoLocal("guardado", "", "", leido.registro.actualizado);
+    if (pendientesDe(l) > 0) ultimoBorrador = { ambito, id };
+    reanudarProcesos();
+    return control;
+  }
+  async function empezarLote() {
+    const perfil = lote ? perfilLote() : null;
+    // El lote abierto solo se suelta si quedó guardado en este navegador; si no, sigue abierto.
+    if (lote) { if (!(await asegurarGuardado())) return; soltarLote(); }
+    lote = loteNuevo(perfil && !esGeneral(perfil) && perfilVivo(perfil) ? perfilVivo(perfil) : null);
+    vistaBorradores = false;
+    importacion = null;
+    estadoLocal(almacenOk ? "inactivo" : "sin-almacen");
+    pintar();
+    const area = document.getElementById(`imp-${lote.fichas[0].colores[0].clave}-texto`);
+    area?.focus({ preventScroll: true });
+    area?.closest(".importador-mensaje")?.scrollIntoView({ block: "nearest" });
+  }
+  async function eliminarBorradorLocal(id) {
+    if (lote?.id === id) return;
+    // Solo el borrador LOCAL: no se borra nada de Supabase ni de Storage.
+    try { await almacen().eliminarBorrador(ambitoActual, id); } catch { avisoBorradores = { texto: "No se pudo eliminar el borrador.", tipo: "aviso" }; pintar(); return; }
+    almacen().avisar({ tipo: "eliminado", ambito: ambitoActual, borrador: id, de: pestana });
+    if (ultimoBorrador?.id === id) ultimoBorrador = null;
+    confirmarBorrar = null;
+    borradoresLista = borradoresLista.filter((b) => b.id !== id);
+    avisoBorradores = { texto: "Borrador eliminado de este navegador.", tipo: "ok" };
+    if (persistencia.tipo === "cuota") estadoLocal("pendiente");
+    pintar();
+    $("#imp-borradores-titulo")?.focus();
+    espacio = await almacen().estimar();
+    if (lote) guardarBorrador(); // si faltaba espacio, se reintenta ya
+  }
+
+  // ------------------------------------------------------------------ respaldo: exportar e importar
+  const separarAmbito = (ambito) => { const i = String(ambito).lastIndexOf("|"); return { proyecto: ambito.slice(0, i), usuario: ambito.slice(i + 1) }; };
+  function descargar(blob, nombre) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = nombre;
+    a.hidden = true;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 30000);
+  }
+  const nombreRespaldo = (proveedor) => {
+    const base = texto().clave(proveedor || "general").replace(/\s+/g, "-").slice(0, 40) || "lote";
+    const d = new Date();
+    const dos = (n) => String(n).padStart(2, "0");
+    return `borrador-importador-${base}-${d.getFullYear()}${dos(d.getMonth() + 1)}${dos(d.getDate())}-${dos(d.getHours())}${dos(d.getMinutes())}.json`;
+  };
+  // Respaldo del lote ABIERTO, desde la memoria: sirve aunque el navegador no tenga espacio para guardarlo.
+  async function exportarLoteAbierto() {
+    if (!lote) return;
+    const registro = { ...registroDe(lote), actualizado: new Date().toISOString() };
+    try {
+      const blob = await almacen().empaquetar({ ambito: separarAmbito(lote.ambito), registro, fotos: fotosDelLote(lote, { todas: true }) });
+      descargar(blob, nombreRespaldo(registro.proveedor));
+      mensaje("Respaldo exportado: el archivo .json incluye los datos y las fotos del lote. Guárdalo en un lugar seguro; no contiene contraseñas ni sesión.", "ok");
+    } catch { mensaje("No se pudo preparar el respaldo.", "aviso"); }
+  }
+  async function exportarGuardado(id) {
+    if (lote?.id === id) { await guardarBorrador(); return exportarLoteAbierto(); }
+    try {
+      const leido = await almacen().leerBorrador(ambitoActual, id);
+      if (!leido) throw new Error("no existe");
+      const fotosLista = [...leido.fotos].map(([ref, g]) => ({ ref, clase: g.clase, blob: g.blob, nombre: g.nombre }));
+      const blob = await almacen().empaquetar({ ambito: separarAmbito(ambitoActual), registro: leido.registro, fotos: fotosLista });
+      descargar(blob, nombreRespaldo(leido.registro.proveedor));
+      avisoBorradores = { texto: "Respaldo exportado con los datos y las fotos del borrador.", tipo: "ok" };
+    } catch { avisoBorradores = { texto: "No se pudo exportar el borrador.", tipo: "aviso" }; }
+    pintar();
+  }
+
+  async function importarRespaldo(archivo) {
+    importacion = null;
+    avisoBorradores = null;
+    let leido;
+    try {
+      leido = await almacen().leerRespaldo(archivo, { firma: fotos().firma });
+      // Los datos del lote se comprueban igual que al recuperar un borrador (sin escribir nada).
+      const raiz = JSON.parse(leido.registro.datos, revivir);
+      if (!raiz || raiz.version !== 1) throw new almacen().ErrorRespaldo("Versión de datos no admitida.");
+      validarLote(raiz.lote);
+    } catch (error) {
+      avisoBorradores = { texto: `No se importó nada: ${error?.message || "el archivo no es válido"}. Tus borradores siguen como estaban.`, tipo: "aviso" };
+      pintar();
+      $("#imp-borradores-aviso")?.focus?.();
+      return;
+    }
+    const actual = separarAmbito(ambitoActual);
+    if (leido.ambito.proyecto !== actual.proyecto || leido.ambito.usuario !== actual.usuario) {
+      importacion = { leido, tipo: "otro-ambito" };
+    } else {
+      const existente = await almacen().existe(ambitoActual, leido.registro.id);
+      if (existente) importacion = { leido, tipo: "existe", existente };
+      else { await escribirImportacion(leido, false); return; }
+    }
+    pintar();
+    $("#imp-importacion")?.querySelector("button")?.focus();
+  }
+  function pintarImportacion() {
+    const { leido, tipo, existente } = importacion;
+    const caja = nodo("div", "importador-confirmar importador-importacion");
+    caja.id = "imp-importacion";
+    caja.setAttribute("role", "group");
+    caja.setAttribute("aria-label", "Importar un respaldo");
+    const r = leido.registro;
+    const quien = `«${r.proveedor || "Perfil general"}», ${r.publicaciones === 1 ? "1 publicación" : `${r.publicaciones} publicaciones`}`;
+    const fila = nodo("div", "editor-botones");
+    if (tipo === "otro-ambito") {
+      caja.append(nodo("p", "", `El respaldo ${quien} es de otro proyecto de Supabase o de otro usuario. Puedes importarlo como borrador nuevo: se conservan los textos, los datos y las fotos, pero no sus guardados (lo que se guardó allí no existe aquí y se tratará como pendiente).`));
+      fila.append(boton("Importar como borrador nuevo", "importacion-nuevo", "boton boton-principal boton-compacto"));
+    } else {
+      caja.append(nodo("p", "", `Ya hay en este navegador un borrador con el mismo identificador (último cambio: ${formatoFecha(existente.actualizado) || "sin fecha"}). El respaldo es ${quien}. ¿Sustituir el borrador de este navegador por el del respaldo? El actual se perderá.`));
+      fila.append(boton("Sustituir el borrador", "importacion-reemplazar", "boton boton-principal boton-compacto"));
+    }
+    fila.append(boton("Cancelar", "importacion-cancelar", "boton boton-secundario boton-compacto"));
+    caja.append(fila);
+    return caja;
+  }
+  // Respaldo de otro proyecto o usuario: borrador nuevo, sin operaciones ni archivos de aquel entorno.
+  function adaptarAOtroAmbito(leido) {
+    const raiz = JSON.parse(leido.registro.datos, revivir);
+    const l = raiz.lote;
+    l.id = uuid();
+    for (const f of l.fichas) {
+      f.id = uuid();
+      f.pendiente = null;
+      f.operaciones = new Set();
+      f.ultimaOperacion = null;
+      f.codigo = "";
+      f.decisionCatalogo = false;
+      if (f.estado !== "borrador") {
+        f.mensaje = "";
+        if (f.estado === "guardada") f.seleccionada = true;
+        f.estado = "borrador";
+      }
+      for (const c of f.colores) {
+        c.id = uuid();
+        for (const x of c.fotos) {
+          if (["subida", "subiendo"].includes(x.estado)) x.estado = "lista";
+          for (const k of ["objeto", "producto", "variante", "ruta", "anterior"]) delete x[k];
+        }
+      }
+    }
+    return { registro: { ...leido.registro, id: l.id, datos: serializar(l) }, fotos: leido.fotos };
+  }
+  async function escribirImportacion(leido, reemplazar) {
+    if (lote?.id === leido.registro.id) {
+      avisoBorradores = { texto: "Ese borrador es el lote abierto aquí: para sustituirlo, empieza otro lote y vuelve a importar el respaldo.", tipo: "aviso" };
+      importacion = null;
+      pintar();
+      return;
+    }
+    try {
+      await almacen().importar(ambitoActual, leido, { reemplazar });
+    } catch (error) {
+      avisoBorradores = { texto: error instanceof almacen().ErrorCuota ? "No hay espacio en este navegador para importar el respaldo. Elimina borradores que no necesites y vuelve a intentarlo." : "No se pudo importar el respaldo; no se cambió nada.", tipo: "aviso" };
+      importacion = null;
+      pintar();
+      return;
+    }
+    if (reemplazar) almacen().avisar({ tipo: "reemplazado", ambito: ambitoActual, borrador: leido.registro.id, de: pestana });
+    importacion = null;
+    avisoBorradores = { texto: `Respaldo importado: «${leido.registro.proveedor || "Perfil general"}», ${leido.registro.publicaciones === 1 ? "1 publicación" : `${leido.registro.publicaciones} publicaciones`}. Pulsa «Continuar» para abrirlo.`, tipo: "ok" };
+    await refrescarBorradores();
+    pintar();
+    document.querySelector(`#imp-borradores [data-borrador="${leido.registro.id}"] [data-imp="borrador-continuar"]`)?.focus();
+  }
+
+  // Suelta el lote de la memoria (al cerrar sesión, cambiar de borrador…). Con «guardar», lo guarda antes.
+  function soltarLote({ guardar = false } = {}) {
+    const l = lote;
+    if (!l) return Promise.resolve();
+    lote = null;
+    clearTimeout(temporizadorGuardado);
+    primerCambio = 0;
+    editorPerfil = null;
+    confirmarBorrar = null;
+    avisoPerfil = "";
+    persistencia.estado = "inactivo";
+    persistencia.tipo = "";
+    const revocar = () => {
+      for (const f of l.fichas) for (const c of f.colores) for (const x of c.fotos) if (String(x.vistaPrevia || "").startsWith("blob:")) URL.revokeObjectURL(x.vistaPrevia);
+      for (const it of l.reparto?.items || []) if (String(it.vistaPrevia || "").startsWith("blob:")) URL.revokeObjectURL(it.vistaPrevia);
+    };
+    if (!guardar) { revocar(); return Promise.resolve(true); }
+    /* Si no se puede guardar (p. ej. sin espacio al cerrar sesión), el lote NO se pierde: queda retenido
+       en memoria, sin mostrarse, y vuelve al abrir el importador con el mismo usuario y proyecto. */
+    return guardarBorrador({ objetivo: l }).then((ok) => {
+      if (ok && !meta(l).sucio) revocar();
+      else if (pendientesDe(l) > 0 && persistencia.estado !== "desconectado") retenidos.set(l.ambito, l);
+      return ok;
+    });
+  }
+  const retenidos = new Map(); // ámbito → lote que no se pudo guardar al soltarlo
+
+  async function prepararAmbito() {
+    const usuario = panel().usuario?.();
+    const conf = panel().configuracion?.();
+    const nuevo = usuario?.id && conf?.url ? `${conf.url}|${usuario.id}` : null;
+    if (nuevo !== ambitoActual) {
+      ambitoActual = nuevo;
+      perfiles = [];
+      borradoresLista = [];
+      if (ultimoBorrador?.ambito !== nuevo) ultimoBorrador = null;
+    }
+    almacenOk = false;
+    if (ambitoActual && almacen()?.disponible()) {
+      try { await almacen().abrirBase(); almacenOk = true; } catch { almacenOk = false; }
+    }
+    if (!almacenOk) return;
+    try { perfiles = validarPerfiles(await almacen().listarPerfiles(ambitoActual)); } catch { perfiles = []; }
+    try { borradoresLista = await almacen().listarBorradores(ambitoActual); } catch { borradoresLista = []; }
+    espacio = await almacen().estimar();
+  }
+  async function elegirLoteAlAbrir() {
+    if (almacenOk && ultimoBorrador && borradoresLista.some((b) => b.id === ultimoBorrador.id)) {
+      try { await cargarBorrador(ultimoBorrador.id); return; } catch { ultimoBorrador = null; }
+    }
+    // Con borradores que tienen trabajo pendiente se ofrece elegir; si no, un lote nuevo.
+    if (almacenOk && borradoresLista.some((b) => b.pendientes > 0)) { lote = null; vistaBorradores = true; return; }
+    lote = loteNuevo();
+    estadoLocal(almacenOk ? "inactivo" : "sin-almacen");
+  }
+
+  // Acciones de la etapa 20. Devuelve true si la atendió.
+  function alClicEtapa20(accion, b) {
+    const f = fichaDe(b.dataset.ficha);
+    switch (accion) {
+      // Pegar varias publicaciones
+      case "pegado-abrir": abrirPegado(); return true;
+      case "pegado-revisar": revisarPegado(); return true;
+      case "pegado-editar":
+        lote.pegado.fase = "texto";
+        pintar();
+        $("#imp-pegado-texto")?.focus();
+        return true;
+      case "pegado-cancelar":
+        lote.pegado = null;
+        pintar();
+        $("#imp-pegado-abrir")?.focus();
+        mensaje("Pegado cancelado: no se creó ninguna publicación.");
+        return true;
+      case "pegado-unir": {
+        const inicio = Number(b.dataset.inicio);
+        const lista = fragmentosPegado();
+        const i = lista.findIndex((x) => x.inicio === inicio);
+        delete lote.pegado.incluir[inicio];
+        cambiarCortes(separador().unirCon(lote.pegado.cortes, inicio), i > 0 ? `imp-frag-${lista[i - 1].inicio}-titulo` : "imp-pegado-titulo");
+        return true;
+      }
+      case "pegado-separar": {
+        const linea = Number(b.dataset.linea);
+        cambiarCortes(separador().separarEn(lote.pegado.cortes, linea), `imp-frag-${linea}-titulo`);
+        return true;
+      }
+      case "pegado-ok": {
+        const inicio = Number(b.dataset.inicio);
+        cambiarCortes(separador().revisado(lote.pegado.cortes, inicio), `imp-frag-${inicio}-titulo`);
+        return true;
+      }
+      case "pegado-crear":
+        if (b.getAttribute("aria-disabled") === "true") { mensaje("Marca al menos una publicación para crear.", "aviso"); return true; }
+        crearPublicaciones();
+        return true;
+      // Perfiles
+      case "perfil-nuevo":
+        if (!almacenOk) { mensaje("Este navegador no permite guardar perfiles.", "aviso"); return true; }
+        abrirEditorPerfil(null);
+        return true;
+      case "perfil-editar": abrirEditorPerfil(b.dataset.perfil); return true;
+      case "perfil-cancelar": editorPerfil = null; repintarEntrada(); $("#imp-perfil-nuevo")?.focus(); return true;
+      case "perfil-guardar": guardarPerfilEditado(); return true;
+      case "perfil-eliminar":
+        confirmarBorrar = { tipo: "perfil", id: b.dataset.perfil };
+        repintarEntrada();
+        $('#imp-perfiles [data-imp="perfil-eliminar-si"]')?.focus();
+        return true;
+      case "perfil-eliminar-si": eliminarPerfil(b.dataset.perfil); return true;
+      case "perfil-reaplicar": reaplicarPerfil(); return true;
+      case "recordar": if (f) recordar(f, b.dataset.propuesta); return true;
+      case "preparar-colores": {
+        // Añade solo los que faltan: pulsar dos veces no duplica nada.
+        if (!f || !editable(f)) return true;
+        const p = pedidosDe(f);
+        if (!p.valido || p.n <= f.colores.length) return true;
+        const nuevos = prepararColores(f, p.n);
+        repintarFicha(f);
+        repintarAjustes();
+        const primero = document.getElementById(`imp-${nuevos[0].clave}-titulo`);
+        primero?.scrollIntoView({ block: "center" });
+        primero?.focus({ preventScroll: true });
+        mensaje(`${nuevos.length === 1 ? "Se preparó 1 color" : `Se prepararon ${nuevos.length} colores`} en la ficha ${numero(f)}: escribe sus nombres y añade sus fotos. Proponen las tallas y el precio de la publicación.`, "ok");
+        return true;
+      }
+      case "recordar-no":
+        if (!f) return true;
+        f.descartadas.add(b.dataset.propuesta);
+        repintarFicha(f);
+        document.getElementById(`imp-${f.clave}-marca`)?.focus({ preventScroll: true });
+        return true;
+      // Borradores, respaldo y pestañas
+      case "borradores-ver": verBorradores(); return true;
+      case "borradores-volver": volverAlLote(); return true;
+      case "borrador-continuar": continuarBorrador(b.dataset.borrador); return true;
+      case "borrador-exportar": exportarGuardado(b.dataset.borrador); return true;
+      case "borrador-eliminar":
+        confirmarBorrar = { tipo: "borrador", id: b.dataset.borrador };
+        pintar();
+        $('#imp-borradores [data-imp="borrador-eliminar-si"]')?.focus();
+        return true;
+      case "borrador-eliminar-si": eliminarBorradorLocal(b.dataset.borrador); return true;
+      case "borrador-nuevo": empezarLote(); return true;
+      case "confirmar-cancelar": {
+        const tipo = confirmarBorrar?.tipo;
+        const id = confirmarBorrar?.id;
+        confirmarBorrar = null;
+        if (tipo === "perfil") { repintarEntrada(); document.querySelector(`#imp-perfiles [data-imp="perfil-eliminar"][data-perfil="${id}"]`)?.focus(); }
+        else { pintar(); document.querySelector(`#imp-borradores [data-imp="borrador-eliminar"][data-borrador="${id}"]`)?.focus(); }
+        return true;
+      }
+      case "importacion-nuevo": if (importacion) escribirImportacion(adaptarAOtroAmbito(importacion.leido), false); return true;
+      case "importacion-reemplazar": if (importacion) escribirImportacion(importacion.leido, true); return true;
+      case "importacion-cancelar":
+        importacion = null;
+        avisoBorradores = { texto: "Importación cancelada: no se cambió nada.", tipo: "ok" };
+        pintar();
+        $("#imp-borradores-titulo")?.focus();
+        return true;
+      case "exportar-actual": exportarLoteAbierto(); return true;
+      case "continuar-aqui": {
+        const id = lote.id;
+        soltarLote();
+        continuarBorrador(id);
+        return true;
+      }
+      case "rescatar": {
+        // El borrador se eliminó en otra pestaña: lo que hay aquí se guarda como un borrador nuevo.
+        lote.id = uuid();
+        metas.delete(lote);
+        estadoLocal("pendiente");
+        guardarBorrador().then(() => { pintar(); $("#importador-titulo")?.focus(); });
+        return true;
+      }
+      default: return false;
+    }
+  }
+
   // ------------------------------------------------------------------ eventos
+  // Acciones que funcionan sin un lote abierto (lista de borradores).
+  const SIN_LOTE = new Set(["cerrar", "cerrar-pie", "seguir", "conservar", "borradores-ver", "borradores-volver", "borrador-continuar", "borrador-exportar", "borrador-eliminar",
+    "borrador-eliminar-si", "borrador-nuevo", "confirmar-cancelar", "importacion-nuevo", "importacion-reemplazar", "importacion-cancelar"]);
   function alClic(e) {
     const b = e.target.closest("[data-imp]");
-    if (!b || !lote) return;
+    if (!b) return;
     const accion = b.dataset.imp;
+    if (!lote && !SIN_LOTE.has(accion)) return;
     if (guardando && accion !== "cerrar") return;
+    if (alClicEtapa20(accion, b)) return;
     const f = fichaDe(b.dataset.ficha);
     switch (accion) {
       case "cerrar": intentarCerrar(); break;
@@ -1846,6 +3747,37 @@
   function alEscribir(e) {
     if (!lote || guardando) return;
     const n = e.target;
+    // Etapa 20: pegado, perfiles y «Recordar para este proveedor».
+    if (n.dataset.pegado === "texto") { if (lote.pegado) { lote.pegado.texto = n.value; lote.pegado.error = ""; } return; }
+    if (n.dataset.pegadoColores !== undefined) {
+      if (!lote.pegado) return;
+      if (!lote.pegado.colores) lote.pegado.colores = {};
+      lote.pegado.colores[n.dataset.pegadoColores] = n.value;
+      programar("pegado-colores", repintarPegado, 400);
+      return;
+    }
+    if (n.dataset.pegadoIncluir) {
+      if (!lote.pegado) return;
+      lote.pegado.incluir[n.dataset.pegadoIncluir] = n.checked;
+      repintarPegado();
+      return;
+    }
+    if (n.dataset.perfilCampo && editorPerfil) {
+      const k = n.dataset.perfilCampo;
+      const rango = /^rango-(dama|hombre|unisex)-(desde|hasta)$/.exec(k);
+      if (rango) editorPerfil.valores.rangos[rango[1]][rango[2]] = n.value;
+      else editorPerfil.valores[k] = n.value;
+      return;
+    }
+    if (n.dataset.perfilLote) { if (n.checked && !n.dataset.eliminado) elegirPerfilLote(n.value); return; }
+    if (n.dataset.recordarPublico) {
+      const f = fichaDe(n.dataset.recordarPublico);
+      if (!f) return;
+      f.recordarPublico = n.value;
+      const previa = document.getElementById(`imp-${f.clave}-recordar-previa`);
+      if (previa) previa.textContent = textoPrevioPublico(f, f.publico);
+      return;
+    }
     if (n.dataset.destinoAjustes) {
       // Destinos de «Aplicar ajustes»: independientes de «Incluir en el guardado» y del reparto de fotos.
       const f = fichaDe(n.dataset.destinoAjustes);
@@ -1867,9 +3799,23 @@
       if (!f || !editable(f)) return;
       const k = n.dataset.fcampo;
       if (n.type === "radio" && !n.checked) return;
+      if (k === "coloresPedidos") {
+        // Etapa 20: dato de preparación (no cambia lo que se guarda): no invalida la operación pendiente.
+        f.coloresPedidos = n.value;
+        f.editados.add("colores");
+        f.revisar.delete("colores");
+        programar(`colores-${f.clave}`, () => repintarFicha(f), 400);
+        return;
+      }
       f[k] = n.type === "checkbox" ? n.checked : n.value;
       f.pendiente = null;
       if (["marca", "modelo", "publico"].includes(k)) { f.editados.add(k); f.revisar.delete(k); }
+      if (k === "categoria") {
+        f.editados.add("categoria");
+        f.origenCategoria = "";
+        // La propuesta «Recordar para este proveedor» depende de la categoría escrita.
+        programar(`categoria-${f.clave}`, () => repintarFicha(f), 600);
+      }
       if (k === "seleccionada") { repintarAjustes(); if (lote.reparto?.items.length) repintarReparto(); pintarPie(); return; }
       if (k === "marca" || k === "modelo") {
         // Título y coincidencias (de esta ficha y de las demás) dependen de la marca y el modelo.
@@ -1955,6 +3901,13 @@
       return;
     }
     if (lote && n.dataset.repartoDestino) { if (n.checked) elegirDestino(n.dataset.repartoDestino, n.value); return; }
+    // Etapa 20: importar un respaldo (también sin lote abierto, desde la lista de borradores).
+    if (n.type === "file" && n.dataset.respaldo) {
+      const archivo = n.files?.[0];
+      n.value = "";
+      if (archivo) importarRespaldo(archivo);
+      return;
+    }
     if (n.type !== "file" || !lote) return;
     if (n.dataset.reparto) {
       const elegidos = [...(n.files || [])];
@@ -2001,34 +3954,59 @@
 
   // ------------------------------------------------------------------ abrir y cerrar
   function hayPendiente() {
-    return Boolean(lote) && (Boolean(lote.reparto?.items.length) || lote.fichas.some((f) => editable(f) && (f.colores.some((c) => c.texto.trim() || c.fotos.length || c.color.trim()) || f.modelo.trim())));
+    return Boolean(lote) && pendientesDe(lote) > 0;
   }
 
+  let abriendo = false;
   async function abrir(disparador = null) {
     const dialogo = $("#importador");
-    if (!dialogo || !comun() || !texto() || !fotos()) {
+    if (!dialogo || !comun() || !texto() || !fotos() || !separador() || !almacen()) {
       panel()?.anunciar({ titulo: "El importador no se pudo cargar", texto: "Recarga la página.", tipo: "aviso" });
       return;
     }
-    origen = disparador instanceof HTMLElement ? disparador : null;
-    // El lote sin guardar se conserva (por ejemplo, tras volver a ingresar).
-    if (!lote || !hayPendiente() && lote.fichas.every((f) => f.estado !== "guardada")) lote = loteNuevo();
-    $("#importador-salida").hidden = true;
-    $("#importador-botones").hidden = false;
-    mensaje("");
-    pintar();
-    if (!dialogo.open) { comun().bloquearFondo(); dialogo.showModal(); }
-    // Lote nuevo: el cuadro del mensaje recibe el foco (pegar es lo primero). Lote conservado: el título.
-    const primero = lote.fichas[0]?.colores[0];
-    const vacio = lote.fichas.length === 1 && primero && !primero.texto.trim() && !primero.fotos.length;
-    if (vacio) {
-      // Etapa 19: los bloques para varias fichas van arriba; el cuadro del mensaje (lo primero que se hace)
-      // se trae entero a la vista, también en celular.
-      const area = document.getElementById(`imp-${primero.clave}-texto`);
-      area?.focus({ preventScroll: true });
-      area?.closest(".importador-mensaje")?.scrollIntoView({ block: "nearest" });
+    if (abriendo) return;
+    abriendo = true;
+    try {
+      origen = disparador instanceof HTMLElement ? disparador : null;
+      // Etapa 20: proyecto y usuario de la sesión; perfiles y borradores de ese ámbito.
+      await prepararAmbito();
+      // Un lote de otro usuario o proyecto (cambio de sesión en esta pestaña) nunca se muestra.
+      if (lote && lote.ambito !== ambitoActual) await soltarLote({ guardar: true });
+      // El lote sin guardar se conserva (por ejemplo, al cerrar la ventana). Uno vacío se renueva.
+      if (lote && !hayPendiente() && lote.fichas.every((f) => f.estado !== "guardada") && !meta(lote).existe) {
+        const perfil = perfilVivo(perfilLote());
+        lote = loteNuevo(perfil);
+      }
+      // Un lote retenido porque no se pudo guardar al cerrar sesión vuelve tal cual (mismo usuario y proyecto).
+      if (!lote && retenidos.has(ambitoActual)) {
+        lote = retenidos.get(ambitoActual);
+        retenidos.delete(ambitoActual);
+        estadoLocal("pendiente");
+        programarGuardado();
+      }
+      if (!lote) await elegirLoteAlAbrir();
+      else if (persistencia.estado !== "desconectado") vistaBorradores = false;
+      $("#importador-salida").hidden = true;
+      $("#importador-botones").hidden = false;
+      mensaje("");
+      pintar();
+      if (!dialogo.open) { comun().bloquearFondo(); dialogo.showModal(); }
+      if (!lote || vistaBorradores) { $("#imp-borradores-titulo")?.focus(); return; }
+      if (persistencia.estado === "desconectado") { $("#imp-desconectado-titulo")?.focus(); return; }
+      // Lote nuevo: el cuadro del mensaje recibe el foco (pegar es lo primero). Lote conservado: el título.
+      const primero = lote.fichas[0]?.colores[0];
+      const vacio = lote.fichas.length === 1 && primero && !primero.texto.trim() && !primero.fotos.length && !lote.pegado;
+      if (vacio) {
+        // Etapa 19: los bloques para varias fichas van arriba; el cuadro del mensaje (lo primero que se hace)
+        // se trae entero a la vista, también en celular.
+        const area = document.getElementById(`imp-${primero.clave}-texto`);
+        area?.focus({ preventScroll: true });
+        area?.closest(".importador-mensaje")?.scrollIntoView({ block: "nearest" });
+      }
+      else $("#importador-titulo").focus();
+    } finally {
+      abriendo = false;
     }
-    else $("#importador-titulo").focus();
     if (formaMuestra === null) {
       formaMuestra = await comun().capacidadForma();
       if (formaMuestra === false && lote) pintar();
@@ -2039,6 +4017,8 @@
     const dialogo = $("#importador");
     for (const t of temporizadores.values()) clearTimeout(t);
     temporizadores.clear();
+    // Lo último que se escribió queda en el borrador local antes de cerrar.
+    if (lote && persistencia.estado !== "desconectado") guardarBorrador();
     if (dialogo?.open) { dialogo.close(); comun().liberarFondo(); }
     $("#importador-cuerpo")?.replaceChildren();
     const destino = origen?.isConnected ? origen : $("#boton-importar");
@@ -2047,45 +4027,87 @@
     destino?.focus({ preventScroll: true });
   }
 
+  /* «Descartar el lote»: acción expresa. Borra el borrador LOCAL y, como antes, limpia de Storage solo
+     los archivos subidos por este lote que ninguna galería usa (limpieza verificada de limpiarSubidas). */
   function descartar() {
     descartarReparto({ silencio: true });
-    for (const f of lote?.fichas || []) for (const c of f.colores) {
-      for (const x of c.fotos) { x.quitada = true; if (x.vistaPrevia) URL.revokeObjectURL(x.vistaPrevia); }
+    const l = lote;
+    for (const f of l?.fichas || []) for (const c of f.colores) {
+      for (const x of c.fotos) { x.quitada = true; if (String(x.vistaPrevia || "").startsWith("blob:")) URL.revokeObjectURL(x.vistaPrevia); }
       limpiarSubidas(f, c.fotos);
     }
+    if (l) {
+      const m = meta(l);
+      m.descartado = true;
+      clearTimeout(temporizadorGuardado);
+      if (almacenOk && m.existe && persistencia.estado !== "desconectado") {
+        cadena = cadena.then(() => almacen().eliminarBorrador(l.ambito, l.id))
+          .then(() => almacen().avisar({ tipo: "eliminado", ambito: l.ambito, borrador: l.id, de: pestana })).catch(() => {});
+      }
+      if (ultimoBorrador?.id === l.id) ultimoBorrador = null;
+      borradoresLista = borradoresLista.filter((b) => b.id !== l.id);
+    }
     lote = null;
+    persistencia.estado = "inactivo";
+    persistencia.tipo = "";
+    vistaBorradores = false;
     cerrar();
   }
 
   function intentarCerrar() {
-    if (!lote) { cerrar(); return; }
+    if (!lote || vistaBorradores || persistencia.estado === "desconectado") { cerrar(); return; }
     if (guardando) { mensaje("Espera a que termine el guardado en curso.", "aviso"); return; }
-    const sinGuardar = lote.fichas.filter((f) => editable(f) && (f.colores.some((c) => c.texto.trim() || c.fotos.length) || f.modelo.trim())).length;
+    // Etapa 20: cuenta cualquier dato escrito o elegido (también sin mensaje ni modelo) y los ajustes del lote.
+    const sinGuardar = lote.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length;
     const porAsignar = lote.reparto?.items.length || 0;
-    if (!sinGuardar && !porAsignar) { descartar(); return; }
+    const pegando = lote.pegado?.texto.trim() ? 1 : 0;
+    const ajustes = ajustesPendientes(lote) ? 1 : 0;
+    if (!sinGuardar && !porAsignar && !pegando && !ajustes) {
+      // Nada pendiente. Un lote que ya está en el borrador local (p. ej. con sus fichas guardadas en
+      // Supabase) se conserva en la lista: solo se borra con una acción expresa.
+      if (almacenOk && meta(lote).existe) { cerrar(); soltarLote({ guardar: true }); return; }
+      descartar();
+      return;
+    }
     mensaje(""); // el pie solo muestra la pregunta: en pantallas bajas no quita sitio al contenido
     const pendientes = [sinGuardar ? (sinGuardar === 1 ? "una ficha sin guardar" : `${sinGuardar} fichas sin guardar`) : "",
-      porAsignar ? (porAsignar === 1 ? "una imagen sin asignar" : `${porAsignar} imágenes sin asignar`) : ""].filter(Boolean).join(" y ");
-    $("#importador-salida-texto").textContent = `Hay ${pendientes}. Puedes cerrar y seguir después (el lote se conserva mientras no recargues la página) o descartarlo.`;
+      porAsignar ? (porAsignar === 1 ? "una imagen sin asignar" : `${porAsignar} imágenes sin asignar`) : "",
+      pegando ? "un pegado de varias publicaciones sin crear" : "", ajustes && !sinGuardar ? "ajustes del lote elegidos" : ""].filter(Boolean).join(" y ");
+    $("#importador-salida-texto").textContent = almacenOk
+      ? `Hay ${pendientes}. Puedes cerrar y seguir después (queda guardado como borrador en este navegador, no en Supabase) o descartarlo.`
+      : `Hay ${pendientes}. Puedes cerrar y seguir después (este navegador no guarda borradores: se conserva mientras no recargues la página) o descartarlo.`;
     $("#importador-salida").hidden = false;
     $("#importador-botones").hidden = true;
     $('[data-imp="seguir"]').focus();
   }
 
-  // admin.js lo llama al perder la sesión o el acceso: el lote queda en memoria.
+  /* admin.js lo llama al cerrar sesión o perder el acceso. Etapa 20: el lote se guarda en el borrador
+     local y deja de estar en memoria (no se muestra a nadie más en esta pestaña); al volver a entrar con
+     el mismo usuario y proyecto se recupera. Sin almacenamiento local se conserva en memoria como antes
+     (y abrir() lo descarta si entra otro usuario). */
   function alPerderAcceso() {
     if ($("#importador")?.open) cerrar();
+    vistaBorradores = false;
+    importacion = null;
+    if (lote && almacenOk) {
+      if (pendientesDe(lote) > 0 && persistencia.estado !== "desconectado") ultimoBorrador = { ambito: lote.ambito, id: lote.id };
+      soltarLote({ guardar: persistencia.estado !== "desconectado" });
+    }
+    perfiles = [];
+    borradoresLista = [];
   }
 
   function preparar() {
     const dialogo = $("#importador");
     if (!dialogo) return;
-    $("#importador-formulario").addEventListener("submit", (e) => { e.preventDefault(); guardarLote(); });
+    $("#importador-formulario").addEventListener("submit", (e) => { e.preventDefault(); if (lote && !vistaBorradores) guardarLote(); });
     dialogo.addEventListener("click", alClic);
     dialogo.addEventListener("pointerdown", () => { pulsando = true; }, true);
     for (const tipo of ["pointerup", "pointercancel"]) window.addEventListener(tipo, () => { pulsando = false; }, true);
     dialogo.addEventListener("input", alEscribir);
     dialogo.addEventListener("change", alCambiar);
+    // Etapa 20: cualquier cambio en el formulario programa el guardado local (con espera: no en cada tecla).
+    for (const tipo of ["input", "change"]) dialogo.addEventListener(tipo, () => programarGuardado());
     for (const tipo of ["dragenter", "dragover", "dragleave", "drop"]) dialogo.addEventListener(tipo, alArrastrar);
     // Solo el «cancel» del propio diálogo (Escape). El de un selector de archivos que se cierra sin elegir
     // nada (Chromium lo lanza en el <input type="file"> y sube hasta aquí) no es «cerrar el importador».
@@ -2093,6 +4115,7 @@
     dialogo.addEventListener("toggle", (e) => {
       if (!lote) return;
       if (e.target.id === "imp-ajustes") lote.ajustesAbiertos = e.target.open;
+      if (e.target.id === "imp-perfiles") lote.perfilesAbierto = e.target.open;
       // «Cambiar destino» del reparto: uno abierto a la vez.
       if (e.target.classList?.contains("importador-reparto-cambiar")) {
         const r = reparto();
@@ -2102,7 +4125,20 @@
         } else if (r.abierto === e.target.dataset.item) r.abierto = null;
       }
     }, true);
-    window.addEventListener("beforeunload", (e) => { if (hayPendiente()) { e.preventDefault(); e.returnValue = ""; } });
+    // Al ocultar o cerrar la pestaña se guarda ya lo pendiente (sin esperar a la pausa de escritura).
+    const vaciar = () => { if (lote && meta(lote).sucio && persistencia.estado !== "desconectado") guardarBorrador(); };
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") vaciar(); });
+    window.addEventListener("pagehide", vaciar);
+    // Solo se avisa si algo podría perderse: sin almacenamiento local o con cambios aún sin guardar en él.
+    window.addEventListener("beforeunload", (e) => {
+      if (!hayPendiente()) return;
+      const alDia = almacenOk && persistencia.estado === "guardado" && !meta(lote).sucio;
+      if (alDia) return;
+      vaciar();
+      e.preventDefault();
+      e.returnValue = "";
+    });
+    almacen()?.escuchar(alMensaje);
   }
 
   window.GamaTallaImportador = Object.freeze({ abrir, alPerderAcceso, abierto: () => Boolean($("#importador")?.open) });
