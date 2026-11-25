@@ -53,7 +53,9 @@ const ARCHIVOS = [
   // Etapa 20: separar varias publicaciones y borradores/perfiles locales del importador.
   'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js',
   // Etapa 21: lectura de catálogos PDF del proveedor (PDF.js se carga solo al usarla).
-  'admin/catalogo-pdf.js'
+  'admin/catalogo-pdf.js',
+  // Etapa 23: reconocer el inventario y comparar entregas.
+  'admin/inventario.js', 'admin/novedades.js'
 ];
 // Carpetas completas: el SDK del panel y three.js (con Draco), que la escena importa por import map.
 // Etapa 21: PDF.js fijado (pdf.min.mjs, su worker, licencia y nota de origen).
@@ -192,7 +194,7 @@ export function construir({ raiz = RAIZ_REPO, salida, env = process.env } = {}) 
 // archivos versionados de _headers existen y son los únicos «immutable».
 export function verificarPaquete(destino, versionados) {
   const problemas = [];
-  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js', 'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js', 'admin/catalogo-pdf.js']
+  const fuentes = ['index.html', 'styles.css', 'app.js', 'assets/js/catalog-intro.js', 'assets/js/catalog-intro-escena.js', 'assets/css/catalog-intro.css', 'admin/index.html', 'admin/admin.js', 'admin/editor.js', 'admin/fotos.js', 'admin/admin.css', 'admin/texto-proveedor.js', 'admin/importador.js', 'admin/separar-publicaciones.js', 'admin/borradores.js', 'admin/categorias.js', 'admin/catalogo-pdf.js', 'admin/inventario.js', 'admin/novedades.js']
     .filter((f) => fs.existsSync(path.join(destino, f)));
   // Etapa 21: catalogo-pdf.js carga PDF.js por import() desde su carpeta de vendor: debe estar en el paquete.
   const lectorPdf = path.join(destino, 'admin/catalogo-pdf.js');

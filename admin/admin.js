@@ -27,6 +27,7 @@
   let enviando = false;        // evita envíos duplicados del formulario
   let ultimaRevision = 0;
   let catalogo = [];           // productos ya preparados para pintar
+  let catalogoLeido = false;   // etapa 23: ¿«catalogo» es una lectura completa? (vacío mientras se relee o si falló)
   let temporizadorBusqueda = 0;
   let cierreLocal = false;     // el propio panel está cerrando la sesión (no es un vencimiento)
 
@@ -311,6 +312,7 @@
     window.GamaTallaImportador?.alPerderAcceso?.();
     usuarioActual = null; // etapa 20: se vuelve a fijar al comprobar el acceso (los borradores van por usuario)
     catalogo = [];
+    catalogoLeido = false;
     seleccion = new Set();
     avisosProducto.clear();
     operacionesEstado.clear();
@@ -461,6 +463,7 @@
       const horas = Number(respuestas[3].data?.valor);
       vigenciaPredeterminada = Number.isInteger(horas) && horas >= 1 && horas <= 60 ? horas : 48;
       catalogo = preparar(respuestas[0].data, respuestas[1].data, respuestas[2].data);
+      catalogoLeido = true;
       podarSeleccion();
       verificacionPendiente = false; // los datos vuelven a venir del servidor
       pintarCatalogo();
@@ -478,6 +481,7 @@
 
   function limpiarCatalogoVisible() {
     catalogo = [];
+    catalogoLeido = false;
     // La selección se conserva (se poda al volver a cargar): solo se limpia al perder el acceso.
     $("#lista-productos").replaceChildren();
     $("#tablero-resumen").textContent = "";
@@ -2443,6 +2447,7 @@
     recargar: () => cargarCatalogo({ conservarPosicion: true }),
     anunciar: anunciarResultado,
     productos: () => catalogo,
+    catalogoLeido: () => catalogoLeido,
     vigenciaPredeterminada: () => vigenciaPredeterminada,
     fecha,
     valorTalla

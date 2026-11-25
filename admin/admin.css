@@ -1620,6 +1620,75 @@ li.importador-pdf-candidato { grid-template-columns: 4rem minmax(0, 1fr); }
   .importador-pdf-miniatura { max-width: 8rem; }
   .importador-pdf-vistas .boton { flex: 1 1 calc(50% - var(--e-2)); }
 }
+/* Etapa 23: «Novedades y diferencias». Origen y destino lado a lado, diferencias por dato y, abajo, qué hacer
+   con la entrada. En celular todo va en una columna, sin zonas de desplazamiento propias. */
+.importador-novedades, .importador-novedad, .importador-nov-opciones, .importador-pdf-elegir { position: relative; } /* contienen lo oculto a la vista («solo-lectores») */
+.importador-novedades { gap: var(--e-3); box-shadow: inset 0 0 0 2px var(--cobalto); min-width: 0; }
+.importador-novedades > p, .importador-novedades .campo-ayuda { margin: 0; }
+.importador-nov-proveedor, .importador-nov-memoria { padding: 0 var(--e-4); border: 1px solid var(--linea-fuerte); border-radius: var(--r-control); background: var(--superficie); min-width: 0; }
+.importador-nov-proveedor[open], .importador-nov-memoria[open] { padding-bottom: var(--e-4); }
+.importador-nov-proveedor > summary, .importador-nov-memoria > summary { min-height: 2.75rem; padding: var(--e-2) 0; font-size: 0.9375rem; cursor: pointer; overflow-wrap: anywhere; }
+.importador-novedades .importador-nov-proveedor > * + *, .importador-novedades .importador-nov-memoria > * + * { margin-top: var(--e-3); }
+.importador-novedades .importador-nov-proveedor > summary + *, .importador-novedades .importador-nov-memoria > summary + * { margin-top: 0; }
+.importador-nov-memoria > summary { font-weight: 700; }
+.importador-nov-proveedor > summary:focus-visible, .importador-nov-memoria > summary:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+.importador-nov-nuevo-proveedor { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e-2) var(--e-3); }
+.importador-nov-nuevo-proveedor .campo { flex: 1 1 14rem; max-width: 24rem; }
+.importador-nov-operaciones, .importador-nov-relaciones, .importador-nov-resultados, .importador-nov-diferencias { display: grid; gap: var(--e-2); margin: 0; padding: 0; list-style: none; min-width: 0; }
+.importador-nov-operacion { display: grid; gap: var(--e-1); padding: var(--e-3); border-radius: var(--r-control); background: var(--papel); box-shadow: inset 4px 0 0 var(--linea-fuerte); overflow-wrap: anywhere; }
+.importador-nov-operacion p { margin: 0; font-size: 0.9375rem; }
+.importador-nov-operacion.es-aplicada { box-shadow: inset 4px 0 0 #1f6b3a; }
+.importador-nov-anunciadas { display: grid; gap: var(--e-1); margin: 0; padding-left: 1.25rem; }
+.importador-nov-operacion.es-fallida, .importador-nov-operacion.es-sin-respaldo, .importador-nov-operacion.es-conflicto, .importador-nov-operacion.es-sin-confirmar { background: #fffaf0; box-shadow: inset 4px 0 0 #b26a00; }
+.importador-nov-operacion .editor-botones, .importador-nov-masivas, .importador-nov-botones { justify-content: flex-start; flex-wrap: wrap; }
+.importador-novedad { grid-template-columns: minmax(0, 1fr); gap: var(--e-3); }
+.importador-novedad > p { margin: 0; }
+.importador-novedad .importador-fragmento-cabecera { flex-wrap: wrap; }
+.importador-nov-marcas { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.importador-nov-marca { padding: 0.125rem 0.5rem; border-radius: 999px; background: var(--papel-2); font-size: 0.75rem; font-weight: 700; color: var(--tinta); white-space: nowrap; }
+.importador-nov-marca.es-revisar { background: #fff0d6; color: #5c3b00; }
+.importador-nov-marca.es-precio, .importador-nov-marca.es-tallas, .importador-nov-marca.es-colores, .importador-nov-marca.es-fotos { background: var(--cobalto-suave); color: var(--cobalto-oscuro); }
+.importador-nov-comparar { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--e-3); }
+.importador-nov-lado { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: var(--e-3); align-items: start; min-width: 0; padding: var(--e-2); border-radius: var(--r-control); background: var(--papel); }
+.importador-nov-lado .importador-pdf-miniatura { max-width: 5.5rem; background: var(--superficie); }
+.importador-nov-datos { display: grid; gap: var(--e-1); min-width: 0; }
+.importador-nov-datos p, .importador-nov-resultado p { margin: 0; }
+.importador-nov-rotulo { font-size: 0.75rem; font-weight: 700; color: var(--tinta-2); }
+.importador-nov-principal { font-size: 0.9375rem; font-weight: 700; overflow-wrap: anywhere; }
+.importador-nov-detalle { margin: 0; font-size: 0.8125rem; color: var(--tinta-2); overflow-wrap: anywhere; }
+.importador-nov-motivo { font-size: 0.9375rem; overflow-wrap: anywhere; }
+.importador-nov-motivo.es-revisar { padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fffaf0; color: #5c3b00; }
+.importador-nov-candidatos, .importador-nov-bloque { display: grid; gap: var(--e-2); min-width: 0; }
+.importador-nov-candidato { display: grid; grid-template-columns: 4rem minmax(0, 1fr) auto; gap: var(--e-2) var(--e-3); align-items: center; font-size: 0.875rem; overflow-wrap: anywhere; }
+.importador-nov-candidato .importador-pdf-miniatura, .importador-nov-color .importador-pdf-miniatura, .importador-nov-relacion > .importador-pdf-miniatura { max-width: 4rem; }
+.importador-nov-diferencia { display: grid; gap: var(--e-2); padding: var(--e-2) 0; border-top: 1px solid var(--linea); min-width: 0; }
+.importador-nov-diferencia p { margin: 0; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.importador-nov-opciones { margin: 0; }
+.importador-nov-efecto { margin: 0; padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: var(--papel); font-size: 0.875rem; overflow-wrap: anywhere; }
+.importador-nov-recuerdo { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); margin: 0; font-size: 0.875rem; color: var(--tinta-2); }
+.importador-nov-recuerdo.es-revisar { padding: var(--e-2) var(--e-3); border-radius: var(--r-control); background: #fffaf0; color: #5c3b00; }
+.importador-novedad [aria-disabled="true"], .importador-nov-recuerdo [aria-disabled="true"], .importador-nov-aplicar [aria-disabled="true"], .importador-nov-memoria [aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+.importador-nov-buscador { display: grid; gap: var(--e-2); margin-top: var(--e-3); min-width: 0; }
+.importador-nov-resultado { display: grid; gap: var(--e-2); padding: var(--e-2) 0; border-top: 1px solid var(--linea); min-width: 0; }
+.importador-nov-colores { display: flex; flex-wrap: wrap; gap: var(--e-2); min-width: 0; }
+.importador-nov-color { display: inline-grid; grid-template-columns: 3rem minmax(0, 1fr); gap: var(--e-2); align-items: center; height: auto; max-width: 100%; text-align: left; white-space: normal; }
+.importador-nov-color .importador-pdf-sinfoto, .importador-nov-relacion > .importador-pdf-sinfoto { font-size: 0.6875rem; }
+.importador-nov-campos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--e-3); align-items: start; }
+.importador-nov-campos .campo { align-content: start; }
+.importador-nov-aplicar { display: grid; gap: var(--e-2); padding: var(--e-3) var(--e-4); border-radius: var(--r-control); background: var(--cobalto-suave); }
+.importador-nov-aplicar p { margin: 0; }
+.importador-nov-aplicar .boton { justify-self: start; }
+.importador-nov-relacion { display: grid; grid-template-columns: 4rem minmax(0, 1fr); gap: var(--e-2) var(--e-3); padding: var(--e-3) 0; border-top: 1px solid var(--linea); min-width: 0; }
+.importador-nov-relacion > :is(.importador-nov-botones, .importador-nov-buscador) { grid-column: 1 / -1; }
+@media (max-width: 767px) {
+  .importador-nov-comparar, .importador-nov-campos { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 479px) {
+  .importador-nov-candidato { grid-template-columns: 4rem minmax(0, 1fr); }
+  .importador-nov-candidato .boton { grid-column: 1 / -1; }
+  .importador-nov-aplicar .boton, .importador-nov-masivas .boton, .importador-nov-confirmar .boton { width: 100%; white-space: normal; height: auto; min-height: 2.75rem; }
+  .importador-nov-lado .importador-pdf-miniatura { max-width: 5.5rem; }
+}
 /* Celular: la cabecera deja sitio al contenido; el estado del borrador local sigue a la vista. */
 @media (max-width: 767px) {
   .importador .importador-descripcion { display: none; }

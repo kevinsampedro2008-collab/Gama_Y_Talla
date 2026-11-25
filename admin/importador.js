@@ -50,6 +50,15 @@
   const formatoPesos = (n) => pesos.format(n).replace(/ /g, " ");
   const mayus = (t) => String(t ?? "").toLocaleUpperCase("es");
   const uuid = () => crypto.randomUUID();
+  /* Etapa 23: «Novedades y diferencias» (novedades.js): reconocer el inventario, recordar relaciones y aplicar
+     cambios a zapatillas existentes. Se crea una vez y usa las utilidades de este archivo. */
+  let inventario = null;
+  const novedades = () => inventario || (inventario = window.GamaTallaNovedades.crear({
+    $, nodo, boton, campo, mensaje, formatoPesos, mayus, uuid, pestana, panel, fotos, texto, almacen, comun, pdf,
+    lote: () => lote, almacenOk: () => almacenOk, ocupado: () => guardando || anadiendoPdf || Boolean(leyendoPdf), fijarOcupado: (v) => { guardando = v; pintarPie(); },
+    reabrirAlmacen, falloLocal, perfiles: () => perfiles, perfilLote, esGeneral, textoPublico, numero, editable, conContenido, colorDe, separarPublicacion, existeObjeto, descargar, formatoFecha, fechaDoc: (f) => fechaDoc(f),
+    analisisPdf, anadidaPdf, decisionPdf, miniaturaPdf, repintarPdf, cambio: () => cambioPdf(), pintar, pintarPie, repintarFicha, programar, programarGuardado, guardarBorrador
+  }));
   let claves = 0;
   const nuevaClave = (prefijo) => `${prefijo}${++claves}`;
 
@@ -138,6 +147,9 @@
     return null;
   }
   const editable = (f) => f.estado !== "guardada" && f.estado !== "guardando";
+  // Fichas que «Guardar lote como oculto» crearía (las resueltas en «Novedades» no crean zapatillas).
+  // Etapa 23: con «Novedades» abierta, la única ficha en blanco no cuenta: quizá solo se actualiza lo existente.
+  const porCrear = (f) => editable(f) && f.seleccionada && !novedades().fichaResuelta(f) && !(lote.fichas.length === 1 && novedades().abierto() && fichaVacia(f));
   const numero = (f) => lote.fichas.indexOf(f) + 1;
   const nombreFicha = (f) => [f.marca, f.modelo].map((t) => t.trim()).filter(Boolean).join(" ") || "sin nombre";
   // Etapa 19: el público identifica la versión de un mismo modelo («NIKE 7 CAMARAS · Dama»). El modelo
@@ -393,7 +405,7 @@
     }
     // Etapa 19: primero lo que afecta a varias fichas (ajustes plegables y fotos por lote), después las fichas.
     // Etapa 20: delante, el proveedor y el pegado de varias publicaciones.
-    cuerpo.replaceChildren(pintarEntrada(), ...(lote.pegado ? [pintarPegado()] : []), ...(lote.pdf ? [pintarPdf()] : []), pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
+    cuerpo.replaceChildren(pintarEntrada(), ...(lote.pegado ? [pintarPegado()] : []), ...(lote.pdf ? [pintarPdf()] : []), ...(novedades().abierto() ? [novedades().pintar()] : []), pintarAjustes(), pintarReparto(), pintarListaFichas(), pintarAgregar(), pintarListas());
     pintarPie();
     programarGuardado();
   }
@@ -544,7 +556,13 @@
 
     const cabecera = nodo("div", "importador-ficha-cabecera");
     cabecera.append(titulo);
-    if (editable(f)) {
+    if (editable(f) && novedades().fichaResuelta(f)) {
+      if (lote.fichas.length > 1) {
+        const quitar = boton("Quitar ficha", "quitar-ficha", "boton boton-texto boton-mini", { ficha: f.clave });
+        quitar.setAttribute("aria-label", `Quitar la ficha ${numero(f)} del lote`);
+        cabecera.append(quitar);
+      }
+    } else if (editable(f)) {
       const incluir = nodo("label", "casilla");
       const check = nodo("input");
       check.type = "checkbox";
@@ -565,6 +583,15 @@
     if (f.estado === "guardada") {
       li.append(articulo);
       return li;
+    }
+    // Etapa 23: corresponde a algo que ya está en el catálogo; no se crea otra zapatilla con esta ficha.
+    const resuelta = novedades().fichaResuelta(f);
+    if (resuelta) {
+      const nota = nodo("div", "importador-coincidencia es-version importador-nov-ficha");
+      nota.append(nodo("p", "", resuelta.modo === "omitir" ? "Entrada omitida: esta ficha no se guarda."
+        : `${resuelta.modo === "color" ? "Es un color nuevo de" : "Corresponde a"} ${novedades().nombreDestino(resuelta.producto, resuelta.variante) || "una zapatilla de tu catálogo"}: se compara y se aplica en «Novedades y diferencias». No se crea otra zapatilla.`),
+        boton("Ver en Novedades", "ver-novedad", "boton boton-secundario boton-mini", { entrada: f.colores[0].clave }));
+      articulo.append(nota);
     }
     // Cada color es una publicación: su mensaje, sus fotos, sus datos y sus ajustes, en ese orden.
     const colores = nodo("ol", "editor-variantes importador-colores");
@@ -590,15 +617,16 @@
     caja.setAttribute("role", "status");
     const textos = {
       borrador: "", guardando: "Guardando…",
-      guardada: `Guardada oculta${f.codigo ? ` · ${f.codigo}` : ""}. Publícala y confirma sus tallas desde el panel.`,
+      guardada: f.aplicadaA ? `Aplicada a una zapatilla existente · ${f.aplicadaA.texto}.` : `Guardada oculta${f.codigo ? ` · ${f.codigo}` : ""}. Publícala y confirma sus tallas desde el panel.${f.memoria ? ` ${f.memoria}` : ""}`,
       fallida: f.mensaje || "No se guardó.", "sin-confirmar": f.mensaje || "Resultado sin confirmar."
     };
     const t = f.estado === "guardada" && f.mensaje ? `${textos.guardada} ${f.mensaje}` : textos[f.estado];
     if (!t) { caja.hidden = true; return caja; }
     caja.append(nodo("p", "", t));
     const acciones = nodo("div", "editor-botones");
-    if (f.estado === "guardada") acciones.append(boton("Abrir en el editor", "abrir-editor", "boton boton-secundario boton-compacto", { producto: f.id }));
+    if (f.estado === "guardada") acciones.append(boton("Abrir en el editor", "abrir-editor", "boton boton-secundario boton-compacto", { producto: f.aplicadaA?.producto || f.id }));
     if (f.estado === "sin-confirmar") acciones.append(boton("Comprobar el resultado", "comprobar", "boton boton-secundario boton-compacto", { ficha: f.clave }));
+    if (f.sinRespaldo) acciones.append(boton("Reintentar", "ficha-reintentar", "boton boton-secundario boton-compacto", { ficha: f.clave }), boton("Exportar respaldo", "exportar-actual", "boton boton-secundario boton-compacto"));
     if (acciones.childElementCount) caja.append(acciones);
     return caja;
   }
@@ -774,6 +802,8 @@
 
     // 2. Las fotos de esta publicación.
     li.append(pintarFotos(f, c));
+    const recuerdo = novedades().pintarRecordarColor(f, c);
+    if (recuerdo) li.append(recuerdo);
 
     // 3. Datos reconocidos: editables; lo dudoso lleva «Revisar».
     const datos = [];
@@ -1007,7 +1037,7 @@
     const sinLote = !lote || vistaBorradores || persistencia.estado === "desconectado";
     guardar.hidden = sinLote;
     if (sinLote) return;
-    const marcadas = lote.fichas.filter((f) => editable(f) && f.seleccionada).length;
+    const marcadas = lote.fichas.filter(porCrear).length;
     guardar.textContent = marcadas ? `Guardar lote como oculto (${marcadas})` : "Guardar lote como oculto";
     document.querySelectorAll("#importador button, #importador input, #importador textarea").forEach((n) => {
       if (n.closest("#importador-salida")) return;
@@ -1041,6 +1071,7 @@
     }
     // Los destinos del reparto de fotos dependen de los nombres y de las fotos de las fichas.
     if (lote.reparto?.items.length) repintarReparto();
+    novedades().repintarLuego();
     pintarPie();
     programarGuardado();
   }
@@ -1099,6 +1130,8 @@
     for (const item of items) {
       if (item.quitada) continue;
       try {
+        // Etapa 23: la identidad del origen se toma del archivo recibido, no del WebP que se genera después.
+        if (!item.identidad) item.identidad = await novedades().identidadDe(item.archivo);
         item.info = await fotos().preparar(item.archivo);
         delete item.archivo;
         // Quitada mientras se optimizaba, o lote descartado: no vuelve a aparecer.
@@ -1115,6 +1148,7 @@
       // La foto pudo cambiar de ficha (agrupar o separar mientras se optimizaba).
       const propietaria = lote.fichas.find((x) => x.colores.includes(c)) || f;
       repintarFicha(propietaria);
+      novedades().alCambiarFotos(propietaria, c);
     }
   }
 
@@ -1567,11 +1601,13 @@
         const version = it.version;
         let info = null;
         let error = "";
+        const identidad = await novedades().identidadDe(it.archivo);
         try { info = await fotos().preparar(it.archivo); } catch (e) { error = e instanceof fotos().ErrorFoto ? e.message : "No pudimos procesar la imagen."; }
         it.enCurso = false;
         // Quitada, reemplazada o lote descartado mientras se optimizaba: este resultado ya no vale.
         if (it.quitada || it.version !== version || lote !== loteActual) continue;
         delete it.archivo;
+        it.identidad = identidad;
         if (info) {
           it.info = info;
           it.blob = info.blob;
@@ -1780,7 +1816,7 @@
       const d = destinoDe(plan.asignacion.get(it.clave).color.clave);
       if (!d || !editable(d.ficha) || !d.ficha.seleccionada || tieneFoto(d.color)) continue;
       // La foto conserva la «ref» de la imagen: en el borrador local es el mismo archivo, no se reescribe.
-      d.color.fotos.unshift({ clave: nuevaClave("p"), ref: it.ref, estado: "lista", blob: it.blob, vistaPrevia: it.vistaPrevia, info: it.info, archivoLote: it.nombre });
+      d.color.fotos.unshift({ clave: nuevaClave("p"), ref: it.ref, estado: "lista", blob: it.blob, vistaPrevia: it.vistaPrevia, info: it.info, archivoLote: it.nombre, identidad: it.identidad || null });
       d.ficha.pendiente = null;
       d.ficha.errores = [];
       if (!tocadas.includes(d.ficha)) tocadas.push(d.ficha);
@@ -1797,6 +1833,7 @@
     if (sinElegir) partes.push(`${sinElegir === 1 ? "1 imagen sin elegir no se asignó" : `${sinElegir} imágenes sin elegir no se asignaron`}.`);
     r.estado = { texto: partes.join(" "), tipo: quedan.sinFoto.length || r.items.length ? "aviso" : "ok" };
     for (const f of tocadas) repintarFicha(f);
+    for (const f of tocadas) for (const c of f.colores) novedades().alCambiarFotos(f, c);
     repintarReparto();
     mensaje(r.estado.texto, r.estado.tipo);
     ($("#imp-reparto-asignar") || $("#imp-reparto-titulo"))?.focus({ preventScroll: true });
@@ -1812,7 +1849,26 @@
     } catch { return null; }
   }
 
+  /* Etapa 23: antes de escribir en el servidor (fotos o alta) tiene que quedar guardado en este navegador lo que
+     permite recuperarlo. Si no se pudo, no se hace ese paso: lo preparado sigue en memoria con los mismos
+     identificadores, nombres de archivo y operación para reintentar. */
+  const SIN_RESPALDO = Symbol("sin-respaldo");
+  function sinRespaldoFicha(f, enviadaAntes, despuesDeSubir) {
+    const motivo = falloLocal();
+    f.sinRespaldo = true;
+    const subidas = despuesDeSubir && f.colores.some((c) => c.fotos.some((x) => x.estado === "subida"));
+    if (enviadaAntes) {
+      f.estado = "sin-confirmar";
+      f.mensaje = `No se reintentó: este navegador no pudo guardar antes los datos para recuperar la ficha (${motivo}). Sigue sin confirmar el envío anterior: compruébalo o vuelve a intentarlo. Lo que no se guardó se perdería al recargar.`;
+    } else {
+      f.estado = "fallida";
+      f.mensaje = `${despuesDeSubir ? "No se envió la ficha: este navegador no pudo guardar antes su operación" : "No se creó nada: este navegador no pudo guardar antes los datos y los archivos para recuperarla"} (${motivo}). Lo preparado sigue abierto aquí, pero lo que no se guardó se perdería al recargar: libera espacio y pulsa «Reintentar», o exporta un respaldo.${subidas ? " Las fotografías ya subidas se reutilizan con el mismo nombre." : ""}`;
+    }
+    repintarFicha(f);
+  }
+
   // Sube las fotos de una ficha que aún no estén en Storage con la ruta de ESTA ficha y color.
+  // Devuelve "" (todo subido), el motivo del fallo o SIN_RESPALDO (no se pudo guardar antes el borrador: no se subió nada).
   async function subirFotosDe(f) {
     let token = null;
     try { token = (await panel().cliente().auth.getSession()).data?.session?.access_token || null; } catch { token = null; }
@@ -1835,7 +1891,7 @@
         porSubir.push({ c, foto });
       }
     }
-    if (porSubir.length) await guardarBorrador({ inmediato: true });
+    if (porSubir.length && !(await guardarBorrador({ inmediato: true }))) return SIN_RESPALDO;
     for (const { c, foto } of porSubir) {
       foto.estado = "subiendo";
       const r = await fotos().subir({ base: conf.url, clave: conf.clave, token, objeto: foto.objeto, blob: foto.blob });
@@ -1863,6 +1919,8 @@
     exigir(f.modelo.trim() && f.modelo.trim().length <= C.LIM.nombre, `imp-${f.clave}-modelo`, "Escribe el modelo.");
     exigir(f.categoria.trim() && f.categoria.trim().length <= C.LIM.categoria, `imp-${f.clave}-categoria`, "Escribe la categoría.");
     exigir(C.PUBLICOS.some(([v]) => v === f.publico), `imp-${f.clave}-publico-0`, "Elige el público: Hombre, Dama o Unisex.");
+    // Etapa 23: una foto ya reconocida (o con dudas) no crea otra zapatilla sin decidirlo.
+    errores.push(...novedades().erroresFicha(f));
     if (coincidenciaLote(f)) errores.push({ campo: null, mensaje: "Decide si es otro color de la ficha con el mismo modelo (agrúpala) o una zapatilla distinta." });
     // Una versión para otro público ya en el catálogo no pide decisión: es otra zapatilla.
     if (relacionCatalogo(f).mismas.length && !f.decisionCatalogo) {
@@ -1909,10 +1967,13 @@
   }
 
   // ------------------------------------------------------------------ guardar
-  async function guardarLote() {
+  // soloFicha: «Reintentar» de una ficha. Sin argumento, todas las marcadas.
+  async function guardarLote(soloFicha = null) {
     if (!lote || guardando) return;
-    const marcadas = lote.fichas.filter((f) => editable(f) && f.seleccionada);
-    if (!marcadas.length) { mensaje("Marca al menos una ficha con «Incluir en el guardado».", "aviso"); return; }
+    const marcadas = lote.fichas.filter((f) => porCrear(f) && (!soloFicha || f === soloFicha));
+    const sinAplicar = novedades().porAplicar();
+    const avisoAplicar = sinAplicar ? ` ${sinAplicar === 1 ? "1 zapatilla existente tiene" : `${sinAplicar} zapatillas existentes tienen`} cambios elegidos: se aplican con «Aplicar cambios seleccionados».` : "";
+    if (!marcadas.length) { mensaje(`${novedades().abierto() ? "No hay zapatillas nuevas por guardar." : "Marca al menos una ficha con «Incluir en el guardado»."}${avisoAplicar}`, "aviso"); return; }
     // Primero se valida todo: si alguna ficha tiene errores, se dice antes de tocar el servidor.
     let primero = null;
     for (const f of marcadas) {
@@ -1921,6 +1982,7 @@
     }
     for (const f of lote.fichas) if (!marcadas.includes(f)) f.errores = [];
     marcadas.forEach(repintarFicha);
+    if (primero) novedades().asegurar();
     const conErrores = marcadas.filter((f) => f.errores.length);
     const validas = marcadas.filter((f) => !f.errores.length);
     if (!validas.length) {
@@ -1932,8 +1994,10 @@
 
     guardando = true;
     pintarPie();
-    const resumen = { guardadas: 0, fallidas: 0, sinConfirmar: 0 };
+    const resumen = { guardadas: 0, fallidas: 0, sinConfirmar: 0, sinRespaldo: 0, sinIntentar: 0, alDia: true };
     try {
+      // Sin almacenamiento local no se escribe: quizá ya se puede guardar (se vuelve a intentar abrirlo).
+      if (!almacenOk) await novedades().recuperarAlmacen();
       const acceso = await panel().comprobarAcceso();
       if (acceso.estado !== "admin") {
         if (acceso.estado === "red") { mensaje("No pudimos comprobar tu sesión. Revisa tu conexión; el lote sigue aquí.", "aviso"); return; }
@@ -1959,7 +2023,12 @@
         mensaje(`Guardando la ficha ${numero(f)} (${i + 1} de ${enviar.length})…`);
         await guardarFicha(f);
         if (f.estado === "guardada") resumen.guardadas += 1;
-        else if (f.estado === "sin-confirmar") resumen.sinConfirmar += 1;
+        else if (f.sinRespaldo) {
+          // El almacenamiento falla para todas: se detiene aquí; las demás quedan sin intentar, intactas.
+          resumen.sinRespaldo += 1;
+          resumen.sinIntentar = enviar.length - i - 1;
+          break;
+        } else if (f.estado === "sin-confirmar") resumen.sinConfirmar += 1;
         else resumen.fallidas += 1;
         if (f.cortar) { delete f.cortar; break; }
       }
@@ -1973,8 +2042,8 @@
           lote.avisoDestinos = `${salen.length === 1 ? "La ficha" : "Las fichas"} ${listaNumeros(salen)} ya ${salen.length === 1 ? "está guardada y deja" : "están guardadas y dejan"} de recibir ajustes.`;
         }
         pintar();
-        guardarBorrador({ inmediato: true }); // el resultado de cada ficha, en el borrador local
-        panel().recargar();
+        resumen.alDia = await guardarBorrador({ inmediato: true }); // el resultado de cada ficha, en el borrador local
+        panel().recargar().then(() => { if (lote?.pdf) programar("novedades", repintarPdf, 0); else if (lote) novedades().repintarLuego(0); }, () => {});
       }
     }
     if (!lote) return;
@@ -1982,8 +2051,13 @@
     if (resumen.fallidas) partes.push(`${resumen.fallidas} no se ${resumen.fallidas === 1 ? "pudo" : "pudieron"} guardar: conservan sus datos para corregir y volver a guardar.`);
     if (resumen.sinConfirmar) partes.push(`${resumen.sinConfirmar} ${resumen.sinConfirmar === 1 ? "quedó" : "quedaron"} sin confirmar: comprueba su resultado antes de reintentar.`);
     if (conErrores.length) partes.push(`${conErrores.length} ${conErrores.length === 1 ? "tenía" : "tenían"} datos por corregir y no se ${conErrores.length === 1 ? "envió" : "enviaron"}.`);
+    if (resumen.sinRespaldo) {
+      partes.push(`${resumen.sinRespaldo === 1 ? "1 no se creó" : `${resumen.sinRespaldo} no se crearon`} porque este navegador no pudo guardar antes el borrador: lo que no se guardó se perdería al recargar. Reintenta o exporta un respaldo.${resumen.sinIntentar ? ` ${resumen.sinIntentar === 1 ? "1 más quedó" : `${resumen.sinIntentar} más quedaron`} sin intentar.` : ""}`);
+    }
+    if (resumen.guardadas && !resumen.alDia) partes.push("Lo ya creado está en el catálogo, pero este navegador no pudo actualizar el borrador: no se repetirá ningún alta (se comprueba con su operación). Exporta un respaldo si lo necesitas.");
     if (resumen.guardadas) partes.push("Publícalas y confirma sus tallas con las acciones del panel.");
-    mensaje(partes.join(" "), resumen.fallidas || resumen.sinConfirmar || conErrores.length ? "aviso" : "ok");
+    if (avisoAplicar) partes.push(avisoAplicar.trim());
+    mensaje(partes.join(" "), resumen.fallidas || resumen.sinConfirmar || resumen.sinRespaldo || !resumen.alDia || conErrores.length ? "aviso" : "ok");
   }
 
   function enfocarError(f) {
@@ -1995,11 +2069,15 @@
   }
 
   async function guardarFicha(f) {
+    const enviadaAntes = f.estado === "sin-confirmar"; // un reintento: si no se puede guardar antes, sigue sin confirmar
     f.estado = "guardando";
     f.mensaje = "";
+    f.sinRespaldo = false;
     repintarFicha(f);
     const fallo = await subirFotosDe(f);
     if (!lote) return;
+    if (fallo === SIN_RESPALDO) { sinRespaldoFicha(f, enviadaAntes, false); return; }
+    if (fallo && enviadaAntes) { f.estado = "sin-confirmar"; f.mensaje = `${fallo} No se reintentó; el envío anterior sigue sin confirmar.`; repintarFicha(f); return; }
     if (fallo) { f.estado = "fallida"; f.mensaje = `${fallo} No se guardó la ficha; sus datos siguen aquí.`; repintarFicha(f); return; }
 
     const datos = datosFicha(f);
@@ -2014,14 +2092,16 @@
     f.ultimaOperacion = f.pendiente.operacion;
     // Etapa 20: la operación queda en el borrador local ANTES de enviarla. Tras una recarga a mitad, la
     // ficha vuelve «sin confirmar» con esta misma operación y se comprueba antes de repetir nada.
-    await guardarBorrador({ inmediato: true });
+    // Si no queda guardada la operación completa con su identificador, no se envía.
+    const guardado = await guardarBorrador({ inmediato: true });
     if (!lote) return;
+    if (!guardado) { sinRespaldoFicha(f, enviadaAntes, true); return; }
     let r;
     try {
       r = await panel().cliente().rpc("fn_admin_guardar_producto", { p_datos: f.pendiente.datos, p_version: null, p_operacion: f.pendiente.operacion });
     } catch { r = { error: { status: 0 } }; }
     if (!lote) return;
-    if (!r.error) { confirmar(f, r.data); return; }
+    if (!r.error) { await confirmar(f, r.data); return; }
     const tipo = comun().tipoError(r);
     if (tipo === "red" || tipo === "conflicto") { await comprobar(f); return; }
     if (tipo === "sin-sesion" || tipo === "sin-permiso") {
@@ -2049,6 +2129,8 @@
   }
 
   function confirmar(f, respuesta, comprobado = false) {
+    const operacion = f.pendiente?.operacion || f.ultimaOperacion || null;
+    f.sinRespaldo = false;
     f.estado = "guardada";
     f.seleccionada = false;
     f.codigo = respuesta?.codigo_interno || f.codigo;
@@ -2062,6 +2144,13 @@
     }
     f.mensaje = avisos.join(" ");
     repintarFicha(f);
+    // Etapa 23: la creación está confirmada; ahora sí se recuerda la relación que estaba pendiente.
+    const loteActual = lote;
+    return novedades().trasCrear(f, operacion, f.codigo).then(() => {
+      if (lote !== loteActual) return;
+      repintarFicha(f);
+      guardarBorrador();
+    });
   }
 
   // Solo lectura: ¿la zapatilla existe con la operación de este guardado?
@@ -2077,7 +2166,7 @@
       f.estado = "sin-confirmar";
       f.mensaje = "Se perdió la respuesta y no pudimos leer el estado actual. Comprueba el resultado antes de reintentar (reintentar usa la misma operación: no se duplica).";
     } else if (r.data && r.data.ultima_operacion === operacion) {
-      confirmar(f, { codigo_interno: r.data.codigo_interno }, true);
+      await confirmar(f, { codigo_interno: r.data.codigo_interno }, true);
       return;
     } else if (r.data && f.operaciones.has(r.data.ultima_operacion)) {
       // Un guardado anterior de esta misma ficha (con otro contenido) ya la creó.
@@ -2147,6 +2236,21 @@
     pintar();
     document.getElementById(`imp-${nueva.clave}-titulo`)?.focus?.();
     document.getElementById(`imp-${nueva.clave}-modelo`)?.focus({ preventScroll: false });
+  }
+
+  // Etapa 23: la publicación pasa a su propia ficha para compararla con el catálogo (sin marcarla como distinta).
+  function separarPublicacion(claveColor) {
+    const ref = colorDe(claveColor);
+    if (!ref || !editable(ref.ficha) || ref.ficha.colores.length < 2) return;
+    const { ficha, color } = ref;
+    ficha.colores = ficha.colores.filter((x) => x !== color);
+    ficha.pendiente = null;
+    const nueva = fichaNueva(ficha.perfil);
+    Object.assign(nueva, { marca: ficha.marca, modelo: ficha.modelo, publico: ficha.publico, categoria: ficha.categoria, segmento: ficha.segmento, colores: [color], origenCategoria: ficha.origenCategoria });
+    nueva.editados = new Set(["marca", "modelo", "publico", ...(ficha.editados.has("categoria") ? ["categoria"] : [])]);
+    lote.fichas.splice(lote.fichas.indexOf(ficha) + 1, 0, nueva);
+    if (lote.destinos) lote.avisoDestinos = `La ficha ${numero(nueva)} (separada de la ${numero(ficha)}) es nueva y no está elegida para los ajustes: márcala si quieres ajustarla.`;
+    pintar();
   }
 
   /* Archivos ya subidos de una foto que se quita: si la ficha nunca llegó a guardarse (o su
@@ -2330,7 +2434,11 @@
     catalogo.id = "imp-pdf-abrir";
     catalogo.setAttribute("aria-expanded", String(Boolean(lote.pdf)));
     const botones = nodo("div", "importador-entrada-botones");
-    botones.append(pegar, catalogo);
+    // Etapa 23: comparar con el catálogo lo que se pegó o se leyó.
+    const comparar = boton("Comparar con mi inventario", "nov-abrir", "boton boton-secundario boton-compacto");
+    comparar.id = "imp-nov-abrir";
+    comparar.setAttribute("aria-expanded", String(novedades().abierto()));
+    botones.append(pegar, catalogo, comparar);
     cabecera.append(h, botones);
     const ayuda = nodo("p", "campo-ayuda importador-entrada-ayuda", "Pega varios mensajes de WhatsApp a la vez y revisa cómo se separan, importa el catálogo PDF del proveedor, o pega cada publicación en su ficha, más abajo.");
     s.append(cabecera, ayuda, pintarPerfiles());
@@ -2453,12 +2561,15 @@
       lote.perfilLote = guardarInstantanea(lote, p);
     }
     adoptarPerfilEnVacias();
+    cambioPdf(); // el proveedor de la entrega puede cambiar con el perfil
+    novedades().repintarFichas();
     const n = lote.fichas.filter((f) => editable(f) && f.colores.some((c) => c.texto.trim())).length;
     avisoPerfil = `Las publicaciones nuevas de este lote se leerán con «${nombrePerfil(perfilLote())}».${n ? " Las fichas ya creadas no cambian." : ""}`;
     lote.perfilesAbierto = true;
     repintarEntrada();
     repintarPropuestas();
     if (lote.pegado?.fase === "revision") repintarPegado();
+    if (lote.pdf) repintarPdf(); else novedades().repintarLuego(0);
   }
 
   function reaplicarPerfil() {
@@ -3053,7 +3164,7 @@
   let leyendoPdf = null;       // { controlador, nombre, pagina, total } mientras se lee un documento
   let anadiendoPdf = false;
   let versionPdf = 0;          // cambia con cada decisión: invalida el análisis en caché
-  let cacheAnalisis = { version: -1, lote: null, perfil: null, valor: null };
+  let cacheAnalisis = { version: -1, lote: null, perfil: null, catalogo: null, valor: null };
   const urlsPdf = new Map();   // ref de foto → URL blob: de su miniatura
   const VISTAS_PDF = [["calzado", "Calzado"], ["otro", "Excluidos"], ["dudosas", "Dudosos"], ["todas", "Todas"]];
 
@@ -3198,11 +3309,11 @@
   // ------------------------------------------------------------------ análisis (en caché)
   function analisisPdf() {
     const p = lote.pdf;
-    if (cacheAnalisis.version === versionPdf && cacheAnalisis.lote === lote && cacheAnalisis.perfil === lote.perfilLote) return cacheAnalisis.valor;
+    if (cacheAnalisis.version === versionPdf && cacheAnalisis.lote === lote && cacheAnalisis.perfil === lote.perfilLote && cacheAnalisis.catalogo === novedades().catalogo()) return cacheAnalisis.valor;
     const P = pdf();
     const principal = principalPdf();
     const valor = { principal, otros: [], filas: [], sinPareja: [], errores: erroresPapeles(), fechasDistintas: [], faltan: [] };
-    cacheAnalisis = { version: versionPdf, lote, perfil: lote.perfilLote, valor };
+    cacheAnalisis = { version: versionPdf, lote, perfil: lote.perfilLote, catalogo: novedades().catalogo(), valor };
     if (!principal || valor.errores.length) return valor;
     const otros = p.documentos.filter((d) => d !== principal && d.papel);
     valor.otros = otros;
@@ -3262,6 +3373,11 @@
       valor.filas.push({ t, numero: i + 1, dec, parejas, comp, leido, tipo, incluir, incompatible, dudas, costesT,
         asociar: dec.asociar?.modo && dec.asociar.modo !== "ficha" ? dec.asociar : { modo: "ficha", destino: "" } });
     });
+    // Etapa 23: lo que ya está en el catálogo (o tiene dudas) no se crea otra vez: se resuelve en «Novedades».
+    for (const r of valor.filas) {
+      r.inventario = novedades().resolverFila(r, valor);
+      if (r.inventario && r.inventario.modo !== "nueva") r.incluir = false;
+    }
     for (const d of otros) for (const id of rel.get(d.id).sinPareja) valor.sinPareja.push({ d, t: porId.get(id).t });
     resolverGruposPdf(valor);
     return valor;
@@ -3290,6 +3406,7 @@
       const d = destinoDe(r);
       if (!d) { r.errorAsociacion = `Escribe el número de la tarjeta (1 a ${a.filas.length}).`; continue; }
       if (d === r) { r.errorAsociacion = "Elige otra tarjeta: no puede ser ella misma."; continue; }
+      if (!d.incluir && d.inventario?.producto) { r.errorAsociacion = `La tarjeta ${d.numero} es de una zapatilla que ya tienes: elige esta entrada en «Novedades y diferencias» como color nuevo u otra fotografía de esa zapatilla.`; continue; }
       if (!d.incluir) { r.errorAsociacion = `La tarjeta ${d.numero} no está marcada para añadir: márcala o elige otra.`; continue; }
       const raiz = seguir(r, (x) => x.asociar.modo === "ficha");
       const color = seguir(r, (x) => x.asociar.modo !== "foto");
@@ -3598,6 +3715,12 @@
     cuerpo.append(nodo("p", "importador-pdf-datos", datos.join(" · ")));
     if (r.comp.titulo.cambios.length) cuerpo.append(nodo("p", "campo-ayuda", `Interpretado: ${r.comp.titulo.cambios.join("; ")}.`));
     if (r.incompatible) cuerpo.append(nodo("p", "editor-nota importador-pdf-incompatible", r.incompatible));
+    // Etapa 23: qué es en tu inventario.
+    if (r.inventario && r.inventario.modo !== "nueva" && r.inventario.modo !== "omitir") {
+      const enCatalogo = nodo("p", `importador-pdf-pareja${r.inventario.confirmada ? "" : " es-revisar"}`, `En tu inventario: ${r.inventario.producto ? novedades().nombreDestino(r.inventario.producto, r.inventario.variante) : "por reconocer"}. Se revisa en «Novedades y diferencias». `);
+      enCatalogo.append(boton("Ver en Novedades", "ver-novedad", "boton boton-texto boton-mini", { entrada: id }));
+      cuerpo.append(enCatalogo);
+    }
     // Precios: coste (con condiciones) y venta sugerida, cada uno con su procedencia.
     const precios = [];
     const prov = docPorPapel("proveedor");
@@ -3718,6 +3841,7 @@
     const activo = document.activeElement?.id;
     actual.replaceWith(pintarPdf());
     if (activo && document.getElementById(activo)) document.getElementById(activo).focus({ preventScroll: true });
+    novedades().repintar();
     programarGuardado();
   }
   function abrirPdf() {
@@ -3751,7 +3875,10 @@
       ventaSugerida: r.comp.ventaSugerida || null,
       notasVenta: (r.comp.notasVenta || []).slice(0, 4).map((n) => String(n).slice(0, 200)),
       incompatible: r.incompatible.slice(0, 400),
-      tallas: r.comp.tallasDeclaradas || null
+      tallas: r.comp.tallasDeclaradas || null,
+      // Etapa 23: de qué entrega salió y qué leyó (para la memoria, si se recuerda al crearse).
+      entrega: { documento: a.principal.nombre, huella: a.principal.huella, fecha: a.principal.fecha || null, lugar: `p${r.t.pagina}-${r.t.orden}`, lugarTexto: `página ${r.t.pagina}, tarjeta ${r.t.orden}`,
+        marca: r.leido.marca ? mayus(r.leido.marca) : "", modelo: r.leido.modelo ? mayus(r.leido.modelo) : "", publico: r.leido.publico || "", tallas: r.leido.tallas, proveedor: novedades().proveedorActual() }
     };
     aplicarTexto(f, c);
     // Tallas declaradas que el lector no admite (calzado infantil 28–35): se conservan tal cual y quedan
@@ -3780,7 +3907,8 @@
     const ext = blob.type === "image/webp" ? "webp" : blob.type === "image/png" ? "png" : "jpg";
     const nombre = `catalogo-p${r.t.pagina}-${r.t.orden}.${ext}`;
     const archivo = typeof File === "function" ? new File([blob], nombre, { type: blob.type }) : blob;
-    const item = { clave: nuevaClave("p"), ref: uuid(), estado: "procesando", archivo, nombre };
+    const item = { clave: nuevaClave("p"), ref: uuid(), estado: "procesando", archivo, nombre,
+      identidad: r.t.foto.exacta ? { tipo: "pdf", exacta: r.t.foto.exacta, gris: r.t.foto.gris || "" } : null };
     c.fotos.push(item);
     return item;
   }
@@ -3871,8 +3999,11 @@
     }
   }
   function cerrarPdf() {
+    // Etapa 23: con una actualización sin confirmar, los documentos se conservan hasta comprobarla.
+    if (novedades().pdfBloqueado()) { lote.pdf.cerrar = false; repintarPdf(); mensaje("Hay una actualización sin confirmar de este catálogo: compruébala en «Novedades y diferencias» antes de cerrarlo.", "aviso"); return; }
     leyendoPdf?.controlador.abort();
     soltarUrlsPdf();
+    novedades().olvidarEntradasPdf();
     lote.pdf = null;
     cambioPdf();
     pintar();
@@ -3945,7 +4076,12 @@
     if (n.type === "radio" && !n.checked) return true;
     let foco = n.id;
     if (d.pdfPapel !== undefined) { const doc = docPdf(d.pdfPapel); if (doc) doc.papel = n.value; }
-    else if (d.pdfIncluir !== undefined) decisionPdf(d.pdfIncluir).incluir = n.checked;
+    else if (d.pdfIncluir !== undefined) {
+      decisionPdf(d.pdfIncluir).incluir = n.checked;
+      // Marcarla expresamente es decidir que es otra zapatilla, aunque se reconozca o haya dudas.
+      const fila = analisisPdf().filas.find((x) => x.t.id === d.pdfIncluir);
+      if ((n.checked && fila?.inventario && fila.inventario.modo !== "nueva") || novedades().decidida(d.pdfIncluir)) novedades().decidir(d.pdfIncluir, n.checked ? "nueva" : "omitir");
+    }
     else if (d.pdfTipo !== undefined) {
       const dec = decisionPdf(d.pdfTipo);
       dec.tipo = n.value;
@@ -3984,7 +4120,7 @@
   let cadena = Promise.resolve();
   const ESPERA_GUARDADO = 800;    // tras el último cambio
   const ESPERA_MAXIMA = 4000;     // aunque se siga escribiendo
-  const TRANSITORIOS = new Set(["blob", "archivo", "vistaPrevia", "quitada", "enCurso", "cortar", "blobs", "cerrar"]);
+  const TRANSITORIOS = new Set(["blob", "archivo", "vistaPrevia", "quitada", "enCurso", "cortar", "blobs", "cerrar", "sinRespaldo"]);
   const horaCorta = new Intl.DateTimeFormat("es-CO", { hour: "numeric", minute: "2-digit" });
   const fechaLarga = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
   const formatoFecha = (iso, formato = fechaLarga) => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? "" : formato.format(d); };
@@ -4016,7 +4152,8 @@
       caja.append(p);
     }
     const acciones = nodo("div", "importador-local-acciones");
-    if (e.estado === "error" && lote) acciones.append(boton("Exportar respaldo", "exportar-actual", "boton boton-texto boton-mini"));
+    // Con el almacenamiento averiado o no disponible, lo único que protege el trabajo es exportarlo.
+    if (lote && (e.estado === "error" || (!almacenOk && e.estado !== "desconectado" && hayContenido(lote)))) acciones.append(boton("Exportar respaldo", "exportar-actual", "boton boton-texto boton-mini"));
     if (almacenOk && ambitoActual && !vistaBorradores) {
       const n = borradoresLista.filter((b) => b.id !== lote?.id).length;
       const ver = boton(n ? `Borradores (${n + (lote && meta(lote).existe ? 1 : 0)})` : "Borradores", "borradores-ver", "boton boton-texto boton-mini");
@@ -4044,7 +4181,7 @@
   // guardando o quedaron sin confirmar), imágenes del reparto, un pegado o ajustes del lote.
   function pendientesDe(l) {
     return l.fichas.filter((f) => f.estado !== "guardada" && conContenido(f)).length + (l.reparto?.items.length || 0) + (l.pegado?.texto.trim() ? 1 : 0)
-      + (ajustesPendientes(l) ? 1 : 0) + (l.pdf?.documentos?.length ? 1 : 0);
+      + (ajustesPendientes(l) ? 1 : 0) + (l.pdf?.documentos?.length ? 1 : 0) + novedades().pendientes(l);
   }
   const hayContenido = (l) => pendientesDe(l) > 0 || l.fichas.some((f) => f.estado !== "borrador");
 
@@ -4072,6 +4209,8 @@
       for (const c of f.colores) for (const x of c.fotos) considerar(x);
     }
     for (const it of l.reparto?.items || []) considerar(it);
+    // Etapa 23: fotos de actualizaciones sin terminar.
+    lista.push(...novedades().fotosPendientes(l).filter((x) => !lista.some((y) => y.ref === x.ref)));
     // Etapa 21: fotos de las tarjetas del catálogo PDF (una por huella), mientras la importación siga abierta.
     for (const ref of Object.values(l.pdf?.fotos || {})) {
       const blob = l.pdf.blobs?.[ref];
@@ -4202,8 +4341,15 @@
         if (c.pdf && !Array.isArray(c.pdf.costes)) c.pdf.costes = [];
         if (!["", "manual", "sugerido"].includes(c.origenVenta ?? "")) c.origenVenta = "";
         for (const x of c.fotos) exigir(x && RE_CLAVE.test(x.clave) && ESTADOS_FOTO.has(x.estado) && (!x.ref || UUID.test(x.ref)), "Una foto no es válida.");
+        // Etapa 23: identidad del origen (los borradores anteriores no la tienen) y relación pendiente.
+        for (const x of c.fotos) if (!window.GamaTallaInventario.identidadValida(x.identidad)) x.identidad = null;
+        c.recordar = window.GamaTallaInventario.ID_PROVEEDOR.test(String(c.recordar || "")) ? c.recordar : "";
+        if (c.pdf && (!c.pdf.entrega || typeof c.pdf.entrega !== "object")) c.pdf.entrega = null;
       }
+      if (f.aplicadaA && !UUID.test(String(f.aplicadaA.producto))) f.aplicadaA = null;
+      if (typeof f.memoria !== "string") f.memoria = "";
     }
+    novedades().normalizar(l);
     if (l.reparto) {
       exigir(Array.isArray(l.reparto.items) && l.reparto.items.length <= MAX_REPARTO, "El reparto de fotos no es válido.");
       for (const it of l.reparto.items) exigir(it && RE_CLAVE.test(it.clave) && ["procesando", "lista", "error"].includes(it.estado) && (!it.ref || UUID.test(it.ref)), "Una imagen del reparto no es válida.");
@@ -4211,6 +4357,7 @@
       const claves = new Set(l.reparto.items.map((it) => it.clave));
       exigir(claves.size === l.reparto.items.length, "Una imagen del reparto no es válida.");
       for (const it of l.reparto.items) {
+        if (!window.GamaTallaInventario.identidadValida(it.identidad)) it.identidad = null;
         it.fuera = it.fuera === true;
         if (!Number.isInteger(it.recibida) || it.recibida < 1) it.recibida = 0;
       }
@@ -4319,6 +4466,7 @@
       for (const d of l.pdf.documentos) for (const t of d.tarjetas) if (t.foto?.ref && !l.pdf.blobs[t.foto.ref]) t.foto.error = "No se pudo recuperar esta foto del borrador.";
       cambioPdf();
     }
+    novedades().restaurarFotos(l, fotosGuardadas);
     if (l.reparto) {
       l.reparto.items.forEach((it) => { vistas(it.clave); restaurarFoto(it, fotosGuardadas, false); });
       if (typeof l.reparto.abierto !== "string") l.reparto.abierto = null;
@@ -4700,6 +4848,7 @@
     const raiz = JSON.parse(leido.registro.datos, revivir);
     const l = raiz.lote;
     l.id = uuid();
+    novedades().adaptar(l);
     for (const f of l.fichas) {
       f.id = uuid();
       f.pendiente = null;
@@ -4788,10 +4937,29 @@
     if (ambitoActual && almacen()?.disponible()) {
       try { await almacen().abrirBase(); almacenOk = true; } catch { almacenOk = false; }
     }
-    if (!almacenOk) return;
+    if (almacenOk) await leerListasLocales();
+    await novedades().cargarMemoria(ambitoActual);
+  }
+  async function leerListasLocales() {
     try { perfiles = validarPerfiles(await almacen().listarPerfiles(ambitoActual)); } catch { perfiles = []; }
     try { borradoresLista = await almacen().listarBorradores(ambitoActual); } catch { borradoresLista = []; }
     espacio = await almacen().estimar();
+  }
+  // Etapa 23: el almacenamiento no estaba disponible al abrir; se vuelve a intentar sin cerrar el importador.
+  async function reabrirAlmacen() {
+    if (almacenOk) return true;
+    if (!ambitoActual || !lote || lote.ambito !== ambitoActual || !almacen()?.disponible()) return false;
+    try { await almacen().abrirBase(); } catch { return false; }
+    almacenOk = true;
+    await leerListasLocales();
+    programarGuardado();
+    return true;
+  }
+  // Por qué no se puede guardar el borrador (para explicarlo donde haga falta).
+  function falloLocal() {
+    if (!almacenOk) return "no permite guardar borradores";
+    if (persistencia.estado === "desconectado") return persistencia.tipo === "eliminado" ? "este borrador se eliminó en otra pestaña" : "este borrador continúa en otra pestaña";
+    return persistencia.tipo === "cuota" ? "falta espacio" : "rechazó la escritura";
   }
   async function elegirLoteAlAbrir() {
     if (almacenOk && ultimoBorrador && borradoresLista.some((b) => b.id === ultimoBorrador.id)) {
@@ -4938,8 +5106,18 @@
     if (guardando && accion !== "cerrar") return;
     if (alClicEtapa20(accion, b)) return;
     if (alClicPdf(accion, b)) return;
+    if (novedades().alClic(accion, b)) return;
     const f = fichaDe(b.dataset.ficha);
     switch (accion) {
+      case "ver-novedad": {
+        lote.inventario = lote.inventario || null;
+        if (lote.inventario) lote.inventario.filtro = "todas";
+        novedades().abrirSeccion();
+        const n = document.getElementById(`imp-nov-${b.dataset.entrada}-titulo`);
+        n?.scrollIntoView({ block: "center" });
+        n?.focus({ preventScroll: true });
+        break;
+      }
       case "cerrar": intentarCerrar(); break;
       case "seguir": $("#importador-salida").hidden = true; $("#importador-botones").hidden = false; $('[data-imp="cerrar-pie"]')?.focus(); break;
       case "cerrar-pie": intentarCerrar(); break;
@@ -4993,6 +5171,7 @@
       case "reparto-quitar": quitarDelReparto(b.dataset.item); break;
       case "abrir-editor": window.GamaTallaEditor?.abrir(b.dataset.producto, b); break;
       case "comprobar": if (f) comprobar(f); break;
+      case "ficha-reintentar": if (f && editable(f)) guardarLote(f); break;
       case "foto-principal": case "foto-quitar": {
         const ref = colorDe(b.dataset.color);
         if (!ref || !editable(ref.ficha)) break;
@@ -5035,6 +5214,8 @@
     const n = e.target;
     // Etapa 21: revisión del catálogo PDF.
     if (alEscribirPdf(n)) return;
+    // Etapa 23: novedades y memoria.
+    if (novedades().alEscribir(n)) return;
     // Etapa 20: pegado, perfiles y «Recordar para este proveedor».
     if (n.dataset.pegado === "texto") { if (lote.pegado) { lote.pegado.texto = n.value; lote.pegado.error = ""; } return; }
     if (n.dataset.pegadoColores !== undefined) {
@@ -5255,7 +5436,7 @@
   let abriendo = false;
   async function abrir(disparador = null) {
     const dialogo = $("#importador");
-    if (!dialogo || !comun() || !texto() || !fotos() || !separador() || !almacen()) {
+    if (!dialogo || !comun() || !texto() || !fotos() || !separador() || !almacen() || !window.GamaTallaInventario || !window.GamaTallaNovedades) {
       panel()?.anunciar({ titulo: "El importador no se pudo cargar", texto: "Recarga la página.", tipo: "aviso" });
       return;
     }
@@ -5333,6 +5514,7 @@
       for (const x of c.fotos) { x.quitada = true; if (String(x.vistaPrevia || "").startsWith("blob:")) URL.revokeObjectURL(x.vistaPrevia); }
       limpiarSubidas(f, c.fotos);
     }
+    novedades().limpiarSubidas(l);
     if (l) {
       const m = meta(l);
       m.descartado = true;
@@ -5360,7 +5542,8 @@
     const pegando = lote.pegado?.texto.trim() ? 1 : 0;
     const ajustes = ajustesPendientes(lote) ? 1 : 0;
     const importando = lote.pdf?.documentos?.length ? 1 : 0;
-    if (!sinGuardar && !porAsignar && !pegando && !ajustes && !importando) {
+    const actualizando = novedades().pendientes(lote);
+    if (!sinGuardar && !porAsignar && !pegando && !ajustes && !importando && !actualizando) {
       // Nada pendiente. Un lote que ya está en el borrador local (p. ej. con sus fichas guardadas en
       // Supabase) se conserva en la lista: solo se borra con una acción expresa.
       if (almacenOk && meta(lote).existe) { cerrar(); soltarLote({ guardar: true }); return; }
@@ -5371,7 +5554,7 @@
     const pendientes = [sinGuardar ? (sinGuardar === 1 ? "una ficha sin guardar" : `${sinGuardar} fichas sin guardar`) : "",
       porAsignar ? (porAsignar === 1 ? "una imagen sin asignar" : `${porAsignar} imágenes sin asignar`) : "",
       pegando ? "un pegado de varias publicaciones sin crear" : "", importando ? "una importación de catálogo PDF abierta" : "",
-      ajustes && !sinGuardar ? "ajustes del lote elegidos" : ""].filter(Boolean).join(" y ");
+      ajustes && !sinGuardar ? "ajustes del lote elegidos" : "", actualizando ? "una actualización del catálogo por comprobar o anotar" : ""].filter(Boolean).join(" y ");
     $("#importador-salida-texto").textContent = almacenOk
       ? `Hay ${pendientes}. Puedes cerrar y seguir después (queda guardado como borrador en este navegador, no en Supabase) o descartarlo.`
       : `Hay ${pendientes}. Puedes cerrar y seguir después (este navegador no guarda borradores: se conserva mientras no recargues la página) o descartarlo.`;
@@ -5404,6 +5587,12 @@
     dialogo.addEventListener("pointerdown", () => { pulsando = true; }, true);
     for (const tipo of ["pointerup", "pointercancel"]) window.addEventListener(tipo, () => { pulsando = false; }, true);
     dialogo.addEventListener("input", alEscribir);
+    // Etapa 23: Intro en los campos de «Novedades» (buscar, proveedor, precio) no envía el formulario del lote.
+    dialogo.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" || !e.target.dataset?.nov || !["text", "search"].includes(e.target.type)) return;
+      e.preventDefault();
+      if (lote && !guardando) novedades().alIntro(e.target);
+    });
     dialogo.addEventListener("change", alCambiar);
     // Etapa 20: cualquier cambio en el formulario programa el guardado local (con espera: no en cada tecla).
     for (const tipo of ["input", "change"]) dialogo.addEventListener(tipo, () => programarGuardado());
@@ -5415,6 +5604,7 @@
       if (!lote) return;
       if (e.target.id === "imp-ajustes") lote.ajustesAbiertos = e.target.open;
       if (e.target.id === "imp-perfiles") lote.perfilesAbierto = e.target.open;
+      novedades().alAlternar(e.target);
       // «Cambiar destino» del reparto: uno abierto a la vez.
       if (e.target.classList?.contains("importador-reparto-cambiar")) {
         const r = reparto();

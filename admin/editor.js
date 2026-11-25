@@ -1973,6 +1973,17 @@
     comun: Object.freeze({
       racional, equivalentes, entero, crearCampoPresentacion, pintarTono, cerrarTono, pintarFormaElegida, normalizarTono, pintarVistaMuestra,
       formaValida, tipoError, limpiarArchivoSinUso, bloquearFondo, liberarFondo, LIM, MUESTRA_HEX, SEGMENTOS, PUBLICOS,
+      /* Etapa 23: registro COMPLETO de un producto (con su versión) y el cuerpo con el que este formulario lo
+         guardaría sin cambiar nada: colores, códigos, referencias, propiedades, tallas con activa_original y
+         galerías. El importador parte de ahí para actualizar. */
+      leerProducto,
+      cuerpoSinCambios: (p, tallas) => {
+        const datos = datosParaGuardar(estadoDesdeServidor(p, tallas));
+        if (codigosEditables === false) { delete datos.codigo_interno; for (const v of datos.variantes) delete v.codigo_variante; }
+        if (publicoYMuestras === false) { delete datos.publico; for (const v of datos.variantes) delete v.muestra_color; }
+        if (formaMuestra === false) for (const v of datos.variantes) delete v.forma_muestra;
+        return datos;
+      },
       capacidadForma: async () => { await comprobarFormaMuestra(); return formaMuestra; },
       capacidadPublico: async () => { await comprobarPublicoYMuestras(); return publicoYMuestras; }
     })

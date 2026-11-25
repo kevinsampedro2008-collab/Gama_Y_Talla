@@ -1,4 +1,4 @@
-# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19, 20, 21 y 22
+# Panel privado de Gama & Talla · etapas 15A, 15B, 16, 17, 18, 19, 20, 21, 22 y 23
 
 Ingreso con correo y contraseña, tablero del catálogo, **gestión de la disponibilidad de las tallas**
 (15B), **administración del catálogo** (16): zapatillas, colores, precios, tallas y fotografías WebP,
@@ -505,6 +505,119 @@ archivo.
 - **CSP:** se añadió `worker-src 'self'`.
 - **Build:** el paquete la copia y comprueba que esté.
 - **Sin servicios externos:** ninguna IA ni clave de API.
+
+### Novedades y diferencias: reconocer el inventario (23)
+
+Al leer un catálogo PDF (o con **«Comparar con mi inventario»**, también para publicaciones de WhatsApp con
+fotos) aparece **«Novedades y diferencias»**: compara cada entrada con tu catálogo **antes de escribir**.
+Archivos: `inventario.js` (lógica, sin pantalla ni red), `novedades.js` (pantalla y guardado) y los almacenes
+nuevos de `borradores.js`. Sin tablas ni migraciones en Supabase.
+
+**Cada entrada se resuelve** como: *Crear otra zapatilla* · *Añadir un color a una zapatilla existente* ·
+*Actualizar un color existente* · *Añadir otra fotografía a un color existente* · *Omitir esta entrada*. Se ven
+juntos la foto y los datos de la entrega y, del destino, la foto, el modelo, el color, el código y su estado.
+
+- **Proveedor de la entrega:** con un perfil es el del **perfil** (su identificador, aunque cambien sus reglas o
+  su nombre). El **Perfil general no tiene proveedor**: se elige uno o se crea; sin proveedor no se usa la
+  memoria. Lo recordado de un proveedor no se usa con otro.
+- **Qué se reconoce solo:** únicamente una fotografía **idéntica** a una relación que confirmaste, del mismo
+  proveedor, con un solo destino vigente. El destino se busca por los **UUID** del producto y del color y se
+  muestran sus datos **actuales** (nombres y colores corregidos después).
+- **Identidad de la foto:** se toma **antes** de optimizarla. En un PDF, el SHA-256 de sus píxeles; en una
+  publicación de WhatsApp, el SHA-256 del archivo recibido. Nunca se compara con el WebP de Storage.
+- **Qué queda para revisión** (nada se elige solo): foto parecida; varias relaciones posibles; datos
+  contradictorios (otro modelo o público que al confirmarla: Hombre, Dama y Unisex no se mezclan solos); una zapatilla
+  cuyo **público cambió** desde que se confirmó la relación, diga lo que diga la entrega; color
+  desactivado; zapatilla retirada (además, no se puede elegir) o que ya no existe; el mismo modelo sin foto
+  reconocida (la marca, el modelo y la referencia del proveedor no identifican un color). Lo reconocido o dudoso
+  **no se añade al lote como ficha nueva** salvo que lo decidas.
+- **Catálogo anterior a esta etapa:** se elige qué es la entrada y se **busca** la zapatilla y el color (código,
+  referencia, marca, modelo o color); no se crea otra vez.
+- **«Confirmar y recordar esta relación»** la guarda en la memoria; **«Usar solo esta vez»** no. Un color o una
+  zapatilla que todavía no existe queda como **relación pendiente** hasta que su creación se confirma (en el lote:
+  **«Recordar las fotos de las zapatillas nuevas del lote»** o el enlace de cada publicación).
+
+- **Una confirmación vale en su contexto:** proveedor, destino, público de la zapatilla y de la entrega, y fotos de
+  origen. Si algo de eso cambia, lo confirmado y los cambios elegidos **dejan de estar aprobados**. Con otro proveedor
+  manda su propia memoria. Si no dice nada, el destino anterior queda propuesto y se confirma otra vez. Lo escrito se
+  conserva como **«Cambios por revisar»**, con «Usar estos cambios aquí» o «Descartarlos». Al volver al contexto original,
+  lo aprobado allí vuelve a valer. Las relaciones de ningún proveedor se borran. También son de su proveedor las fechas
+  aceptadas y las relaciones pendientes de fichas nuevas.
+- **Lo ya enviado no cambia de proveedor:** una operación en curso, sin confirmar o aplicada conserva el suyo; se
+  comprueba y se reintenta con su identificador y se anota en su memoria.
+- **Nombres y colores corregidos:** la relación sigue por los UUID; no son una contradicción.
+
+**Diferencias y filtros:** Nuevas zapatillas, Nuevos colores, Cambios de precio, Cambios de tallas, Nuevas
+fotografías, Sin cambios, Por reconocer o revisar y Omitidas (una entrada puede estar en varios). Los contadores
+distinguen tarjetas o publicaciones, zapatillas y colores. Cada diferencia dice el valor actual o último conocido,
+el propuesto, su documento y fecha, qué se modificaría y qué se conserva. **Nada viene seleccionado** salvo la
+foto o el color que se pidió añadir.
+
+- **Precios:** coste del proveedor, venta sugerida y precio del catálogo van separados. Un cambio de coste **no**
+  cambia el precio; se conserva salvo elección expresa (venta sugerida, coste + ajuste del lote u otro). Varios
+  importes o uno condicionado piden elegir el coste; nunca se toma el menor. Sin dato previo: «Sin historial».
+- **Tallas**, tres cosas distintas:
+  - **Anunciadas** frente a la última entrega revisada que traía tallas: lo que se deja de mencionar o se vuelve a mencionar
+    cuenta como cambio de tallas («Esta entrega ya no menciona 42 y 43. Se conservan en el catálogo; no se desactivó
+    nada»). **«Marcar como revisada»** lo anota solo en la memoria local, y la misma información no vuelve a salir.
+    Tampoco la de un mensaje sin fecha, o anterior a la referencia, igual a lo último que se revisó.
+  - **Nuevas** que se podrían añadir al catálogo (nacen «por revisar»; hay que elegirlas).
+  - **No mencionadas** y desactivadas: se conservan. Una zapatilla que no aparece no se da por agotada.
+  - Una entrega **sin tallas** no es una lista vacía: no se compara y no reemplaza a las últimas anunciadas.
+- **Fechas:** un documento **anterior** al último revisado del proveedor se avisa y no pasa a ser lo más reciente;
+  una fecha desconocida también. Para aplicar cambios de ellos hay que marcar la casilla. La fecha de un mensaje de
+  WhatsApp sale de su encabezado, si lo trae.
+- **«Dar por revisadas sin cambios»** anota lo visto en el historial local, sin escribir en el catálogo.
+
+**«Aplicar cambios seleccionados»** actualiza zapatillas existentes; lo nuevo se sigue guardando, oculto, con
+«Guardar lote como oculto» (la sección dice cuántas se crean y cuántas se actualizan).
+
+- **Una operación por zapatilla:** lee el registro completo y su versión (lo mismo que el editor) y aplica solo lo
+  elegido de **todas** sus entradas; códigos, referencias, propiedades, colores, galerías y tallas no elegidos se
+  reenvían igual (con `activa_original`). No cambia si está publicada u oculta. Un **color nuevo** de una zapatilla
+  publicada se crea **desactivado** salvo que elijas que se vea.
+- **Nada idéntico se envía:** sin cambios reales no hay RPC ni subida de fotos.
+- **Conflictos:** si la versión ya no es la que se revisó (o el servidor lo rechaza) no se escribe; se carga lo
+  actual y se vuelve a revisar.
+- **Guardado previo obligatorio:** antes de subir una foto quedan en el borrador local su archivo y su nombre, y antes de
+  enviar, la operación completa con su identificador. Si ese guardado falla (o el navegador no permite guardar), **no se
+  sube ni se envía nada**. Lo preparado sigue abierto, se avisa de que se perdería al recargar y se ofrecen
+  «Reintentar» (los mismos nombres y la misma operación) y «Exportar respaldo». Sin almacenamiento se puede comparar y
+  preparar; «Reintentar» comprueba si ya se puede guardar.
+- **Lo mismo al crear zapatillas nuevas («Guardar lote como oculto»):** antes de subir una fotografía se comprueba que
+  el borrador (con sus archivos y los nombres de destino) quedó guardado, y antes de llamar a `fn_admin_guardar_producto`,
+  que quedaron guardados el cuerpo completo y el identificador de la operación. Esperar el guardado no basta: se mira
+  su resultado. Si falla, ese paso no se hace, la ficha queda con el aviso «No se creó nada…» o «No se envió la ficha…»
+  (lo que no se guardó se perdería al recargar) y se ofrecen **«Reintentar»** (solo esa ficha) y **«Exportar
+  respaldo»** (también en la cabecera si el navegador no permite guardar). El lote sigue abierto y editable, pero no se
+  sube ni se crea nada hasta que el borrador se guarde. Si falla con varias fichas, se detiene en la primera: la
+  anterior queda creada y las siguientes, sin intentar.
+  - El reintento usa el mismo producto, colores, tallas, nombres de archivo y operación: las fotos que ya llegaron a
+    Storage se reutilizan sin subirlas otra vez.
+  - Si el envío anterior había quedado sin confirmar, sigue «sin confirmar» (se comprueba con su operación antes de repetirlo).
+  - Un fallo local **posterior** a una creación confirmada no la convierte en otra alta: el lote avisa de que el borrador
+    no se pudo actualizar y, si se recarga, la ficha se comprueba con su operación y no se duplica. Si falla la memoria de
+    asociaciones, solo se reintenta la memoria.
+- **Respuesta perdida, recarga o fallo parcial:** la operación queda en el borrador antes de enviarse. Se comprueba
+  por `ultima_operacion` y, si hubo otra edición después, por el historial del servidor (`historial.lote`). Si no
+  llegó, «Reintentar» envía la **misma** operación y el mismo cuerpo. Las fotos conservan su nombre de archivo. Solo
+  se anuncia lo confirmado.
+- **Memoria local que falla tras guardar:** se dice qué queda pendiente (va en el borrador) y **«Reintentar guardar
+  en la memoria»** no repite la escritura del catálogo.
+
+**Memoria de reconocimiento** (al final de la sección): consultar, buscar, **Corregir** (otro color), **Olvidar**
+(no cambia el catálogo), **Exportar** e **Importar** (archivo `gama-talla/memoria-inventario`, versión 1: relaciones
+e historial, sin fotos; aparte del respaldo de borradores, que no cambia de formato).
+
+- **Dónde está:** IndexedDB de este navegador (base `gama-talla-panel`, versión 2: se **añaden** `proveedores`,
+  `asociaciones` e `historial`; lo anterior no se toca). Separada por proyecto, usuario y proveedor. Se conservan
+  los últimos 20 registros de historial por color.
+- **Límites:** no viaja sola entre navegadores ni equipos (se exporta) y se pierde si se borran los datos del
+  navegador. Las huellas de un PDF son de los píxeles que descodifica ese navegador: en otro podrían no ser
+  idénticas y la foto quedaría como parecida, por confirmar. Una pestaña con una versión anterior del panel debe
+  recargarse para volver a guardar.
+- **De otro proyecto o usuario:** las relaciones entran **«por vincular»** (sin UUID) y el historial no se importa.
+  Un borrador de otro proyecto o usuario llega sin destinos, operaciones ni relaciones pendientes.
 
 ### Publicar u ocultar desde la tarjeta del modelo (22)
 
@@ -1160,3 +1273,27 @@ SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa22 --workers=1
 - **Celular táctil:** 390 px, con toques, miniaturas de al menos 120 px y sin desplazamiento horizontal.
 
 No se guarda nada en el catálogo.
+
+Etapa 23: contra el **entorno aislado** (8770), con PDF sintéticos y modelos ficticios « P23»:
+
+```bash
+SITIO=http://127.0.0.1:8770 npx playwright test tests/etapa23 --workers=1
+```
+
+- **`inventario.spec.js`**: lógica sin red. Reconocer (exacta, proveedor, ambigua, contradictoria, parecida,
+  desactivada, retirada, inexistente), costes, tallas, fechas, último conocido, consolidar y memoria exportada.
+- **`entregas.spec.js`**: dos entregas de días distintos (documentos y fotos en otro orden; dos colores del mismo
+  producto en una sola escritura; un color nuevo; registros sin cambios; repetir la entrega), catálogo anterior
+  vinculado a mano con conservación completa, WhatsApp, fechas anteriores y desconocidas, celular y borrador.
+- **`guardado.spec.js`**: conflicto antes de enviar y en el servidor, doble clic, respuesta perdida (también con otra
+  edición después), petición que no llegó, recarga a mitad, fallo parcial, fotos y fallos del almacenamiento local.
+- **`creacion.spec.js`**: alta normal; fallo del borrador antes de subir (cero subidas y cero escrituras) y antes del alta tras
+  subir las fotos (el reintento reutiliza fotos, identificadores y operación); almacenamiento no disponible (se prepara y
+  exporta, no se crea) y su recuperación; respuesta perdida y recarga sin duplicar; fallo local o de la memoria posterior a una
+  creación confirmada; varias fichas con fallo a mitad.
+- **`revision.spec.js`**: cambio de proveedor tras confirmar y elegir cambios, operaciones sin confirmar de otro proveedor,
+  cambio de público del destino y nombres corregidos; fallo del guardado previo (fotos y actualización) con reintento y
+  recarga; tallas que se dejan de anunciar, entregas ya revisadas y mensajes sin tallas.
+- **`memoria.spec.js`**: destinos renombrados, desactivados, retirados e inexistentes; parecidas, contradictorias y
+  con varios destinos; separación por proveedor, usuario y proyecto; corregir, olvidar, exportar e importar; relación
+  pendiente; base en versión 1 y respaldos anteriores.

@@ -20,12 +20,19 @@
  *
  * Respaldo: archivo JSON versionado (formato FORMATO, versión VERSION) con los datos y las fotos en
  * base64. Al importarlo se valida la estructura y la firma de cada foto; si algo falla no se escribe nada.
+ *
+ * Etapa 23 · Memoria del inventario (versión 2 de la base; la 1 se amplía sin tocar lo que ya hay)
+ *  - «proveedores»: identidad estable de cada proveedor (la del perfil, o una propia con el Perfil general).
+ *  - «asociaciones»: relaciones confirmadas entre una fotografía de origen (su huella) y un color del
+ *    catálogo (UUID). «historial»: lo último revisado y lo realmente aplicado de cada color.
+ *  - Las mismas reglas: por proyecto y usuario, solo en este navegador, sin fotos ni PDF.
  */
 (() => {
   "use strict";
 
   const BASE = "gama-talla-panel";
-  const VERSION_BASE = 1;
+  const VERSION_BASE = 2; // 2 (etapa 23): se AÑADEN proveedores, asociaciones e historial
+  const HISTORIAL_POR_COLOR = 20; // registros que se conservan de cada color y proveedor
   const FORMATO = "gama-talla/borrador-importador";
   const VERSION = 1;
   const BYTES_ORIGINAL_MAX = 15 * 1024 * 1024; // el mismo límite de entrada de fotos.js
@@ -35,6 +42,8 @@
   const BYTES_PDF_MAX = 15 * 1024 * 1024;
   const RESPALDO_MAX = 400 * 1024 * 1024;       // archivo de respaldo
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  const MEMORIA = ["proveedores", "asociaciones", "historial"];
 
   class ErrorCuota extends Error {}
   class ErrorConflicto extends Error {}
@@ -57,6 +66,9 @@
         if (!db.objectStoreNames.contains("perfiles")) db.createObjectStore("perfiles", { keyPath: "clave" }).createIndex("ambito", "ambito");
         if (!db.objectStoreNames.contains("borradores")) db.createObjectStore("borradores", { keyPath: "clave" }).createIndex("ambito", "ambito");
         if (!db.objectStoreNames.contains("fotos")) db.createObjectStore("fotos", { keyPath: "clave" }).createIndex("borrador", "borrador");
+        for (const nombre of MEMORIA) {
+          if (!db.objectStoreNames.contains(nombre)) db.createObjectStore(nombre, { keyPath: "clave" }).createIndex("ambito", "ambito");
+        }
       };
       peticion.onsuccess = () => {
         const db = peticion.result;
@@ -200,6 +212,42 @@
     });
   }
 
+  // ------------------------------------------------------------------ memoria del inventario (etapa 23)
+  async function leerMemoria(ambito) {
+    return transaccion(MEMORIA, "readonly", async (tx) => {
+      const leer = async (nombre) => (await pedir(tx.objectStore(nombre).index("ambito").getAll(IDBKeyRange.only(ambito)))).map((f) => f.dato);
+      return { proveedores: await leer("proveedores"), asociaciones: await leer("asociaciones"), historial: await leer("historial") };
+    });
+  }
+  /* Escribe en UNA transacción (todo o nada). Las claves son deterministas (proveedor, huella, color, entrega):
+     repetir la misma escritura no duplica. quitar: ids de asociaciones que se olvidan.
+     fusionar(previo, nuevo): une el historial de la misma entrega. */
+  async function guardarMemoria(ambito, { proveedores = [], asociaciones = [], historial = [], quitar = [] }, { fusionar = (previo, nuevo) => nuevo } = {}) {
+    const copia = (x) => JSON.parse(JSON.stringify(x));
+    return transaccion(MEMORIA, "readwrite", async (tx) => {
+      const poner = (nombre, dato) => tx.objectStore(nombre).put({ clave: claveDe(ambito, dato.id), ambito, dato: copia(dato) });
+      for (const p of proveedores) poner("proveedores", p);
+      for (const id of quitar) tx.objectStore("asociaciones").delete(claveDe(ambito, id));
+      for (const a of asociaciones) {
+        const previa = await pedir(tx.objectStore("asociaciones").get(claveDe(ambito, a.id)));
+        poner("asociaciones", { ...a, creado: previa?.dato?.creado || a.creado });
+      }
+      const almacenH = tx.objectStore("historial");
+      for (const h of historial) {
+        const previo = await pedir(almacenH.get(claveDe(ambito, h.id)));
+        poner("historial", fusionar(previo?.dato || null, h));
+        // Se conservan los últimos de cada color: lo necesario para comparar, sin crecer sin fin.
+        const prefijo = `${claveDe(ambito, `${h.proveedor}|${h.variante}`)}|`;
+        const filas = await pedir(almacenH.getAll(IDBKeyRange.bound(prefijo, `${prefijo}\uffff`)));
+        if (filas.length > HISTORIAL_POR_COLOR) {
+          filas.sort((a, b) => String(b.dato.fecha || "").localeCompare(String(a.dato.fecha || "")) || String(b.dato.revisado?.cuando || "").localeCompare(String(a.dato.revisado?.cuando || "")));
+          for (const f of filas.slice(HISTORIAL_POR_COLOR)) almacenH.delete(f.clave);
+        }
+      }
+      return true;
+    });
+  }
+
   // Estimación del navegador (no es una cuota fija: cada navegador decide). null si no la da.
   async function estimar() {
     try {
@@ -327,6 +375,7 @@
     disponible, abrirBase, fallo: () => fallo,
     listarPerfiles, guardarPerfil, eliminarPerfil,
     listarBorradores, guardarBorrador, leerBorrador, reclamar, eliminarBorrador, existe, estimar,
+    leerMemoria, guardarMemoria,
     empaquetar, leerRespaldo, importar, escuchar, avisar, BYTES_PDF_MAX,
     ErrorCuota, ErrorConflicto, ErrorRespaldo, FORMATO, VERSION, UUID, esCuota
   });
